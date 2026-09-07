@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Rutina · Fitness Park</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
 <style>
   :root{
     --bg:#111316;
@@ -511,6 +511,12 @@
 
   .metric-empty{color:var(--muted); font-size:13px; text-align:center; padding:20px 0;}
 
+  .chart-wrap{
+    position:relative;
+    height:220px;
+    width:100%;
+  }
+
   details.info{
     margin:22px 0 6px;
     background:var(--card);
@@ -609,15 +615,15 @@
 
   <div class="metric-card">
     <div class="metric-title">Progresión de peso</div>
-    <div class="metric-sub">Elige un ejercicio para ver su evolución</div>
+    <div class="metric-sub" id="progressSub">Elige un ejercicio para ver su evolución</div>
     <select class="metric-select" id="exerciseSelect" onchange="renderProgressChart()"></select>
-    <canvas id="progressChart" height="180"></canvas>
+    <div class="chart-wrap"><canvas id="progressChart"></canvas></div>
   </div>
 
   <div class="metric-card">
     <div class="metric-title">Volumen semanal total</div>
-    <div class="metric-sub">Peso × reps × series sumado por semana — el mejor indicador de progreso para ganar músculo</div>
-    <canvas id="volumeChart" height="180"></canvas>
+    <div class="metric-sub" id="volumeSub">Peso × reps × series sumado por semana — el mejor indicador de progreso para ganar músculo</div>
+    <div class="chart-wrap"><canvas id="volumeChart"></canvas></div>
   </div>
 </div>
 
@@ -846,9 +852,21 @@ function renderProgressChart(){
   const labels = filtered.map(r => String(r['Fecha']).slice(5));
   const weights = filtered.map(r => Number(r['Peso (kg)']) || 0);
 
+  const subEl = document.getElementById('progressSub');
   const ctx = document.getElementById('progressChart');
-  if (progressChartInstance) progressChartInstance.destroy();
-  if (!window.Chart || labels.length === 0) return;
+  if (progressChartInstance) { progressChartInstance.destroy(); progressChartInstance = null; }
+
+  if (!window.Chart) {
+    subEl.textContent = '⚠️ No se pudo cargar la librería de gráficos (revisa tu conexión y recarga).';
+    return;
+  }
+  if (!exercise || labels.length === 0) {
+    subEl.textContent = rows.length === 0
+      ? 'Aún no hay registros para tu perfil.'
+      : 'No hay registros de "' + exercise + '" todavía.';
+    return;
+  }
+  subEl.textContent = 'Elige un ejercicio para ver su evolución';
 
   progressChartInstance = new Chart(ctx, {
     type: 'line',
@@ -866,6 +884,7 @@ function renderProgressChart(){
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } },
@@ -895,9 +914,19 @@ function renderVolumeChart(){
   const labels = weekKeys;
   const values = weekKeys.map(k => Math.round(volumeByWeek[k]));
 
+  const subEl = document.getElementById('volumeSub');
   const ctx = document.getElementById('volumeChart');
-  if (volumeChartInstance) volumeChartInstance.destroy();
-  if (!window.Chart || labels.length === 0) return;
+  if (volumeChartInstance) { volumeChartInstance.destroy(); volumeChartInstance = null; }
+
+  if (!window.Chart) {
+    subEl.textContent = '⚠️ No se pudo cargar la librería de gráficos (revisa tu conexión y recarga).';
+    return;
+  }
+  if (labels.length === 0) {
+    subEl.textContent = 'Aún no hay suficientes registros para calcular el volumen semanal.';
+    return;
+  }
+  subEl.textContent = 'Peso × reps × series sumado por semana — el mejor indicador de progreso para ganar músculo';
 
   volumeChartInstance = new Chart(ctx, {
     type: 'bar',
@@ -912,6 +941,7 @@ function renderVolumeChart(){
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { display: false } },
