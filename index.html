@@ -751,7 +751,7 @@ function cancelEditHist(){
 
 async function saveEditHist(id){
   const row = document.querySelector(`[data-hist-id="${id}"]`);
-  const peso = row.querySelector('.edit-peso').value;
+  const peso = row.querySelector('.edit-peso').value.replace(',', '.').trim();
   const reps = row.querySelector('.edit-reps').value;
   const series = row.querySelector('.edit-series').value;
   try {
@@ -805,7 +805,7 @@ function renderHistorial(){
       return `
         <div class="draft-item" data-hist-id="${id}">
           <div class="draft-edit-form">
-            <input class="edit-peso" type="number" inputmode="decimal" value="${r['Peso (kg)']}" placeholder="kg">
+            <input class="edit-peso" type="text" inputmode="decimal" value="${r['Peso (kg)']}" placeholder="kg">
             <input class="edit-reps" type="number" inputmode="numeric" value="${r['Reps']}" placeholder="reps">
             <input class="edit-series" type="number" inputmode="numeric" value="${r['Series']}" placeholder="series">
             <button class="draft-edit-save" onclick="saveEditHist('${id}')">OK</button>
@@ -1086,7 +1086,7 @@ function cancelEditDraft(){
 
 function saveEditDraft(id){
   const row = document.querySelector(`[data-draft-id="${id}"]`);
-  const peso = row.querySelector('.edit-peso').value;
+  const peso = row.querySelector('.edit-peso').value.replace(',', '.').trim();
   const reps = row.querySelector('.edit-reps').value;
   const series = row.querySelector('.edit-series').value;
   const entry = draftEntries.find(e => e.id === id);
@@ -1113,7 +1113,7 @@ function renderDraftList(){
       return `
         <div class="draft-item" data-draft-id="${e.id}">
           <div class="draft-edit-form">
-            <input class="edit-peso" type="number" inputmode="decimal" value="${e.peso}" placeholder="kg">
+            <input class="edit-peso" type="text" inputmode="decimal" value="${e.peso}" placeholder="kg">
             <input class="edit-reps" type="number" inputmode="numeric" value="${e.reps}" placeholder="reps">
             <input class="edit-series" type="number" inputmode="numeric" value="${e.series}" placeholder="series">
             <button class="draft-edit-save" onclick="saveEditDraft('${e.id}')">OK</button>
@@ -1161,7 +1161,7 @@ function persistPending(){
 
 function addPendingRow(logId){
   const box = document.getElementById(logId);
-  const peso = box.querySelector('.inp-peso').value;
+  const peso = box.querySelector('.inp-peso').value.replace(',', '.').trim();
   const reps = box.querySelector('.inp-reps').value;
   if (!peso || !reps) {
     showToast('Falta peso o reps');
@@ -1383,7 +1383,7 @@ function renderDay(){
           <div class="howto"><b>Cómo hacerlo:</b> ${ex.howTo}</div>
           <button class="log-toggle" onclick="toggleLog('${logId}')">📈 Registrar serie</button>
           <div class="log-form" id="${logId}">
-            <input class="inp-peso" type="number" inputmode="decimal" placeholder="Peso kg">
+            <input class="inp-peso" type="text" inputmode="decimal" placeholder="Peso kg">
             <input class="inp-reps" type="number" inputmode="numeric" placeholder="Reps">
             <button class="log-add" onclick="addPendingRow('${logId}')">+ Añadir</button>
           </div>
