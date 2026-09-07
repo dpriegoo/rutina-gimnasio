@@ -267,6 +267,64 @@
     transform:translateX(-50%) translateY(0);
   }
 
+  .draft-section{
+    margin:26px 16px 0;
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:14px;
+    padding:14px;
+  }
+  .draft-title{
+    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+    font-size:14.5px;
+    font-weight:600;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:8px;
+  }
+  .draft-badge{
+    background:var(--blue);
+    color:#fff;
+    border-radius:10px;
+    padding:1px 9px;
+    font-size:12px;
+    font-weight:600;
+  }
+  .draft-empty{color:var(--muted); font-size:13px; padding:6px 0;}
+  .draft-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding:9px 0;
+    border-bottom:1px solid var(--card-border);
+    font-size:13.5px;
+  }
+  .draft-item:last-child{border-bottom:none;}
+  .di-text{flex:1; min-width:0;}
+  .di-sub{color:var(--muted); font-size:12px; margin-top:1px;}
+  .draft-del{
+    flex:0 0 auto;
+    background:none;
+    border:none;
+    color:#e0656a;
+    font-size:17px;
+    padding:4px 6px;
+  }
+  .finish-btn{
+    width:100%;
+    margin-top:12px;
+    background:var(--green);
+    color:#0d1f16;
+    border:none;
+    border-radius:10px;
+    padding:13px;
+    font-weight:700;
+    font-size:14.5px;
+  }
+  .finish-btn:disabled{opacity:0.35;}
+
   details.info{
     margin:22px 0 6px;
     background:var(--card);
@@ -307,6 +365,15 @@
 <div class="qrtip"><b>Truco:</b> casi todas las máquinas Technogym llevan un código QR o NFC en el propio panel. Escanéalo con el móvil y se abre un vídeo corto del ejercicio en la app Technogym — útil si con la ficha aún tienes dudas.</div>
 
 <main id="main"></main>
+
+<div class="draft-section">
+  <div class="draft-title">
+    <span>Borrador de hoy</span>
+    <span class="draft-badge" id="draftCount">0</span>
+  </div>
+  <div id="draftList"></div>
+  <button class="finish-btn" id="finishBtn" onclick="finishDay()" disabled>✅ Terminar día y enviar</button>
+</div>
 
 <div style="padding:0 16px;">
 <details class="info">
@@ -362,13 +429,64 @@ function toggleLog(id){
   form.classList.toggle('open');
 }
 
-function saveLog(id, dia, grupo, ejercicio, defaultSeries){
-  const sheetUrl = getSheetUrl();
-  if (!sheetUrl) {
-    showToast('Configura tu Google Sheet primero (⚙️ arriba)');
-    configureSheet();
+// ---- Draft (borrador de hoy) ----
+let draftEntries = JSON.parse(localStorage.getItem('draftEntries') || '[]');
+
+function persistDraft(){
+  localStorage.setItem('draftEntries', JSON.stringify(draftEntries));
+}
+
+function addDraft(dia, grupo, ejercicio, peso, reps, series){
+  draftEntries.push({
+    id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+    fecha: new Date().toISOString().slice(0,10),
+    dia: dia, grupo: grupo, ejercicio: ejercicio,
+    peso: peso, reps: reps, series: series, nota: ''
+  });
+  persistDraft();
+  renderDraftList();
+}
+
+function removeDraft(id){
+  draftEntries = draftEntries.filter(e => e.id !== id);
+  persistDraft();
+  renderDraftList();
+}
+
+function renderDraftList(){
+  const listEl = document.getElementById('draftList');
+  const countEl = document.getElementById('draftCount');
+  const btn = document.getElementById('finishBtn');
+  countEl.textContent = draftEntries.length;
+  btn.disabled = draftEntries.length === 0;
+  if (draftEntries.length === 0){
+    listEl.innerHTML = '<div class="draft-empty">Todavía no has registrado ninguna serie hoy.</div>';
     return;
   }
+  listEl.innerHTML = draftEntries.map(e => `
+    <div class="draft-item">
+      <div class="di-text">${e.ejercicio}<div class="di-sub">${e.peso} kg · ${e.reps} reps · ${e.series} series</div></div>
+      <button class="draft-del" onclick="removeDraft('${e.id}')">✕</button>
+    </div>
+  `).join('');
+}
+
+function finishDay(){
+  if (draftEntries.length === 0) { showToast('No hay series en el borrador'); return; }
+  const sheetUrl = getSheetUrl();
+  const count = draftEntries.length;
+  fetch(sheetUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ entries: draftEntries })
+  }).then(() => {}).catch(() => {});
+  showToast('Día enviado ✓ (' + count + ' series)');
+  draftEntries = [];
+  persistDraft();
+  renderDraftList();
+}
+
+function saveLog(id, dia, grupo, ejercicio, defaultSeries){
   const box = document.getElementById(id);
   const peso = box.querySelector('.inp-peso').value;
   const reps = box.querySelector('.inp-reps').value;
@@ -377,25 +495,8 @@ function saveLog(id, dia, grupo, ejercicio, defaultSeries){
     showToast('Falta peso o reps');
     return;
   }
-  const payload = {
-    fecha: new Date().toISOString().slice(0,10),
-    dia: dia,
-    grupo: grupo,
-    ejercicio: ejercicio,
-    peso: peso,
-    reps: reps,
-    series: series,
-    nota: ''
-  };
-  fetch(sheetUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify(payload)
-  }).then(() => {
-    showToast('Guardado ✓ ' + ejercicio);
-  }).catch(() => {
-    showToast('Guardado ✓ ' + ejercicio);
-  });
+  addDraft(dia, grupo, ejercicio, peso, reps, series);
+  showToast('Añadido al borrador ✓');
   box.querySelector('.inp-peso').value = '';
   box.querySelector('.inp-reps').value = '';
   box.classList.remove('open');
@@ -584,6 +685,7 @@ function renderDay(){
 
 renderTabs();
 renderDay();
+renderDraftList();
 </script>
 
 </body>
