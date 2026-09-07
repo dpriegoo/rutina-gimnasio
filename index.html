@@ -321,6 +321,12 @@
 
 <script>
 // ---- Google Sheet config ----
+const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwgIxhB_Pym24bLJETzkQ5wEiE7lgeN_jb-yTj4FntarGEwns7gy3JxhFLbOPk31D_V/exec';
+
+function getSheetUrl(){
+  return localStorage.getItem('sheetUrl') || DEFAULT_SHEET_URL;
+}
+
 function configureSheet(){
   const current = localStorage.getItem('sheetUrl') || '';
   const url = prompt('Pega aquí la URL de tu Web App de Apps Script (termina en /exec):', current);
@@ -357,7 +363,7 @@ function toggleLog(id){
 }
 
 function saveLog(id, dia, grupo, ejercicio, defaultSeries){
-  const sheetUrl = localStorage.getItem('sheetUrl');
+  const sheetUrl = getSheetUrl();
   if (!sheetUrl) {
     showToast('Configura tu Google Sheet primero (⚙️ arriba)');
     configureSheet();
