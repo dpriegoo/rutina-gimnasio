@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Rutina · Fitness Park</title>
+<style>
+  :root{
+    --bg:#111316;
+    --card:#1b1e23;
+    --card-border:#2a2e35;
+    --text:#f2f3f5;
+    --muted:#9aa1ab;
+    --blue:#3f7cf0;
+    --blue-dim:#274a94;
+    --amber:#f2a93b;
+    --green:#4caf7d;
+    --icon-bg:#20242b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,'SF Pro Text',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:40px;
+  }
+  h1,h2,.dayname,.exname{font-family:-apple-system,'SF Pro Display',system-ui,sans-serif; letter-spacing:0.2px;}
+
+  header{
+    padding:20px 16px 14px;
+    border-bottom:1px solid var(--card-border);
+    position:sticky;
+    top:0;
+    background:var(--bg);
+    z-index:20;
+  }
+  header{position:sticky;}
+  header{padding-right:60px;}
+  header{box-sizing:border-box;}
+  header h1{
+    margin:0 0 2px;
+    font-size:22px;
+    font-weight:600;
+    letter-spacing:0.3px;
+  }
+  header p{
+    margin:0;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  .daytabs{
+    display:flex;
+    gap:8px;
+    overflow-x:auto;
+    padding:14px 16px 4px;
+    -webkit-overflow-scrolling:touch;
+  }
+  .daytabs::-webkit-scrollbar{display:none;}
+  .daytab{
+    flex:0 0 auto;
+    padding:8px 14px;
+    border-radius:20px;
+    border:1px solid var(--card-border);
+    background:transparent;
+    color:var(--muted);
+    font-size:13px;
+    font-weight:500;
+    white-space:nowrap;
+  }
+  .daytab.active{
+    background:rgba(63,124,240,0.15);
+    border-color:var(--blue);
+    color:#fff;
+  }
+
+  main{padding:6px 16px 0;}
+
+  .qrtip{
+    margin:14px 16px 0;
+    background:rgba(63,124,240,0.10);
+    border:1px solid var(--blue-dim);
+    border-radius:12px;
+    padding:10px 12px;
+    font-size:12.5px;
+    color:#cfe0ff;
+    line-height:1.4;
+  }
+  .qrtip b{color:#fff;}
+
+  .group{margin-top:22px;}
+  .group-label{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color:var(--muted);
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    margin-bottom:10px;
+  }
+  .group-label .dot{
+    width:6px;height:6px;border-radius:50%;
+    background:var(--blue);
+    flex:0 0 auto;
+  }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:10px;
+    display:flex;
+    gap:12px;
+  }
+  .icon-box{
+    flex:0 0 auto;
+    width:56px;
+    height:56px;
+    border-radius:12px;
+    background:var(--icon-bg);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .icon-box svg{width:34px;height:34px;stroke:#cfd6e0;fill:none;}
+
+  .card-body{flex:1; min-width:0;}
+  .card-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+  }
+  .exname{
+    font-size:15.5px;
+    font-weight:600;
+    line-height:1.25;
+  }
+  .sets{
+    flex:0 0 auto;
+    background:var(--blue-dim);
+    color:#cfe0ff;
+    font-family:-apple-system,'SF Pro Text',system-ui,sans-serif;
+    font-size:11.5px;
+    font-weight:600;
+    padding:3px 7px;
+    border-radius:8px;
+    white-space:nowrap;
+  }
+
+  .machine{margin-top:8px;}
+  .machine-row{
+    display:flex;
+    gap:8px;
+    align-items:flex-start;
+    font-size:13.5px;
+    margin-bottom:4px;
+  }
+  .machine-row .tag{
+    flex:0 0 auto;
+    font-size:10.5px;
+    font-weight:600;
+    padding:2px 7px;
+    border-radius:6px;
+    margin-top:1px;
+  }
+  .tag.primary{background:rgba(76,175,125,0.18); color:var(--green);}
+  .tag.alt{background:rgba(242,169,59,0.16); color:var(--amber);}
+  .machine-row span.txt{color:var(--text);}
+  .alt-list{color:var(--muted); font-size:13px; margin-top:2px; margin-left:2px;}
+
+  .howto{
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px dashed var(--card-border);
+    font-size:13px;
+    color:var(--muted);
+    line-height:1.42;
+  }
+  .howto b{color:var(--text); font-weight:600;}
+
+  .header-actions{
+    position:absolute;
+    top:20px;
+    right:16px;
+    display:flex;
+    gap:8px;
+  }
+  .icon-btn{
+    width:34px;
+    height:34px;
+    border-radius:10px;
+    border:1px solid var(--card-border);
+    background:var(--card);
+    color:var(--muted);
+    font-size:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .log-toggle{
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px dashed var(--card-border);
+    background:none;
+    border-left:none; border-right:none; border-bottom:none;
+    color:var(--blue);
+    font-size:13px;
+    font-weight:600;
+    padding-left:0;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .log-form{
+    display:none;
+    margin-top:10px;
+    gap:8px;
+  }
+  .log-form.open{display:flex;}
+  .log-form input{
+    flex:1;
+    min-width:0;
+    background:var(--icon-bg);
+    border:1px solid var(--card-border);
+    border-radius:8px;
+    color:var(--text);
+    padding:8px 6px;
+    font-size:13.5px;
+    text-align:center;
+  }
+  .log-form input::placeholder{color:var(--muted); font-size:11px;}
+  .log-save{
+    flex:0 0 auto;
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    padding:0 14px;
+    font-size:13px;
+    font-weight:600;
+  }
+
+  .toast{
+    position:fixed;
+    left:50%;
+    bottom:24px;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--card);
+    border:1px solid var(--green);
+    color:var(--text);
+    padding:10px 18px;
+    border-radius:20px;
+    font-size:13px;
+    opacity:0;
+    transition:opacity 0.25s, transform 0.25s;
+    z-index:50;
+    pointer-events:none;
+  }
+  .toast.show{
+    opacity:1;
+    transform:translateX(-50%) translateY(0);
+  }
+
+  details.info{
+    margin:22px 0 6px;
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:14px;
+    padding:12px 14px;
+  }
+  details.info summary{
+    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+    list-style:none;
+  }
+  details.info summary::-webkit-details-marker{display:none;}
+  details.info p{
+    color:var(--muted);
+    font-size:13.5px;
+    line-height:1.5;
+    margin:10px 0 0;
+  }
+  details.info b{color:var(--text);}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Rutina de fuerza</h1>
+  <p>5 días · máquinas Technogym — Fitness Park</p>
+  <div class="header-actions">
+    <button class="icon-btn" onclick="openSheet()" title="Abrir hoja de progreso">📊</button>
+    <button class="icon-btn" onclick="configureSheet()" title="Configurar Google Sheet">⚙️</button>
+  </div>
+</header>
+
+<div class="daytabs" id="daytabs"></div>
+
+<div class="qrtip"><b>Truco:</b> casi todas las máquinas Technogym llevan un código QR o NFC en el propio panel. Escanéalo con el móvil y se abre un vídeo corto del ejercicio en la app Technogym — útil si con la ficha aún tienes dudas.</div>
+
+<main id="main"></main>
+
+<div style="padding:0 16px;">
+<details class="info">
+  <summary>RIR y descanso — recordatorio rápido</summary>
+  <p><b>RIR 3–2:</b> trabaja con un peso que te deje 2–3 repeticiones en reserva antes del fallo muscular en cada serie.</p>
+  <p><b>Descanso:</b> lo ideal es no encadenar más de 3 días seguidos de entreno. Si entrenas los 5 días seguidos, descansa el fin de semana completo.</p>
+  <p><b>Progresión:</b> empieza cada ejercicio por el rango de repeticiones más bajo indicado; cuando te recuperes bien, añade una serie antes de subir al rango más alto.</p>
+</details>
+</div>
+
+<div class="toast" id="toast">Guardado ✓</div>
+
+<script>
+// ---- Google Sheet config ----
+function configureSheet(){
+  const current = localStorage.getItem('sheetUrl') || '';
+  const url = prompt('Pega aquí la URL de tu Web App de Apps Script (termina en /exec):', current);
+  if (url !== null && url.trim() !== '') {
+    localStorage.setItem('sheetUrl', url.trim());
+    const viewUrl = prompt('Opcional: pega el enlace normal de tu Google Sheet (para abrirla y ver el histórico):', localStorage.getItem('sheetViewUrl') || '');
+    if (viewUrl !== null && viewUrl.trim() !== '') {
+      localStorage.setItem('sheetViewUrl', viewUrl.trim());
+    }
+    showToast('Configuración guardada ✓');
+  }
+}
+
+function openSheet(){
+  const viewUrl = localStorage.getItem('sheetViewUrl');
+  if (viewUrl) {
+    window.open(viewUrl, '_blank');
+  } else {
+    configureSheet();
+  }
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function toggleLog(id){
+  const form = document.getElementById(id);
+  form.classList.toggle('open');
+}
+
+function saveLog(id, dia, grupo, ejercicio, defaultSeries){
+  const sheetUrl = localStorage.getItem('sheetUrl');
+  if (!sheetUrl) {
+    showToast('Configura tu Google Sheet primero (⚙️ arriba)');
+    configureSheet();
+    return;
+  }
+  const box = document.getElementById(id);
+  const peso = box.querySelector('.inp-peso').value;
+  const reps = box.querySelector('.inp-reps').value;
+  const series = box.querySelector('.inp-series').value || defaultSeries;
+  if (!peso || !reps) {
+    showToast('Falta peso o reps');
+    return;
+  }
+  const payload = {
+    fecha: new Date().toISOString().slice(0,10),
+    dia: dia,
+    grupo: grupo,
+    ejercicio: ejercicio,
+    peso: peso,
+    reps: reps,
+    series: series,
+    nota: ''
+  };
+  fetch(sheetUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(payload)
+  }).then(() => {
+    showToast('Guardado ✓ ' + ejercicio);
+  }).catch(() => {
+    showToast('Guardado ✓ ' + ejercicio);
+  });
+  box.querySelector('.inp-peso').value = '';
+  box.querySelector('.inp-reps').value = '';
+  box.classList.remove('open');
+}
+
+// ---- Schematic icons (simple pictograms, not photos) ----
+const ICONS = {
+  barbellBench: `<svg viewBox="0 0 40 40"><rect x="10" y="24" width="20" height="5" rx="1"/><line x1="4" y1="14" x2="36" y2="14"/><rect x="4" y="11" width="6" height="6" rx="1"/><rect x="30" y="11" width="6" height="6" rx="1"/><line x1="12" y1="29" x2="12" y2="34"/><line x1="28" y1="29" x2="28" y2="34"/></svg>`,
+  inclineDumbbell: `<svg viewBox="0 0 40 40"><rect x="12" y="14" width="6" height="20" rx="1" transform="rotate(-25 15 24)"/><circle cx="10" cy="12" r="3"/><circle cx="26" cy="12" r="3"/><line x1="7" y1="12" x2="13" y2="12"/><line x1="23" y1="12" x2="29" y2="12"/></svg>`,
+  pecDeck: `<svg viewBox="0 0 40 40"><rect x="16" y="10" width="8" height="20" rx="2"/><path d="M16 16 C8 14 4 20 8 24" /><path d="M24 16 C32 14 36 20 32 24" /><circle cx="20" cy="34" r="2"/></svg>`,
+  reversePecDeck: `<svg viewBox="0 0 40 40"><rect x="16" y="10" width="8" height="20" rx="2"/><path d="M8 14 C4 20 8 24 16 22" /><path d="M32 14 C36 20 32 24 24 22" /><circle cx="20" cy="34" r="2"/></svg>`,
+  cableHigh: `<svg viewBox="0 0 40 40"><line x1="8" y1="4" x2="8" y2="36"/><line x1="32" y1="4" x2="32" y2="36"/><circle cx="8" cy="8" r="2.5"/><circle cx="32" cy="8" r="2.5"/><line x1="8" y1="10" x2="20" y2="24"/><line x1="14" y1="26" x2="26" y2="26"/></svg>`,
+  cableLow: `<svg viewBox="0 0 40 40"><line x1="8" y1="4" x2="8" y2="36"/><line x1="32" y1="4" x2="32" y2="36"/><circle cx="8" cy="32" r="2.5"/><circle cx="32" cy="32" r="2.5"/><line x1="8" y1="30" x2="20" y2="18"/><line x1="14" y1="16" x2="26" y2="16"/></svg>`,
+  latPulldown: `<svg viewBox="0 0 40 40"><line x1="20" y1="4" x2="20" y2="14"/><circle cx="20" cy="4" r="2.5"/><line x1="10" y1="14" x2="30" y2="14"/><rect x="16" y="20" width="8" height="10" rx="2"/><line x1="14" y1="32" x2="26" y2="32"/><line x1="16" y1="34" x2="16" y2="30"/><line x1="24" y1="34" x2="24" y2="30"/></svg>`,
+  seatedRow: `<svg viewBox="0 0 40 40"><rect x="17" y="10" width="6" height="6" rx="1"/><rect x="16" y="18" width="8" height="10" rx="2"/><line x1="24" y1="22" x2="34" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/><circle cx="6" cy="22" r="2.5"/></svg>`,
+  barbellRow: `<svg viewBox="0 0 40 40"><line x1="6" y1="26" x2="30" y2="10"/><rect x="4" y="24" width="6" height="6" rx="1" transform="rotate(-30 7 27)"/><circle cx="30" cy="10" r="2.5"/><line x1="27" y1="10" x2="34" y2="10"/></svg>`,
+  preacherCurl: `<svg viewBox="0 0 40 40"><rect x="10" y="16" width="8" height="18" rx="2" transform="rotate(20 14 25)"/><line x1="18" y1="12" x2="30" y2="12"/><circle cx="16" cy="12" r="2.5"/><circle cx="30" cy="12" r="2.5"/></svg>`,
+  squatRack: `<svg viewBox="0 0 40 40"><line x1="8" y1="6" x2="8" y2="34"/><line x1="32" y1="6" x2="32" y2="34"/><line x1="4" y1="18" x2="36" y2="18"/><rect x="2" y="15" width="6" height="6" rx="1"/><rect x="32" y="15" width="6" height="6" rx="1"/></svg>`,
+  legPress: `<svg viewBox="0 0 40 40"><rect x="6" y="24" width="20" height="6" rx="1" transform="rotate(-18 16 27)"/><rect x="24" y="10" width="10" height="16" rx="2" transform="rotate(-18 29 18)"/></svg>`,
+  legExtension: `<svg viewBox="0 0 40 40"><rect x="14" y="10" width="8" height="14" rx="2"/><line x1="18" y1="24" x2="18" y2="30"/><line x1="8" y1="30" x2="28" y2="30"/><rect x="22" y="26" width="10" height="4" rx="1"/></svg>`,
+  legCurl: `<svg viewBox="0 0 40 40"><rect x="14" y="10" width="8" height="14" rx="2"/><line x1="18" y1="24" x2="18" y2="30"/><rect x="22" y="16" width="10" height="4" rx="1"/><line x1="8" y1="30" x2="28" y2="30"/></svg>`,
+  shoulderPress: `<svg viewBox="0 0 40 40"><rect x="16" y="16" width="8" height="12" rx="2"/><line x1="12" y1="10" x2="18" y2="16"/><line x1="28" y1="10" x2="22" y2="16"/><circle cx="12" cy="8" r="2.2"/><circle cx="28" cy="8" r="2.2"/><line x1="14" y1="30" x2="26" y2="30"/></svg>`,
+  abBench: `<svg viewBox="0 0 40 40"><rect x="8" y="18" width="20" height="5" rx="1" transform="rotate(-15 18 20)"/><circle cx="30" cy="12" r="2.5"/><line x1="28" y1="14" x2="24" y2="20"/></svg>`,
+  dumbbells: `<svg viewBox="0 0 40 40"><line x1="10" y1="20" x2="30" y2="20"/><rect x="6" y="15" width="7" height="10" rx="2"/><rect x="27" y="15" width="7" height="10" rx="2"/></svg>`,
+  floorMat: `<svg viewBox="0 0 40 40"><rect x="6" y="12" width="28" height="16" rx="2" stroke-dasharray="3 2"/><line x1="6" y1="20" x2="34" y2="20" stroke-dasharray="1 3"/></svg>`,
+  lunge: `<svg viewBox="0 0 40 40"><rect x="6" y="15" width="7" height="10" rx="2"/><rect x="27" y="15" width="7" height="10" rx="2"/><line x1="10" y1="25" x2="10" y2="32"/><line x1="30" y1="25" x2="24" y2="32"/></svg>`,
+  pullover: `<svg viewBox="0 0 40 40"><line x1="20" y1="4" x2="20" y2="16"/><circle cx="20" cy="4" r="2.5"/><rect x="10" y="20" width="20" height="6" rx="1"/><line x1="20" y1="16" x2="20" y2="20"/></svg>`,
+};
+
+const DAYS = [
+  {
+    name: "Día 1 · Pectoral, deltoides y tríceps",
+    groups: [
+      { label: "Pectoral", exercises: [
+        { name:"Press banca plano", sets:"3 · 6-8", icon:"barbellBench", primary:"Barra libre en banco plano (zona de peso libre)", alts:["Chest Press (Technogym)","Mancuernas en banco plano"], howTo:"Ajusta las manos algo más anchas que los hombros. Baja la barra controlada hasta rozar el pecho y empuja hacia arriba sin bloquear los codos del todo." },
+        { name:"Press superior con mancuernas", sets:"3 · 8-10", icon:"inclineDumbbell", primary:"Banco inclinado (30–45°) + mancuernas", alts:["Chest Press en el punto más alto del ajuste","Press inclinado en Multipower (Smith)"], howTo:"Mancuernas a la altura de los hombros, codos a 90°. Empuja hacia arriba juntando las mancuernas casi sin chocarlas, y baja controlando." },
+        { name:"Aperturas en máquina", sets:"3 · 10-12", icon:"pecDeck", primary:"Pectoral / Pec Fly (Technogym)", alts:["Crossover Cables (cruce de poleas)","Aperturas con mancuernas en banco plano"], howTo:"Codos ligeramente flexionados apoyados en las almohadillas. Junta los brazos hacia el centro del pecho en un arco amplio, sin usar impulso." },
+      ]},
+      { label: "Deltoides", exercises: [
+        { name:"Elevaciones laterales sentado", sets:"3 · 12-14", icon:"dumbbells", primary:"Mancuernas + banco con respaldo", alts:["Delts Machine (Technogym)","Pulley bajo, un brazo a la vez"], howTo:"Brazos casi rectos con leve flexión de codo. Sube lateralmente hasta la altura de los hombros liderando con los codos, no con las manos." },
+        { name:"Posterior en máquina", sets:"3 · 14-16", icon:"reversePecDeck", primary:"Reverse Fly / Dual Pectoral-Reverse Fly (Technogym)", alts:["Pulley alto con cuerda (face pull)","Aperturas invertidas con mancuernas en banco inclinado"], howTo:"Pecho apoyado en el respaldo, agarra las asas y abre los brazos hacia atrás llevando los omóplatos hacia el centro." },
+      ]},
+      { label: "Tríceps", exercises: [
+        { name:"Extensión de tríceps en polea", sets:"3 · 8-10", icon:"cableHigh", primary:"Pulley alto con barra recta (Technogym)", alts:["Arm Extension (máquina de tríceps sentado)","Easy Chin/Dip (fondos asistidos)"], howTo:"De pie, codos pegados al cuerpo y fijos. Empuja la barra hacia abajo hasta extender el brazo del todo, y sube controlando sin abrir los codos." },
+        { name:"Ext. tríceps con cuerda overhead", sets:"3 · 10-12", icon:"cableHigh", primary:"Pulley con cuerda, de espaldas a la torre", alts:["Extensión a una mano con mancuerna","Arm Extension (máquina de tríceps)"], howTo:"Sujeta la cuerda por detrás de la cabeza con los codos altos y fijos junto a las orejas. Extiende los brazos hacia arriba/adelante y vuelve controlando." },
+      ]},
+    ]
+  },
+  {
+    name: "Día 2 · Dorsales, bíceps y core",
+    groups: [
+      { label: "Dorsales", exercises: [
+        { name:"Jalón al pecho agarre neutro", sets:"3 · 6-8", icon:"latPulldown", primary:"Lat Machine, agarre neutro (Technogym)", alts:["Vertical Traction","Lat Machine con agarre supino"], howTo:"Siéntate con los muslos fijos bajo el apoyo. Tira de la barra hacia la parte alta del pecho sacando pecho, sin balancear el torso hacia atrás." },
+        { name:"Remo en máquina", sets:"3 · 8-10", icon:"seatedRow", primary:"Low Row (Technogym)", alts:["Pulley bajo con barra o triángulo","Remo con mancuerna a una mano apoyado en banco"], howTo:"Pecho apoyado en el respaldo. Tira de las asas hacia el abdomen juntando los omóplatos, sin encoger los hombros." },
+        { name:"Remo en polea baja agarre V", sets:"3 · 10-12", icon:"cableLow", primary:"Pulley bajo, agarre en V (Technogym)", alts:["Low Row","Remo con barra libre"], howTo:"Espalda recta, rodillas semi-flexionadas. Tira del agarre hacia el abdomen manteniendo los codos pegados al cuerpo." },
+      ]},
+      { label: "Bíceps", exercises: [
+        { name:"Curl de bíceps con barra", sets:"3 · 8-10", icon:"dumbbells", primary:"Barra recta o Z (zona de peso libre)", alts:["Curl con mancuernas","Pulley bajo con barra recta"], howTo:"Codos fijos junto al cuerpo. Sube la barra flexionando solo el antebrazo, sin balancear la espalda para ayudarte." },
+        { name:"Curl martillo con cuerda", sets:"3 · 10-12", icon:"cableLow", primary:"Pulley bajo con cuerda (Technogym)", alts:["Curl martillo con mancuernas","Curl en polea con agarre invertido"], howTo:"Agarre neutro (pulgares hacia arriba). Flexiona el codo manteniendo la muñeca fija, sin mover el hombro." },
+      ]},
+      { label: "Core", exercises: [
+        { name:"Elevación de piernas tumbado", sets:"3 · 10-12", icon:"floorMat", primary:"Tumbado en banco o suelo (zona de esterillas)", alts:["Barra de dominadas con soporte lumbar (elevación colgado)","Rueda abdominal"], howTo:"Tumbado boca arriba, lumbares pegadas al suelo. Eleva las piernas rectas o semi-flexionadas hasta 90° y baja controlando sin arquear la espalda." },
+        { name:"Planchas abdominales", sets:"3 · 30 seg", icon:"floorMat", primary:"Suelo, zona de esterillas", alts:["Plancha con disco sobre la espalda","Mountain climbers"], howTo:"Apoyo en antebrazos y puntas de los pies, cuerpo en línea recta de cabeza a talones, abdomen contraído sin hundir la cadera." },
+      ]},
+    ]
+  },
+  {
+    name: "Día 3 · Piernas y hombros",
+    groups: [
+      { label: "Piernas", exercises: [
+        { name:"Sentadillas", sets:"3 · 6-8", icon:"squatRack", primary:"Barra libre en rack de sentadillas", alts:["Multipower (Smith) de Technogym","Leg Press"], howTo:"Barra sobre los trapecios, pies a la anchura de hombros. Baja llevando la cadera hacia atrás y abajo hasta unos 90°, y sube empujando con los talones." },
+        { name:"Peso muerto rumano", sets:"3 · 8-10", icon:"barbellRow", primary:"Barra libre (zona de peso libre)", alts:["Peso muerto rumano con mancuernas","Leg Curl (femoral de pie o tumbado)"], howTo:"Barra pegada a las piernas, rodillas semi-flexionadas fijas. Baja empujando la cadera hacia atrás hasta notar el estiramiento en el femoral, y sube apretando glúteo." },
+        { name:"Ext. de cuádriceps", sets:"3 · 10-12", icon:"legExtension", primary:"Leg Extension (Technogym)", alts:["Zancadas con mancuernas","Leg Press con pies altos y adelantados"], howTo:"Espalda apoyada en el respaldo, tobillos bajo el rodillo. Extiende las piernas hasta casi bloquear la rodilla y baja controlando." },
+        { name:"Femoral sentado o tumbado", sets:"3 · 12-14", icon:"legCurl", primary:"Leg Curl (Technogym)", alts:["Peso muerto rumano con mancuernas","Pulley bajo con tobillera"], howTo:"Rodillo apoyado tras los tobillos. Flexiona la rodilla llevando el talón hacia el glúteo, y vuelve controlando sin soltar de golpe." },
+      ]},
+      { label: "Hombros", exercises: [
+        { name:"Press de hombros en máquina", sets:"3 · 8-10", icon:"shoulderPress", primary:"Shoulder Press (Technogym)", alts:["Press militar con mancuernas","Press militar con barra"], howTo:"Agarra las asas a la altura de los hombros. Empuja hacia arriba sin bloquear los codos del todo, y baja controlando." },
+        { name:"Elevaciones laterales sentado", sets:"3 · 12-14", icon:"dumbbells", primary:"Mancuernas + banco con respaldo", alts:["Delts Machine (Technogym)","Pulley bajo, un brazo a la vez"], howTo:"Brazos casi rectos con leve flexión de codo. Sube lateralmente hasta la altura de los hombros liderando con los codos." },
+        { name:"Posterior en máquina", sets:"3 · 14-16", icon:"reversePecDeck", primary:"Reverse Fly / Dual Pectoral-Reverse Fly (Technogym)", alts:["Pulley alto con cuerda (face pull)","Aperturas invertidas con mancuernas"], howTo:"Pecho apoyado en el respaldo. Abre los brazos hacia atrás llevando los omóplatos hacia el centro." },
+      ]},
+    ]
+  },
+  {
+    name: "Día 4 · Pectoral y dorsales",
+    groups: [
+      { label: "Pectoral", exercises: [
+        { name:"Press banca plano", sets:"3 · 6-8", icon:"barbellBench", primary:"Barra libre en banco plano", alts:["Chest Press (Technogym)","Mancuernas en banco plano"], howTo:"Manos algo más anchas que los hombros. Baja la barra controlada hasta rozar el pecho y empuja hacia arriba." },
+        { name:"Press superior mancuernas", sets:"3 · 10-12", icon:"inclineDumbbell", primary:"Banco inclinado + mancuernas", alts:["Chest Press en ajuste alto","Press inclinado en Multipower"], howTo:"Mancuernas a la altura de los hombros, codos a 90°. Empuja hacia arriba juntando las mancuernas y baja controlando." },
+        { name:"Aperturas en máquina", sets:"3 · 10-12", icon:"pecDeck", primary:"Pectoral / Pec Fly (Technogym)", alts:["Crossover Cables","Aperturas con mancuernas en banco plano"], howTo:"Codos apoyados en las almohadillas con leve flexión. Junta los brazos en un arco amplio sin impulso." },
+      ]},
+      { label: "Dorsales", exercises: [
+        { name:"Remo con barra o máquina", sets:"3 · 8-10", icon:"barbellRow", primary:"Barra libre, remo inclinado", alts:["Low Row (Technogym)","Pulley bajo con barra"], howTo:"Torso inclinado unos 45°, espalda recta. Tira de la barra hacia el abdomen apretando los omóplatos, sin usar impulso de piernas." },
+        { name:"Jalón al pecho agarre supino", sets:"3 · 8-10", icon:"latPulldown", primary:"Lat Machine, agarre supino (Technogym)", alts:["Lat Machine agarre neutro","Vertical Traction"], howTo:"Agarre estrecho con palmas hacia ti. Tira hacia la parte alta del pecho llevando los codos hacia abajo y atrás." },
+        { name:"Pullover serrato polea alta", sets:"3 · 14-16", icon:"pullover", primary:"Pulley alto con barra recta (Technogym)", alts:["Pullover con mancuerna en banco plano","Pulley alto con cuerda"], howTo:"De pie o de rodillas, brazos casi rectos. Baja la barra en arco desde arriba hasta los muslos sin flexionar los codos, sintiendo el dorsal." },
+      ]},
+    ]
+  },
+  {
+    name: "Día 5 · Piernas, brazos y core",
+    groups: [
+      { label: "Piernas", exercises: [
+        { name:"Prensa", sets:"3 · 6-8", icon:"legPress", primary:"Leg Press (Technogym)", alts:["Multipower (Smith) para sentadilla","Sentadilla libre"], howTo:"Pies a la anchura de hombros en la plataforma. Baja hasta unos 90° de rodilla y empuja sin bloquear la rodilla del todo." },
+        { name:"Zancadas con mancuernas", sets:"3 · 8-10", icon:"lunge", primary:"Mancuernas, zona de peso libre", alts:["Sentadilla búlgara","Leg Press a una pierna"], howTo:"Un paso largo hacia adelante, baja la rodilla trasera casi al suelo manteniendo el torso recto. Empuja con el talón delantero para volver." },
+        { name:"Femoral sentado o tumbado", sets:"3 · 10-12", icon:"legCurl", primary:"Leg Curl (Technogym)", alts:["Peso muerto rumano con mancuernas","Pulley bajo con tobillera"], howTo:"Rodillo apoyado tras los tobillos. Flexiona la rodilla llevando el talón hacia el glúteo y vuelve controlando." },
+      ]},
+      { label: "Brazos", exercises: [
+        { name:"Curl predicador bíceps", sets:"3 · 12-14", icon:"preacherCurl", primary:"Scott Bench + barra Z (Technogym)", alts:["Curl predicador en máquina","Pulley bajo con barra"], howTo:"Brazos apoyados en el banco inclinado, axilas pegadas al soporte. Sube la barra flexionando el codo sin despegar el tríceps del apoyo." },
+        { name:"Extensión de tríceps en polea", sets:"3 · 8-10", icon:"cableHigh", primary:"Pulley alto con barra recta (Technogym)", alts:["Arm Extension (máquina de tríceps)","Easy Chin/Dip (fondos asistidos)"], howTo:"Codos pegados al cuerpo y fijos. Empuja la barra hacia abajo hasta extender el brazo, y sube controlando." },
+      ]},
+      { label: "Core", exercises: [
+        { name:"Crunch abdominal", sets:"3 · 14-16", icon:"abBench", primary:"Abdominal Crunch (Technogym)", alts:["Total Abdominal (Technogym)","Rueda abdominal"], howTo:"Espalda apoyada, agarra las asas. Contrae el abdomen llevando el pecho hacia la pelvis, sin tirar del cuello con los brazos." },
+        { name:"Planchas abdominales", sets:"3 · 30 seg", icon:"floorMat", primary:"Suelo, zona de esterillas", alts:["Plancha con disco sobre la espalda","Mountain climbers"], howTo:"Apoyo en antebrazos y puntas de los pies, cuerpo en línea recta, abdomen contraído sin hundir la cadera." },
+      ]},
+    ]
+  },
+];
+
+let currentDay = 0;
+
+function renderTabs(){
+  const wrap = document.getElementById('daytabs');
+  wrap.innerHTML = '';
+  DAYS.forEach((d, i) => {
+    const b = document.createElement('button');
+    b.className = 'daytab' + (i===currentDay ? ' active' : '');
+    b.textContent = d.name.split('·')[0].trim();
+    b.onclick = () => { currentDay = i; renderTabs(); renderDay(); };
+    wrap.appendChild(b);
+  });
+}
+
+function renderDay(){
+  const day = DAYS[currentDay];
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+
+  const title = document.createElement('h2');
+  title.className = 'dayname';
+  title.style.fontSize = '17px';
+  title.style.margin = '4px 0 0';
+  title.textContent = day.name;
+  main.appendChild(title);
+
+  day.groups.forEach(g => {
+    const groupEl = document.createElement('div');
+    groupEl.className = 'group';
+
+    const label = document.createElement('div');
+    label.className = 'group-label';
+    label.innerHTML = '<span class="dot"></span>' + g.label;
+    groupEl.appendChild(label);
+
+    g.exercises.forEach((ex, exIdx) => {
+      const logId = 'log-' + currentDay + '-' + g.label.replace(/\s/g,'') + '-' + exIdx;
+      const defaultSeries = (ex.sets.split('·')[0] || '3').trim();
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="icon-box">${ICONS[ex.icon] || ''}</div>
+        <div class="card-body">
+          <div class="card-top">
+            <div class="exname">${ex.name}</div>
+            <div class="sets">${ex.sets}</div>
+          </div>
+          <div class="machine">
+            <div class="machine-row"><span class="tag primary">USA</span><span class="txt">${ex.primary}</span></div>
+            <div class="machine-row"><span class="tag alt">SI OCUPADA</span></div>
+            <div class="alt-list">${ex.alts.join(' &nbsp;·&nbsp; ')}</div>
+          </div>
+          <div class="howto"><b>Cómo hacerlo:</b> ${ex.howTo}</div>
+          <button class="log-toggle" onclick="toggleLog('${logId}')">📈 Registrar serie</button>
+          <div class="log-form" id="${logId}">
+            <input class="inp-peso" type="number" inputmode="decimal" placeholder="Peso kg">
+            <input class="inp-reps" type="number" inputmode="numeric" placeholder="Reps">
+            <input class="inp-series" type="number" inputmode="numeric" placeholder="${defaultSeries}">
+            <button class="log-save" onclick="saveLog('${logId}','${day.name.replace(/'/g,"\\'")}','${g.label.replace(/'/g,"\\'")}','${ex.name.replace(/'/g,"\\'")}','${defaultSeries}')">Guardar</button>
+          </div>
+        </div>
+      `;
+      groupEl.appendChild(card);
+    });
+
+    main.appendChild(groupEl);
+  });
+}
+
+renderTabs();
+renderDay();
+</script>
+
+</body>
+</html>
