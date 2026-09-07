@@ -116,7 +116,21 @@
     margin-bottom:10px;
     display:flex;
     gap:12px;
+    transition:border-color 0.2s, background 0.2s;
   }
+  .card.done{
+    border-color:var(--green);
+    background:rgba(76,175,125,0.08);
+  }
+  .card.done .icon-box{background:rgba(76,175,125,0.20);}
+  .done-badge{
+    display:none;
+    color:var(--green);
+    font-size:11px;
+    font-weight:700;
+    margin-left:6px;
+  }
+  .card.done .done-badge{display:inline;}
   .icon-box{
     flex:0 0 auto;
     width:56px;
@@ -236,7 +250,7 @@
     text-align:center;
   }
   .log-form input::placeholder{color:var(--muted); font-size:11px;}
-  .log-save{
+  .log-add{
     flex:0 0 auto;
     background:var(--blue);
     color:#fff;
@@ -245,6 +259,36 @@
     padding:0 14px;
     font-size:13px;
     font-weight:600;
+  }
+
+  .pending-wrap{margin-top:8px;}
+  .pending-list{margin-bottom:8px;}
+  .pending-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background:var(--icon-bg);
+    border-radius:8px;
+    padding:7px 10px;
+    font-size:13px;
+    margin-bottom:6px;
+  }
+  .pending-del{
+    background:none;
+    border:none;
+    color:#e0656a;
+    font-size:15px;
+    padding:2px 6px;
+  }
+  .accept-btn{
+    width:100%;
+    background:var(--green);
+    color:#0d1f16;
+    border:none;
+    border-radius:8px;
+    padding:10px;
+    font-weight:700;
+    font-size:13.5px;
   }
 
   .toast{
@@ -1000,6 +1044,16 @@ function persistDraft(){
   localStorage.setItem('draftEntries', JSON.stringify(draftEntries));
 }
 
+function updateCardHighlights(){
+  const day = DAYS[currentDay];
+  if (!day) return;
+  document.querySelectorAll('#main .card[data-exercise]').forEach(cardEl => {
+    const exName = cardEl.getAttribute('data-exercise');
+    const count = draftEntries.filter(e => e.dia === day.name && e.ejercicio === exName).length;
+    cardEl.classList.toggle('done', count >= 3);
+  });
+}
+
 function addDraft(dia, grupo, ejercicio, peso, reps, series){
   draftEntries.push({
     id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
@@ -1076,6 +1130,7 @@ function renderDraftList(){
       </div>
     `;
   }).join('');
+  updateCardHighlights();
 }
 
 function finishDay(){
@@ -1094,19 +1149,70 @@ function finishDay(){
 }
 
 function saveLog(id, dia, grupo, ejercicio, defaultSeries){
-  const box = document.getElementById(id);
+  // deprecated, kept as no-op in case of stale cached references
+}
+
+// ---- Pending rows per card (acumular antes de aceptar) ----
+let pendingRows = JSON.parse(localStorage.getItem('pendingRows') || '{}');
+
+function persistPending(){
+  localStorage.setItem('pendingRows', JSON.stringify(pendingRows));
+}
+
+function addPendingRow(logId){
+  const box = document.getElementById(logId);
   const peso = box.querySelector('.inp-peso').value;
   const reps = box.querySelector('.inp-reps').value;
-  const series = box.querySelector('.inp-series').value || defaultSeries;
   if (!peso || !reps) {
     showToast('Falta peso o reps');
     return;
   }
-  addDraft(dia, grupo, ejercicio, peso, reps, series);
-  showToast('Añadido al borrador ✓');
+  if (!pendingRows[logId]) pendingRows[logId] = [];
+  pendingRows[logId].push({ peso, reps });
+  persistPending();
   box.querySelector('.inp-peso').value = '';
   box.querySelector('.inp-reps').value = '';
-  box.classList.remove('open');
+  renderPendingWrap(logId);
+}
+
+function removePendingRow(logId, idx){
+  pendingRows[logId].splice(idx, 1);
+  persistPending();
+  renderPendingWrap(logId);
+}
+
+function acceptPending(logId){
+  const wrap = document.getElementById('pendingWrap-' + logId);
+  if (!wrap) return;
+  const dia = wrap.dataset.dia, grupo = wrap.dataset.grupo, ejercicio = wrap.dataset.ejercicio;
+  const rows = pendingRows[logId] || [];
+  if (rows.length === 0) return;
+  rows.forEach(r => addDraft(dia, grupo, ejercicio, r.peso, r.reps, 1));
+  showToast('Añadido al borrador ✓ (' + rows.length + (rows.length > 1 ? ' series)' : ' serie)'));
+  pendingRows[logId] = [];
+  persistPending();
+  renderPendingWrap(logId);
+}
+
+function renderPendingWrap(logId){
+  const wrap = document.getElementById('pendingWrap-' + logId);
+  if (!wrap) return;
+  const rows = pendingRows[logId] || [];
+  if (rows.length === 0) {
+    wrap.innerHTML = '';
+    return;
+  }
+  wrap.innerHTML = `
+    <div class="pending-list">
+      ${rows.map((r, i) => `
+        <div class="pending-row">
+          <span>Serie ${i + 1}: ${r.peso} kg × ${r.reps} reps</span>
+          <button class="pending-del" onclick="removePendingRow('${logId}', ${i})">✕</button>
+        </div>
+      `).join('')}
+    </div>
+    <button class="accept-btn" onclick="acceptPending('${logId}')">✅ Aceptar (${rows.length} ${rows.length > 1 ? 'series' : 'serie'})</button>
+  `;
 }
 
 // ---- Schematic icons (simple pictograms, not photos) ----
@@ -1261,11 +1367,12 @@ function renderDay(){
       const defaultSeries = (ex.sets.split('·')[0] || '3').trim();
       const card = document.createElement('div');
       card.className = 'card';
+      card.setAttribute('data-exercise', ex.name);
       card.innerHTML = `
         <div class="icon-box">${ICONS[ex.icon] || ''}</div>
         <div class="card-body">
           <div class="card-top">
-            <div class="exname">${ex.name}</div>
+            <div class="exname">${ex.name}<span class="done-badge">✓ hecho</span></div>
             <div class="sets">${ex.sets}</div>
           </div>
           <div class="machine">
@@ -1278,16 +1385,19 @@ function renderDay(){
           <div class="log-form" id="${logId}">
             <input class="inp-peso" type="number" inputmode="decimal" placeholder="Peso kg">
             <input class="inp-reps" type="number" inputmode="numeric" placeholder="Reps">
-            <input class="inp-series" type="number" inputmode="numeric" placeholder="${defaultSeries}">
-            <button class="log-save" onclick="saveLog('${logId}','${day.name.replace(/'/g,"\\'")}','${g.label.replace(/'/g,"\\'")}','${ex.name.replace(/'/g,"\\'")}','${defaultSeries}')">Guardar</button>
+            <button class="log-add" onclick="addPendingRow('${logId}')">+ Añadir</button>
           </div>
+          <div class="pending-wrap" id="pendingWrap-${logId}" data-dia="${day.name.replace(/"/g,'&quot;')}" data-grupo="${g.label.replace(/"/g,'&quot;')}" data-ejercicio="${ex.name.replace(/"/g,'&quot;')}"></div>
         </div>
       `;
       groupEl.appendChild(card);
+      renderPendingWrap(logId);
     });
 
     main.appendChild(groupEl);
   });
+
+  updateCardHighlights();
 }
 
 renderTabs();
