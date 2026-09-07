@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Rutina · Fitness Park</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <style>
   :root{
     --bg:#111316;
@@ -325,6 +326,155 @@
   }
   .finish-btn:disabled{opacity:0.35;}
 
+  .profile-screen{
+    position:fixed;
+    inset:0;
+    background:var(--bg);
+    z-index:100;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:32px;
+  }
+  .profile-title{
+    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+    font-size:19px;
+    font-weight:600;
+    color:var(--text);
+  }
+  .profile-grid{display:flex; gap:26px;}
+  .profile-card{
+    background:none;
+    border:none;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+    color:var(--muted);
+    font-size:14px;
+  }
+  .avatar{
+    width:78px;
+    height:78px;
+    border-radius:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#fff;
+    font-size:30px;
+    font-weight:700;
+    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+  }
+  .profile-card:active .avatar{outline:3px solid #fff;}
+
+  .profile-indicator{
+    margin-top:8px;
+    display:inline-block;
+    color:var(--muted);
+    font-size:12px;
+    border:1px solid var(--card-border);
+    border-radius:14px;
+    padding:4px 10px;
+  }
+
+  .viewtoggle{
+    display:flex;
+    gap:8px;
+    margin:14px 16px 0;
+  }
+  .viewtoggle button{
+    flex:1;
+    padding:10px 0;
+    border-radius:10px;
+    border:1px solid var(--card-border);
+    background:var(--card);
+    color:var(--muted);
+    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+    font-size:13.5px;
+    font-weight:600;
+  }
+  .viewtoggle button.active{
+    background:var(--blue);
+    border-color:var(--blue);
+    color:#fff;
+  }
+
+  .metric-card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:14px;
+    padding:14px;
+    margin:16px 16px 0;
+  }
+  .metric-title{
+    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+    font-size:15px;
+    font-weight:600;
+    margin-bottom:2px;
+  }
+  .metric-sub{
+    color:var(--muted);
+    font-size:12px;
+    margin-bottom:12px;
+  }
+
+  .heatmap-scroll{
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    padding-bottom:4px;
+  }
+  .heatmap-grid{
+    display:flex;
+    gap:3px;
+  }
+  .heatmap-week{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+  }
+  .heatmap-cell{
+    width:12px;
+    height:12px;
+    border-radius:3px;
+    background:var(--card-border);
+  }
+  .heatmap-legend{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    margin-top:10px;
+    font-size:11px;
+    color:var(--muted);
+  }
+  .heatmap-legend .heatmap-cell{width:10px; height:10px;}
+
+  .metric-select{
+    width:100%;
+    background:var(--icon-bg);
+    border:1px solid var(--card-border);
+    color:var(--text);
+    border-radius:8px;
+    padding:9px 10px;
+    font-size:13.5px;
+    margin-bottom:12px;
+  }
+
+  .refresh-btn{
+    display:block;
+    width:calc(100% - 32px);
+    margin:16px 16px 0;
+    background:var(--card);
+    border:1px solid var(--card-border);
+    color:var(--muted);
+    border-radius:10px;
+    padding:11px;
+    font-size:13px;
+    font-weight:600;
+  }
+
+  .metric-empty{color:var(--muted); font-size:13px; text-align:center; padding:20px 0;}
+
   details.info{
     margin:22px 0 6px;
     background:var(--card);
@@ -351,15 +501,36 @@
 </head>
 <body>
 
+<div class="profile-screen" id="profileScreen">
+  <div class="profile-title">¿Quién entrena hoy?</div>
+  <div class="profile-grid">
+    <button class="profile-card" onclick="selectProfile('David')">
+      <div class="avatar" style="background:#3f7cf0;">D</div>
+      <span>David</span>
+    </button>
+    <button class="profile-card" onclick="selectProfile('Pedro')">
+      <div class="avatar" style="background:#f2a93b;">P</div>
+      <span>Pedro</span>
+    </button>
+  </div>
+</div>
+
 <header>
   <h1>Rutina de fuerza</h1>
   <p>5 días · máquinas Technogym — Fitness Park</p>
+  <div class="profile-indicator" id="profileIndicator" onclick="showProfileScreen()"></div>
   <div class="header-actions">
     <button class="icon-btn" onclick="openSheet()" title="Abrir hoja de progreso">📊</button>
     <button class="icon-btn" onclick="configureSheet()" title="Configurar Google Sheet">⚙️</button>
   </div>
 </header>
 
+<div class="viewtoggle">
+  <button id="viewBtnRutina" class="active" onclick="setView('rutina')">🏋️ Rutina</button>
+  <button id="viewBtnMetricas" onclick="setView('metricas')">📈 Métricas</button>
+</div>
+
+<div id="rutinaView">
 <div class="daytabs" id="daytabs"></div>
 
 <div class="qrtip"><b>Truco:</b> casi todas las máquinas Technogym llevan un código QR o NFC en el propio panel. Escanéalo con el móvil y se abre un vídeo corto del ejercicio en la app Technogym — útil si con la ficha aún tienes dudas.</div>
@@ -374,6 +545,39 @@
   <div id="draftList"></div>
   <button class="finish-btn" id="finishBtn" onclick="finishDay()" disabled>✅ Terminar día y enviar</button>
 </div>
+</div>
+
+<div id="metricasView" style="display:none;">
+  <button class="refresh-btn" onclick="loadMetrics(true)" id="refreshBtn">🔄 Actualizar datos</button>
+
+  <div class="metric-card">
+    <div class="metric-title">Constancia</div>
+    <div class="metric-sub" id="heatmapSub">Últimos ~3 meses</div>
+    <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmapGrid"></div></div>
+    <div class="heatmap-legend">
+      <span>Menos</span>
+      <span class="heatmap-cell" style="background:var(--card-border)"></span>
+      <span class="heatmap-cell" style="background:#1e3a72"></span>
+      <span class="heatmap-cell" style="background:#274a94"></span>
+      <span class="heatmap-cell" style="background:#3f7cf0"></span>
+      <span class="heatmap-cell" style="background:#8ab4ff"></span>
+      <span>Más</span>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-title">Progresión de peso</div>
+    <div class="metric-sub">Elige un ejercicio para ver su evolución</div>
+    <select class="metric-select" id="exerciseSelect" onchange="renderProgressChart()"></select>
+    <canvas id="progressChart" height="180"></canvas>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-title">Volumen semanal total</div>
+    <div class="metric-sub">Peso × reps × series sumado por semana — el mejor indicador de progreso para ganar músculo</div>
+    <canvas id="volumeChart" height="180"></canvas>
+  </div>
+</div>
 
 <div style="padding:0 16px;">
 <details class="info">
@@ -387,6 +591,206 @@
 <div class="toast" id="toast">Guardado ✓</div>
 
 <script>
+// ---- Profile (selector estilo Netflix) ----
+function getProfile(){
+  return localStorage.getItem('profile');
+}
+
+function selectProfile(name){
+  localStorage.setItem('profile', name);
+  document.getElementById('profileScreen').style.display = 'none';
+  updateProfileIndicator();
+}
+
+function showProfileScreen(){
+  document.getElementById('profileScreen').style.display = 'flex';
+}
+
+function updateProfileIndicator(){
+  const p = getProfile();
+  const el = document.getElementById('profileIndicator');
+  el.textContent = p ? ('👤 ' + p + ' · cambiar') : '';
+}
+
+// ---- View switching ----
+function setView(v){
+  document.getElementById('rutinaView').style.display = v === 'rutina' ? '' : 'none';
+  document.getElementById('metricasView').style.display = v === 'metricas' ? '' : 'none';
+  document.getElementById('viewBtnRutina').classList.toggle('active', v === 'rutina');
+  document.getElementById('viewBtnMetricas').classList.toggle('active', v === 'metricas');
+  if (v === 'metricas' && !window._progressCache) {
+    loadMetrics(false);
+  }
+}
+
+// ---- Metrics: fetch + render ----
+let progressChartInstance = null;
+let volumeChartInstance = null;
+
+async function loadMetrics(force){
+  const btn = document.getElementById('refreshBtn');
+  btn.textContent = '⏳ Cargando…';
+  try {
+    const res = await fetch(getSheetUrl());
+    const data = await res.json();
+    window._progressCache = data;
+    renderHeatmap();
+    populateExerciseSelect();
+    renderProgressChart();
+    renderVolumeChart();
+    btn.textContent = '🔄 Actualizar datos';
+  } catch (err) {
+    btn.textContent = '⚠️ No se pudo cargar — reintentar';
+  }
+}
+
+function myRows(){
+  const data = window._progressCache || [];
+  const profile = getProfile();
+  return data.filter(r => (r['Perfil'] || '') === profile);
+}
+
+function renderHeatmap(){
+  const rows = myRows();
+  const counts = {};
+  rows.forEach(r => {
+    const f = String(r['Fecha']).slice(0,10);
+    counts[f] = (counts[f] || 0) + 1;
+  });
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  let days = [];
+  for (let i = 97; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    days.push(d);
+  }
+  while (days[0].getDay() !== 1) {
+    const prev = new Date(days[0]);
+    prev.setDate(prev.getDate() - 1);
+    days.unshift(prev);
+  }
+  const weeks = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+
+  function heatColor(n){
+    if (!n) return 'var(--card-border)';
+    if (n <= 2) return '#1e3a72';
+    if (n <= 5) return '#274a94';
+    if (n <= 9) return '#3f7cf0';
+    return '#8ab4ff';
+  }
+
+  const grid = document.getElementById('heatmapGrid');
+  grid.innerHTML = weeks.map(week => `
+    <div class="heatmap-week">
+      ${week.map(d => {
+        const key = d.toISOString().slice(0,10);
+        const n = counts[key] || 0;
+        return `<div class="heatmap-cell" style="background:${heatColor(n)}" title="${key}: ${n} series"></div>`;
+      }).join('')}
+    </div>
+  `).join('');
+
+  const totalDays = Object.keys(counts).length;
+  document.getElementById('heatmapSub').textContent = totalDays + ' días entrenados en los últimos ~3 meses';
+}
+
+function populateExerciseSelect(){
+  const rows = myRows();
+  const names = [...new Set(rows.map(r => r['Ejercicio']))].filter(Boolean);
+  const sel = document.getElementById('exerciseSelect');
+  const prevValue = sel.value;
+  sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
+  if (names.includes(prevValue)) sel.value = prevValue;
+}
+
+function renderProgressChart(){
+  const rows = myRows();
+  const exercise = document.getElementById('exerciseSelect').value;
+  const filtered = rows
+    .filter(r => r['Ejercicio'] === exercise)
+    .sort((a,b) => String(a['Fecha']).localeCompare(String(b['Fecha'])));
+
+  const labels = filtered.map(r => String(r['Fecha']).slice(5));
+  const weights = filtered.map(r => Number(r['Peso (kg)']) || 0);
+
+  const ctx = document.getElementById('progressChart');
+  if (progressChartInstance) progressChartInstance.destroy();
+  if (!window.Chart || labels.length === 0) return;
+
+  progressChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Peso (kg)',
+        data: weights,
+        borderColor: '#3f7cf0',
+        backgroundColor: 'rgba(63,124,240,0.15)',
+        tension: 0.3,
+        fill: true,
+        pointRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } },
+        y: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } }
+      }
+    }
+  });
+}
+
+function isoWeekLabel(dateStr){
+  const d = new Date(dateStr);
+  const monday = new Date(d);
+  const day = (d.getDay() + 6) % 7;
+  monday.setDate(d.getDate() - day);
+  return monday.toISOString().slice(5,10);
+}
+
+function renderVolumeChart(){
+  const rows = myRows();
+  const volumeByWeek = {};
+  rows.forEach(r => {
+    const week = isoWeekLabel(String(r['Fecha']));
+    const vol = (Number(r['Peso (kg)']) || 0) * (Number(r['Reps']) || 0) * (Number(r['Series']) || 0);
+    volumeByWeek[week] = (volumeByWeek[week] || 0) + vol;
+  });
+  const weekKeys = Object.keys(volumeByWeek).sort().slice(-10);
+  const labels = weekKeys;
+  const values = weekKeys.map(k => Math.round(volumeByWeek[k]));
+
+  const ctx = document.getElementById('volumeChart');
+  if (volumeChartInstance) volumeChartInstance.destroy();
+  if (!window.Chart || labels.length === 0) return;
+
+  volumeChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Volumen (kg)',
+        data: values,
+        backgroundColor: '#3f7cf0',
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } }
+      }
+    }
+  });
+}
+
 // ---- Google Sheet config ----
 const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwgIxhB_Pym24bLJETzkQ5wEiE7lgeN_jb-yTj4FntarGEwns7gy3JxhFLbOPk31D_V/exec';
 
@@ -440,6 +844,7 @@ function addDraft(dia, grupo, ejercicio, peso, reps, series){
   draftEntries.push({
     id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
     fecha: new Date().toISOString().slice(0,10),
+    perfil: getProfile() || 'Sin perfil',
     dia: dia, grupo: grupo, ejercicio: ejercicio,
     peso: peso, reps: reps, series: series, nota: ''
   });
@@ -465,7 +870,7 @@ function renderDraftList(){
   }
   listEl.innerHTML = draftEntries.map(e => `
     <div class="draft-item">
-      <div class="di-text">${e.ejercicio}<div class="di-sub">${e.peso} kg · ${e.reps} reps · ${e.series} series</div></div>
+      <div class="di-text">${e.ejercicio}<div class="di-sub">${e.peso} kg · ${e.reps} reps · ${e.series} series · ${e.perfil}</div></div>
       <button class="draft-del" onclick="removeDraft('${e.id}')">✕</button>
     </div>
   `).join('');
@@ -686,6 +1091,13 @@ function renderDay(){
 renderTabs();
 renderDay();
 renderDraftList();
+
+if (getProfile()) {
+  document.getElementById('profileScreen').style.display = 'none';
+  updateProfileIndicator();
+} else {
+  updateProfileIndicator();
+}
 </script>
 
 </body>
