@@ -313,6 +313,42 @@
     font-size:17px;
     padding:4px 6px;
   }
+  .draft-edit{
+    flex:0 0 auto;
+    background:none;
+    border:none;
+    color:var(--blue);
+    font-size:15px;
+    padding:4px 6px;
+  }
+  .draft-edit-form{
+    display:flex;
+    gap:6px;
+    flex:1;
+    align-items:center;
+  }
+  .draft-edit-form input{
+    width:0;
+    flex:1;
+    min-width:0;
+    background:var(--icon-bg);
+    border:1px solid var(--card-border);
+    border-radius:7px;
+    color:var(--text);
+    padding:6px 4px;
+    font-size:12.5px;
+    text-align:center;
+  }
+  .draft-edit-save{
+    flex:0 0 auto;
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    border-radius:7px;
+    padding:6px 10px;
+    font-size:12px;
+    font-weight:600;
+  }
   .finish-btn{
     width:100%;
     margin-top:12px;
@@ -566,6 +602,12 @@
   </div>
 
   <div class="metric-card">
+    <div class="metric-title">Historial reciente</div>
+    <div class="metric-sub">Toca ✏️ para corregir un registro ya enviado, o ✕ para borrarlo</div>
+    <div id="historialList"></div>
+  </div>
+
+  <div class="metric-card">
     <div class="metric-title">Progresión de peso</div>
     <div class="metric-sub">Elige un ejercicio para ver su evolución</div>
     <select class="metric-select" id="exerciseSelect" onchange="renderProgressChart()"></select>
@@ -635,6 +677,7 @@ async function loadMetrics(force){
     const data = await res.json();
     window._progressCache = data;
     renderHeatmap();
+    renderHistorial();
     populateExerciseSelect();
     renderProgressChart();
     renderVolumeChart();
@@ -642,6 +685,93 @@ async function loadMetrics(force){
   } catch (err) {
     btn.textContent = '⚠️ No se pudo cargar — reintentar';
   }
+}
+
+let editingHistId = null;
+
+function startEditHist(id){
+  editingHistId = id;
+  renderHistorial();
+}
+
+function cancelEditHist(){
+  editingHistId = null;
+  renderHistorial();
+}
+
+async function saveEditHist(id){
+  const row = document.querySelector(`[data-hist-id="${id}"]`);
+  const peso = row.querySelector('.edit-peso').value;
+  const reps = row.querySelector('.edit-reps').value;
+  const series = row.querySelector('.edit-series').value;
+  try {
+    await fetch(getSheetUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'update', id, peso, reps, series })
+    });
+  } catch(e) {}
+  const row2 = window._progressCache.find(r => String(r['ID']) === String(id));
+  if (row2) { row2['Peso (kg)'] = peso; row2['Reps'] = reps; row2['Series'] = series; }
+  editingHistId = null;
+  showToast('Registro actualizado ✓');
+  renderHistorial();
+  renderProgressChart();
+  renderVolumeChart();
+}
+
+async function deleteHist(id){
+  try {
+    await fetch(getSheetUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'delete', id })
+    });
+  } catch(e) {}
+  window._progressCache = window._progressCache.filter(r => String(r['ID']) !== String(id));
+  showToast('Registro borrado ✓');
+  renderHistorial();
+  renderHeatmap();
+  populateExerciseSelect();
+  renderProgressChart();
+  renderVolumeChart();
+}
+
+function renderHistorial(){
+  const listEl = document.getElementById('historialList');
+  const rows = myRows()
+    .filter(r => r['ID'])
+    .sort((a,b) => String(b['Fecha']).localeCompare(String(a['Fecha'])))
+    .slice(0, 20);
+
+  if (rows.length === 0) {
+    listEl.innerHTML = '<div class="draft-empty">Aún no hay registros enviados.</div>';
+    return;
+  }
+
+  listEl.innerHTML = rows.map(r => {
+    const id = r['ID'];
+    if (editingHistId === id) {
+      return `
+        <div class="draft-item" data-hist-id="${id}">
+          <div class="draft-edit-form">
+            <input class="edit-peso" type="number" inputmode="decimal" value="${r['Peso (kg)']}" placeholder="kg">
+            <input class="edit-reps" type="number" inputmode="numeric" value="${r['Reps']}" placeholder="reps">
+            <input class="edit-series" type="number" inputmode="numeric" value="${r['Series']}" placeholder="series">
+            <button class="draft-edit-save" onclick="saveEditHist('${id}')">OK</button>
+          </div>
+          <button class="draft-del" onclick="cancelEditHist()">✕</button>
+        </div>
+      `;
+    }
+    return `
+      <div class="draft-item" data-hist-id="${id}">
+        <div class="di-text">${r['Ejercicio']}<div class="di-sub">${String(r['Fecha']).slice(0,10)} · ${r['Peso (kg)']} kg · ${r['Reps']} reps · ${r['Series']} series</div></div>
+        <button class="draft-edit" onclick="startEditHist('${id}')">✏️</button>
+        <button class="draft-del" onclick="deleteHist('${id}')">✕</button>
+      </div>
+    `;
+  }).join('');
 }
 
 function myRows(){
@@ -858,6 +988,32 @@ function removeDraft(id){
   renderDraftList();
 }
 
+let editingDraftId = null;
+
+function startEditDraft(id){
+  editingDraftId = id;
+  renderDraftList();
+}
+
+function cancelEditDraft(){
+  editingDraftId = null;
+  renderDraftList();
+}
+
+function saveEditDraft(id){
+  const row = document.querySelector(`[data-draft-id="${id}"]`);
+  const peso = row.querySelector('.edit-peso').value;
+  const reps = row.querySelector('.edit-reps').value;
+  const series = row.querySelector('.edit-series').value;
+  const entry = draftEntries.find(e => e.id === id);
+  if (entry && peso && reps) {
+    entry.peso = peso; entry.reps = reps; entry.series = series || entry.series;
+  }
+  editingDraftId = null;
+  persistDraft();
+  renderDraftList();
+}
+
 function renderDraftList(){
   const listEl = document.getElementById('draftList');
   const countEl = document.getElementById('draftCount');
@@ -868,12 +1024,28 @@ function renderDraftList(){
     listEl.innerHTML = '<div class="draft-empty">Todavía no has registrado ninguna serie hoy.</div>';
     return;
   }
-  listEl.innerHTML = draftEntries.map(e => `
-    <div class="draft-item">
-      <div class="di-text">${e.ejercicio}<div class="di-sub">${e.peso} kg · ${e.reps} reps · ${e.series} series · ${e.perfil}</div></div>
-      <button class="draft-del" onclick="removeDraft('${e.id}')">✕</button>
-    </div>
-  `).join('');
+  listEl.innerHTML = draftEntries.map(e => {
+    if (editingDraftId === e.id) {
+      return `
+        <div class="draft-item" data-draft-id="${e.id}">
+          <div class="draft-edit-form">
+            <input class="edit-peso" type="number" inputmode="decimal" value="${e.peso}" placeholder="kg">
+            <input class="edit-reps" type="number" inputmode="numeric" value="${e.reps}" placeholder="reps">
+            <input class="edit-series" type="number" inputmode="numeric" value="${e.series}" placeholder="series">
+            <button class="draft-edit-save" onclick="saveEditDraft('${e.id}')">OK</button>
+          </div>
+          <button class="draft-del" onclick="cancelEditDraft()">✕</button>
+        </div>
+      `;
+    }
+    return `
+      <div class="draft-item" data-draft-id="${e.id}">
+        <div class="di-text">${e.ejercicio}<div class="di-sub">${e.peso} kg · ${e.reps} reps · ${e.series} series · ${e.perfil}</div></div>
+        <button class="draft-edit" onclick="startEditDraft('${e.id}')">✏️</button>
+        <button class="draft-del" onclick="removeDraft('${e.id}')">✕</button>
+      </div>
+    `;
+  }).join('');
 }
 
 function finishDay(){
