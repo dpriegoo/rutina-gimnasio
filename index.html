@@ -212,24 +212,41 @@
   }
   .howto b{color:var(--text); font-weight:600;}
 
-  .header-actions{
-    position:absolute;
-    top:20px;
-    right:16px;
+  .timer-fab{
+    position:fixed;
+    bottom:22px;
+    right:18px;
+    width:64px;
+    height:64px;
+    border-radius:50%;
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    box-shadow:0 4px 14px rgba(0,0,0,0.4);
+    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+    font-size:13px;
+    font-weight:700;
     display:flex;
-    gap:8px;
-  }
-  .icon-btn{
-    width:34px;
-    height:34px;
-    border-radius:10px;
-    border:1px solid var(--card-border);
-    background:var(--card);
-    color:var(--muted);
-    font-size:16px;
-    display:flex;
+    flex-direction:column;
     align-items:center;
     justify-content:center;
+    line-height:1.1;
+    z-index:60;
+    transition:background 0.2s, transform 0.15s;
+  }
+  .timer-fab .timer-icon{font-size:18px; margin-bottom:1px;}
+  .timer-fab.running{
+    background:var(--green);
+    color:#0d1f16;
+  }
+  .timer-fab.done{
+    background:#e0656a;
+    color:#fff;
+    animation:timerPulse 0.6s ease-in-out infinite;
+  }
+  @keyframes timerPulse{
+    0%, 100% { transform:scale(1); }
+    50% { transform:scale(1.12); }
   }
 
   .log-toggle{
@@ -619,10 +636,6 @@
   <h1>Rutina de fuerza</h1>
   <p>5 días · máquinas Technogym — Fitness Park</p>
   <div class="profile-indicator" id="profileIndicator" onclick="showProfileScreen()"></div>
-  <div class="header-actions">
-    <button class="icon-btn" onclick="openSheet()" title="Abrir hoja de progreso">📊</button>
-    <button class="icon-btn" onclick="configureSheet()" title="Configurar Google Sheet">⚙️</button>
-  </div>
 </header>
 
 <div class="viewtoggle">
@@ -695,6 +708,11 @@
 </div>
 
 <div class="toast" id="toast">Guardado ✓</div>
+
+<button class="timer-fab" id="timerFab" onclick="toggleRestTimer()">
+  <span class="timer-icon">⏱️</span>
+  <span id="timerLabel">3:00</span>
+</button>
 
 <script>
 // ---- Profile (selector estilo Netflix) ----
@@ -1022,34 +1040,94 @@ function getSheetUrl(){
   return localStorage.getItem('sheetUrl') || DEFAULT_SHEET_URL;
 }
 
-function configureSheet(){
-  const current = localStorage.getItem('sheetUrl') || '';
-  const url = prompt('Pega aquí la URL de tu Web App de Apps Script (termina en /exec):', current);
-  if (url !== null && url.trim() !== '') {
-    localStorage.setItem('sheetUrl', url.trim());
-    const viewUrl = prompt('Opcional: pega el enlace normal de tu Google Sheet (para abrirla y ver el histórico):', localStorage.getItem('sheetViewUrl') || '');
-    if (viewUrl !== null && viewUrl.trim() !== '') {
-      localStorage.setItem('sheetViewUrl', viewUrl.trim());
-    }
-    showToast('Configuración guardada ✓');
-  }
-}
-
-function openSheet(){
-  const viewUrl = localStorage.getItem('sheetViewUrl');
-  if (viewUrl) {
-    window.open(viewUrl, '_blank');
-  } else {
-    configureSheet();
-  }
-}
-
 function showToast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(window._toastTimer);
   window._toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ---- Cronómetro de descanso (3 min) ----
+const REST_SECONDS = 180;
+let restRemaining = REST_SECONDS;
+let restTimerId = null;
+let restState = 'idle'; // idle | running | done
+
+function formatMMSS(s){
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return m + ':' + String(sec).padStart(2, '0');
+}
+
+function playBeep(){
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    for (let i = 0; i < 3; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      const start = ctx.currentTime + i * 0.35;
+      gain.gain.setValueAtTime(0.25, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+      osc.start(start);
+      osc.stop(start + 0.28);
+    }
+  } catch (e) {}
+}
+
+function toggleRestTimer(){
+  if (restState === 'running') {
+    stopRestTimer(true);
+    return;
+  }
+  if (restState === 'done') {
+    stopRestTimer(true);
+    return;
+  }
+  startRestTimer();
+}
+
+function startRestTimer(){
+  restState = 'running';
+  restRemaining = REST_SECONDS;
+  const fab = document.getElementById('timerFab');
+  fab.classList.add('running');
+  fab.classList.remove('done');
+  updateRestLabel();
+  restTimerId = setInterval(() => {
+    restRemaining--;
+    updateRestLabel();
+    if (restRemaining <= 0) {
+      finishRestTimer();
+    }
+  }, 1000);
+}
+
+function finishRestTimer(){
+  clearInterval(restTimerId);
+  restState = 'done';
+  const fab = document.getElementById('timerFab');
+  fab.classList.remove('running');
+  fab.classList.add('done');
+  document.getElementById('timerLabel').textContent = '¡Ya!';
+  if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
+  playBeep();
+}
+
+function stopRestTimer(reset){
+  clearInterval(restTimerId);
+  restState = 'idle';
+  const fab = document.getElementById('timerFab');
+  fab.classList.remove('running', 'done');
+  restRemaining = REST_SECONDS;
+  if (reset) updateRestLabel();
+}
+
+function updateRestLabel(){
+  document.getElementById('timerLabel').textContent = formatMMSS(restRemaining);
 }
 
 function toggleLog(id){
