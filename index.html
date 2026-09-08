@@ -740,12 +740,15 @@ function updateProfileIndicator(){
 }
 
 // ---- View switching ----
+let metricsLoadedOnce = false;
+
 function setView(v){
   document.getElementById('rutinaView').style.display = v === 'rutina' ? '' : 'none';
   document.getElementById('metricasView').style.display = v === 'metricas' ? '' : 'none';
   document.getElementById('viewBtnRutina').classList.toggle('active', v === 'rutina');
   document.getElementById('viewBtnMetricas').classList.toggle('active', v === 'metricas');
-  if (v === 'metricas' && !window._progressCache) {
+  if (v === 'metricas' && !metricsLoadedOnce) {
+    metricsLoadedOnce = true;
     loadMetrics(false);
   }
 }
@@ -761,6 +764,7 @@ async function loadMetrics(force){
     const res = await fetch(getSheetUrl());
     const data = await res.json();
     window._progressCache = data;
+    try { localStorage.setItem('progressCache', JSON.stringify(data)); } catch(e) {}
     renderHeatmap();
     renderHistorial();
     populateExerciseSelect();
@@ -1642,8 +1646,16 @@ async function fetchProgressSilently(){
     const res = await fetch(getSheetUrl());
     const data = await res.json();
     window._progressCache = data;
+    try { localStorage.setItem('progressCache', JSON.stringify(data)); } catch(e) {}
     renderTabs();
     updateCardHighlights();
+  } catch (e) {}
+}
+
+function loadCachedProgress(){
+  try {
+    const cached = localStorage.getItem('progressCache');
+    if (cached) window._progressCache = JSON.parse(cached);
   } catch (e) {}
 }
 
@@ -1709,6 +1721,7 @@ function renderDay(){
   updateCardHighlights();
 }
 
+loadCachedProgress();
 renderTabs();
 renderDay();
 renderDraftList();
