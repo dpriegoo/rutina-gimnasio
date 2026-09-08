@@ -128,6 +128,12 @@
     background:rgba(76,175,125,0.08);
   }
   .card.done .icon-box{background:rgba(76,175,125,0.20);}
+  .series-progress{
+    font-size:11px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+  .card.done .series-progress{color:var(--green);}
   .done-badge{
     display:none;
     color:var(--green);
@@ -1101,6 +1107,8 @@ function updateCardHighlights(){
     const exName = cardEl.getAttribute('data-exercise');
     const count = weeklySeriesCount(day.name, exName);
     cardEl.classList.toggle('done', count >= 3);
+    const prog = cardEl.querySelector('.series-progress');
+    if (prog) prog.textContent = count + '/3 esta semana';
   });
 }
 
@@ -1454,6 +1462,7 @@ function renderDay(){
             <div class="exname">${ex.name}<span class="done-badge">✓ hecho</span></div>
             <div class="sets">${ex.sets}</div>
           </div>
+          <div class="series-progress"></div>
           <div class="machine">
             <div class="machine-row"><span class="tag primary">USA</span><span class="txt">${ex.primary}</span></div>
             <div class="machine-row"><span class="tag alt">SI OCUPADA</span></div>
