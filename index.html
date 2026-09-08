@@ -1080,13 +1080,17 @@ function weeklySeriesCount(dia, ejercicio){
   const profile = getProfile();
   const weekStart = getWeekStart();
   const cache = window._progressCache || [];
-  const sheetCount = cache.filter(r => {
-    if ((r['Perfil'] || '') !== profile) return false;
-    if (r['Día'] !== dia || r['Ejercicio'] !== ejercicio) return false;
-    const f = parseLocalDate(r['Fecha']);
-    return f >= weekStart;
-  }).length;
-  const draftCount = draftEntries.filter(e => e.dia === dia && e.ejercicio === ejercicio).length;
+  const sheetCount = cache
+    .filter(r => {
+      if ((r['Perfil'] || '') !== profile) return false;
+      if (r['Día'] !== dia || r['Ejercicio'] !== ejercicio) return false;
+      const f = parseLocalDate(r['Fecha']);
+      return f >= weekStart;
+    })
+    .reduce((sum, r) => sum + (Number(r['Series']) || 0), 0);
+  const draftCount = draftEntries
+    .filter(e => e.dia === dia && e.ejercicio === ejercicio)
+    .reduce((sum, e) => sum + (Number(e.series) || 0), 0);
   return sheetCount + draftCount;
 }
 
