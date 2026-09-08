@@ -55,14 +55,32 @@
     font-size:13px;
   }
 
+  .daytabs-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:14px 16px 4px;
+  }
   .daytabs{
     display:flex;
     gap:8px;
     overflow-x:auto;
-    padding:14px 16px 4px;
+    flex:1;
+    min-width:0;
     -webkit-overflow-scrolling:touch;
   }
   .daytabs::-webkit-scrollbar{display:none;}
+  .week-summary-btn{
+    flex:0 0 auto;
+    padding:8px 12px;
+    border-radius:20px;
+    border:1px solid var(--amber);
+    background:rgba(242,169,59,0.12);
+    color:var(--amber);
+    font-size:12.5px;
+    font-weight:600;
+    white-space:nowrap;
+  }
   .daytab{
     flex:0 0 auto;
     padding:8px 14px;
@@ -489,6 +507,127 @@
     padding:4px 10px;
   }
 
+  .summary-screen{
+    position:fixed;
+    inset:0;
+    background:var(--bg);
+    z-index:90;
+    overflow-y:auto;
+    display:none;
+  }
+  .summary-header{
+    position:sticky;
+    top:0;
+    background:var(--bg);
+    border-bottom:1px solid var(--card-border);
+    padding:18px 16px 14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .summary-header h2{
+    margin:0;
+    font-size:19px;
+    font-weight:600;
+    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+  }
+  .summary-close{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    color:var(--text);
+    width:32px; height:32px;
+    border-radius:10px;
+    font-size:15px;
+  }
+  .summary-body{padding:0 16px 30px;}
+  .sum-card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:14px;
+    padding:14px;
+    margin-top:14px;
+  }
+  .sum-title{
+    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:10px;
+  }
+  .sum-big{
+    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+    font-size:26px;
+    font-weight:700;
+  }
+  .sum-delta{
+    font-size:12.5px;
+    font-weight:600;
+    margin-top:2px;
+  }
+  .sum-delta.up{color:var(--green);}
+  .sum-delta.down{color:#e0656a;}
+  .sum-delta.flat{color:var(--muted);}
+  .sum-days{
+    display:flex;
+    gap:6px;
+    margin-top:10px;
+  }
+  .sum-day-pill{
+    flex:1;
+    text-align:center;
+    padding:7px 0;
+    border-radius:8px;
+    font-size:11px;
+    font-weight:600;
+    background:var(--icon-bg);
+    color:var(--muted);
+  }
+  .sum-day-pill.done{
+    background:rgba(76,175,125,0.18);
+    color:var(--green);
+  }
+  .sum-improve-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:8px 0;
+    border-bottom:1px solid var(--card-border);
+    font-size:13.5px;
+  }
+  .sum-improve-row:last-child{border-bottom:none;}
+  .sum-improve-delta{
+    color:var(--green);
+    font-weight:700;
+    font-size:12.5px;
+  }
+  .sum-vs-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:6px;
+  }
+  .sum-vs-name{
+    flex:0 0 70px;
+    font-size:13px;
+    font-weight:600;
+  }
+  .sum-vs-bar-wrap{
+    flex:1;
+    background:var(--icon-bg);
+    border-radius:6px;
+    height:10px;
+    overflow:hidden;
+  }
+  .sum-vs-bar{
+    height:100%;
+    border-radius:6px;
+  }
+  .sum-vs-value{
+    flex:0 0 60px;
+    text-align:right;
+    font-size:12px;
+    color:var(--muted);
+  }
+
   .viewtoggle{
     display:flex;
     gap:8px;
@@ -644,7 +783,10 @@
 </div>
 
 <div id="rutinaView">
-<div class="daytabs" id="daytabs"></div>
+<div class="daytabs-row">
+  <div class="daytabs" id="daytabs"></div>
+  <button class="week-summary-btn" onclick="showWeekSummary()">📋 Resumen</button>
+</div>
 
 <div class="qrtip"><b>Truco:</b> casi todas las máquinas Technogym llevan un código QR o NFC en el propio panel. Escanéalo con el móvil y se abre un vídeo corto del ejercicio en la app Technogym — útil si con la ficha aún tienes dudas.</div>
 
@@ -706,6 +848,14 @@
   <p><b>Progresión:</b> empieza cada ejercicio por el rango de repeticiones más bajo indicado; cuando te recuperes bien, añade una serie antes de subir al rango más alto.</p>
   <p><b>1RM (repetición máxima):</b> es el peso más pesado que podrías levantar haciendo <b>una sola repetición</b> con buena técnica. Nadie hace series de 1 rep en el día a día, así que se <b>estima</b> a partir de tus series normales: si haces 60 kg × 8 reps, tu 1RM estimado ronda los 76 kg. Sirve para comparar tu fuerza real de una semana a otra aunque cambies el número de repeticiones — por ejemplo, subir de 60×6 a 62×8 no es solo "2 kg más", es una mejora bastante mayor de fuerza real, y el 1RM te lo muestra con un solo número en vez de tener que hacer la cuenta tú. Lo ves reflejado en la gráfica de "Progresión de peso" en Métricas (línea ámbar discontinua).</p>
 </details>
+</div>
+
+<div class="summary-screen" id="summaryScreen">
+  <div class="summary-header">
+    <h2>Resumen de la semana</h2>
+    <button class="summary-close" onclick="hideWeekSummary()">✕</button>
+  </div>
+  <div class="summary-body" id="summaryBody"></div>
 </div>
 
 <div class="toast" id="toast">Guardado ✓</div>
@@ -1241,6 +1391,156 @@ function getWeekStart(){
   const dow = (d.getDay() + 6) % 7; // 0=lunes ... 6=domingo
   d.setDate(d.getDate() - dow);
   return d;
+}
+
+function getWeekStartOffset(offsetWeeks){
+  const d = getWeekStart();
+  d.setDate(d.getDate() + offsetWeeks * 7);
+  return d;
+}
+
+function rowVolume(r){
+  return (Number(r['Peso (kg)']) || 0) * (Number(r['Reps']) || 0) * (Number(r['Series']) || 0);
+}
+
+function weeklyVolumeForProfile(profile, weekStart){
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const cache = window._progressCache || [];
+  return cache
+    .filter(r => (r['Perfil'] || '') === profile)
+    .filter(r => { const f = parseLocalDate(r['Fecha']); return f >= weekStart && f < weekEnd; })
+    .reduce((sum, r) => sum + rowVolume(r), 0);
+}
+
+function daysTrainedThisWeek(profile){
+  const weekStart = getWeekStart();
+  const cache = window._progressCache || [];
+  const dates = new Set(
+    cache.filter(r => (r['Perfil'] || '') === profile)
+      .filter(r => parseLocalDate(r['Fecha']) >= weekStart)
+      .map(r => String(r['Fecha']).slice(0,10))
+  );
+  return dates;
+}
+
+function weeklyImprovements(profile){
+  const thisWeekStart = getWeekStart();
+  const lastWeekStart = getWeekStartOffset(-1);
+  const cache = window._progressCache || [];
+  const rows = cache.filter(r => (r['Perfil'] || '') === profile && !isTimedExercise(r['Ejercicio']));
+  const byExercise = {};
+  rows.forEach(r => {
+    const f = parseLocalDate(r['Fecha']);
+    const ex = r['Ejercicio'];
+    const peso = Number(r['Peso (kg)']) || 0;
+    if (!byExercise[ex]) byExercise[ex] = { thisWeek: 0, lastWeek: 0 };
+    if (f >= thisWeekStart) {
+      byExercise[ex].thisWeek = Math.max(byExercise[ex].thisWeek, peso);
+    } else if (f >= lastWeekStart && f < thisWeekStart) {
+      byExercise[ex].lastWeek = Math.max(byExercise[ex].lastWeek, peso);
+    }
+  });
+  const improvements = [];
+  Object.keys(byExercise).forEach(ex => {
+    const { thisWeek, lastWeek } = byExercise[ex];
+    if (thisWeek > 0 && lastWeek > 0 && thisWeek > lastWeek) {
+      improvements.push({ ex, from: lastWeek, to: thisWeek, delta: Math.round((thisWeek - lastWeek) * 10) / 10 });
+    }
+  });
+  improvements.sort((a, b) => b.delta - a.delta);
+  return improvements;
+}
+
+function showWeekSummary(){
+  renderWeekSummary();
+  document.getElementById('summaryScreen').style.display = 'block';
+}
+
+function hideWeekSummary(){
+  document.getElementById('summaryScreen').style.display = 'none';
+}
+
+function renderWeekSummary(){
+  const profile = getProfile();
+  const otherProfile = profile === 'David' ? 'Pedro' : 'David';
+  const body = document.getElementById('summaryBody');
+
+  // Días entrenados
+  const trainedDates = daysTrainedThisWeek(profile);
+  const weekStart = getWeekStart();
+  const dayLabels = ['L','M','X','J','V','S','D'];
+  const dayPills = dayLabels.map((lbl, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    const key = localDateStr(d);
+    const done = trainedDates.has(key);
+    return `<div class="sum-day-pill${done ? ' done' : ''}">${lbl}</div>`;
+  }).join('');
+
+  // Volumen esta semana vs semana pasada
+  const volThis = Math.round(weeklyVolumeForProfile(profile, getWeekStart()));
+  const volLast = Math.round(weeklyVolumeForProfile(profile, getWeekStartOffset(-1)));
+  let deltaHtml = '';
+  if (volLast > 0) {
+    const pct = Math.round(((volThis - volLast) / volLast) * 100);
+    const cls = pct > 0 ? 'up' : (pct < 0 ? 'down' : 'flat');
+    const arrow = pct > 0 ? '▲' : (pct < 0 ? '▼' : '·');
+    deltaHtml = `<div class="sum-delta ${cls}">${arrow} ${pct > 0 ? '+' : ''}${pct}% vs. semana pasada (${volLast.toLocaleString('es-ES')} kg)</div>`;
+  } else {
+    deltaHtml = `<div class="sum-delta flat">Sin datos de la semana pasada para comparar</div>`;
+  }
+
+  // Mejoras de la semana
+  const improvements = weeklyImprovements(profile);
+  const improvementsHtml = improvements.length === 0
+    ? `<div class="metric-empty" style="padding:8px 0;">Aún no hay mejoras registradas esta semana respecto a la pasada.</div>`
+    : improvements.slice(0, 6).map(imp => `
+        <div class="sum-improve-row">
+          <span>${imp.ex}</span>
+          <span class="sum-improve-delta">+${imp.delta} kg</span>
+        </div>
+      `).join('');
+
+  // Comparativa con el compañero
+  const volOtherThis = Math.round(weeklyVolumeForProfile(otherProfile, getWeekStart()));
+  const maxVol = Math.max(volThis, volOtherThis, 1);
+  const barsHtml = `
+    <div class="sum-vs-row">
+      <div class="sum-vs-name">${profile}</div>
+      <div class="sum-vs-bar-wrap"><div class="sum-vs-bar" style="width:${(volThis/maxVol*100)}%; background:var(--blue);"></div></div>
+      <div class="sum-vs-value">${volThis.toLocaleString('es-ES')} kg</div>
+    </div>
+    <div class="sum-vs-row">
+      <div class="sum-vs-name">${otherProfile}</div>
+      <div class="sum-vs-bar-wrap"><div class="sum-vs-bar" style="width:${(volOtherThis/maxVol*100)}%; background:var(--amber);"></div></div>
+      <div class="sum-vs-value">${volOtherThis.toLocaleString('es-ES')} kg</div>
+    </div>
+  `;
+
+  body.innerHTML = `
+    <div class="sum-card">
+      <div class="sum-title">Días entrenados esta semana</div>
+      <div class="sum-big">${trainedDates.size} / 5</div>
+      <div class="sum-days">${dayPills}</div>
+    </div>
+
+    <div class="sum-card">
+      <div class="sum-title">Volumen total esta semana</div>
+      <div class="sum-big">${volThis.toLocaleString('es-ES')} kg</div>
+      ${deltaHtml}
+    </div>
+
+    <div class="sum-card">
+      <div class="sum-title">Mejoras de la semana (peso máximo por ejercicio)</div>
+      ${improvementsHtml}
+    </div>
+
+    <div class="sum-card">
+      <div class="sum-title">Volumen esta semana: ${profile} vs. ${otherProfile}</div>
+      ${barsHtml}
+    </div>
+  `;
 }
 
 function weeklySeriesCount(dia, ejercicio){
