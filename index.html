@@ -822,7 +822,8 @@
 
   <div class="metric-card">
     <div class="metric-title">Historial reciente</div>
-    <div class="metric-sub">Toca ✏️ para corregir un registro ya enviado, o ✕ para borrarlo</div>
+    <div class="metric-sub">Elige un ejercicio para ver y corregir sus últimos registros</div>
+    <select class="metric-select" id="historialExerciseSelect" onchange="renderHistorial()"></select>
     <div id="historialList"></div>
   </div>
 
@@ -916,8 +917,8 @@ async function loadMetrics(force){
     window._progressCache = data;
     try { localStorage.setItem('progressCache', JSON.stringify(data)); } catch(e) {}
     renderHeatmap();
-    renderHistorial();
     populateExerciseSelect();
+    renderHistorial();
     renderProgressChart();
     renderVolumeChart();
     renderTabs();
@@ -980,9 +981,9 @@ async function deleteHist(id){
   } catch(e) {}
   window._progressCache = window._progressCache.filter(r => String(r['ID']) !== String(id));
   showToast('Registro borrado ✓');
-  renderHistorial();
   renderHeatmap();
   populateExerciseSelect();
+  renderHistorial();
   renderProgressChart();
   renderVolumeChart();
   renderTabs();
@@ -991,13 +992,21 @@ async function deleteHist(id){
 
 function renderHistorial(){
   const listEl = document.getElementById('historialList');
+  const sel = document.getElementById('historialExerciseSelect');
+  const exercise = sel ? sel.value : '';
+
+  if (!exercise) {
+    listEl.innerHTML = '<div class="draft-empty">Elige un ejercicio arriba para ver su historial.</div>';
+    return;
+  }
+
   const rows = myRows()
-    .filter(r => r['ID'])
+    .filter(r => r['ID'] && r['Ejercicio'] === exercise)
     .sort((a,b) => String(b['Fecha']).localeCompare(String(a['Fecha'])))
     .slice(0, 20);
 
   if (rows.length === 0) {
-    listEl.innerHTML = '<div class="draft-empty">Aún no hay registros enviados.</div>';
+    listEl.innerHTML = '<div class="draft-empty">Aún no hay registros de "' + exercise + '".</div>';
     return;
   }
 
@@ -1098,6 +1107,14 @@ function populateExerciseSelect(){
   const prevValue = sel.value;
   sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
   if (names.includes(prevValue)) sel.value = prevValue;
+
+  const histSel = document.getElementById('historialExerciseSelect');
+  if (histSel) {
+    const histPrev = histSel.value;
+    histSel.innerHTML = '<option value="">Elige un ejercicio…</option>' +
+      names.map(n => `<option value="${n}">${n}</option>`).join('');
+    if (names.includes(histPrev)) histSel.value = histPrev;
+  }
 }
 
 function renderProgressChart(){
