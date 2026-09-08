@@ -949,12 +949,14 @@ function populateExerciseSelect(){
 function renderProgressChart(){
   const rows = myRows();
   const exercise = document.getElementById('exerciseSelect').value;
+  const timed = isTimedExercise(exercise);
   const filtered = rows
     .filter(r => r['Ejercicio'] === exercise)
     .sort((a,b) => String(a['Fecha']).localeCompare(String(b['Fecha'])));
 
   const labels = filtered.map(r => String(r['Fecha']).slice(5));
   const weights = filtered.map(r => Number(r['Peso (kg)']) || 0);
+  const seconds = filtered.map(r => Number(r['Reps']) || 0);
   const oneRM = filtered.map(r => {
     const p = Number(r['Peso (kg)']) || 0;
     const reps = Number(r['Reps']) || 0;
@@ -975,6 +977,36 @@ function renderProgressChart(){
       : 'No hay registros de "' + exercise + '" todavía.';
     return;
   }
+
+  if (timed) {
+    subEl.textContent = 'Ejercicio por tiempo: segundos aguantados en cada serie';
+    progressChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Segundos',
+          data: seconds,
+          borderColor: '#4caf7d',
+          backgroundColor: 'rgba(76,175,125,0.15)',
+          tension: 0.3,
+          fill: true,
+          pointRadius: 3,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } },
+          y: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } }
+        }
+      }
+    });
+    return;
+  }
+
   subEl.textContent = 'Línea azul: peso levantado · línea ámbar: 1RM estimado (fórmula de Epley)';
 
   progressChartInstance = new Chart(ctx, {
