@@ -877,7 +877,7 @@ function renderHeatmap(){
   grid.innerHTML = weeks.map(week => `
     <div class="heatmap-week">
       ${week.map(d => {
-        const key = d.toISOString().slice(0,10);
+        const key = localDateStr(d);
         const n = counts[key] || 0;
         return `<div class="heatmap-cell" style="background:${heatColor(n)}" title="${key}: ${n} series"></div>`;
       }).join('')}
@@ -950,11 +950,11 @@ function renderProgressChart(){
 }
 
 function isoWeekLabel(dateStr){
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   const monday = new Date(d);
   const day = (d.getDay() + 6) % 7;
   monday.setDate(d.getDate() - day);
-  return monday.toISOString().slice(5,10);
+  return localDateStr(monday).slice(5,10);
 }
 
 function renderVolumeChart(){
@@ -1055,6 +1055,19 @@ function persistDraft(){
   localStorage.setItem('draftEntries', JSON.stringify(draftEntries));
 }
 
+function localDateStr(d){
+  d = d || new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+function parseLocalDate(dateStr){
+  const parts = String(dateStr).slice(0, 10).split('-').map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
 function getWeekStart(){
   const d = new Date();
   d.setHours(0,0,0,0);
@@ -1070,7 +1083,7 @@ function weeklySeriesCount(dia, ejercicio){
   const sheetCount = cache.filter(r => {
     if ((r['Perfil'] || '') !== profile) return false;
     if (r['Día'] !== dia || r['Ejercicio'] !== ejercicio) return false;
-    const f = new Date(String(r['Fecha']).slice(0,10));
+    const f = parseLocalDate(r['Fecha']);
     return f >= weekStart;
   }).length;
   const draftCount = draftEntries.filter(e => e.dia === dia && e.ejercicio === ejercicio).length;
@@ -1090,7 +1103,7 @@ function updateCardHighlights(){
 function addDraft(dia, grupo, ejercicio, peso, reps, series){
   draftEntries.push({
     id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-    fecha: new Date().toISOString().slice(0,10),
+    fecha: localDateStr(),
     perfil: getProfile() || 'Sin perfil',
     dia: dia, grupo: grupo, ejercicio: ejercicio,
     peso: peso, reps: reps, series: series, nota: ''
