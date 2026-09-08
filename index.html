@@ -788,9 +788,18 @@ function cancelEditHist(){
 
 async function saveEditHist(id){
   const row = document.querySelector(`[data-hist-id="${id}"]`);
-  const peso = row.querySelector('.edit-peso').value.replace(',', '.').trim();
-  const reps = row.querySelector('.edit-reps').value;
-  const series = row.querySelector('.edit-series').value;
+  const existing = (window._progressCache || []).find(r => String(r['ID']) === String(id));
+  const timed = existing && isTimedExercise(existing['Ejercicio']);
+  let peso, reps, series;
+  if (timed) {
+    reps = row.querySelector('.edit-reps').value;
+    peso = '0';
+    series = existing ? existing['Series'] : 1;
+  } else {
+    peso = row.querySelector('.edit-peso').value.replace(',', '.').trim();
+    reps = row.querySelector('.edit-reps').value;
+    series = row.querySelector('.edit-series').value;
+  }
   try {
     await fetch(getSheetUrl(), {
       method: 'POST',
@@ -840,7 +849,19 @@ function renderHistorial(){
 
   listEl.innerHTML = rows.map(r => {
     const id = r['ID'];
+    const timed = isTimedExercise(r['Ejercicio']);
     if (editingHistId === id) {
+      if (timed) {
+        return `
+          <div class="draft-item" data-hist-id="${id}">
+            <div class="draft-edit-form">
+              <input class="edit-reps" type="number" inputmode="numeric" value="${r['Reps']}" placeholder="segundos">
+              <button class="draft-edit-save" onclick="saveEditHist('${id}')">OK</button>
+            </div>
+            <button class="draft-del" onclick="cancelEditHist()">✕</button>
+          </div>
+        `;
+      }
       return `
         <div class="draft-item" data-hist-id="${id}">
           <div class="draft-edit-form">
@@ -855,7 +876,7 @@ function renderHistorial(){
     }
     return `
       <div class="draft-item" data-hist-id="${id}">
-        <div class="di-text">${r['Ejercicio']}<div class="di-sub">${String(r['Fecha']).slice(0,10)} · ${r['Peso (kg)']} kg · ${r['Reps']} reps · ${r['Series']} series</div></div>
+        <div class="di-text">${r['Ejercicio']}<div class="di-sub">${String(r['Fecha']).slice(0,10)} · ${timed ? r['Reps'] + ' seg' : r['Peso (kg)'] + ' kg · ' + r['Reps'] + ' reps'} · ${r['Series']} series</div></div>
         <button class="draft-edit" onclick="startEditHist('${id}')">✏️</button>
         <button class="draft-del" onclick="deleteHist('${id}')">✕</button>
       </div>
@@ -1204,6 +1225,21 @@ function weeklySeriesCount(dia, ejercicio){
   return sheetCount + draftCount;
 }
 
+function lastSessionValue(ejercicio){
+  const profile = getProfile();
+  const cache = window._progressCache || [];
+  const fromSheet = cache
+    .filter(r => (r['Perfil'] || '') === profile && r['Ejercicio'] === ejercicio)
+    .map(r => ({ fecha: String(r['Fecha']).slice(0,10), peso: r['Peso (kg)'], reps: r['Reps'] }));
+  const fromDraft = draftEntries
+    .filter(e => e.ejercicio === ejercicio)
+    .map(e => ({ fecha: e.fecha, peso: e.peso, reps: e.reps }));
+  const combined = fromSheet.concat(fromDraft);
+  if (combined.length === 0) return null;
+  combined.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  return combined[combined.length - 1];
+}
+
 function updateCardHighlights(){
   const day = DAYS[currentDay];
   if (!day) return;
@@ -1213,6 +1249,16 @@ function updateCardHighlights(){
     cardEl.classList.toggle('done', count >= 3);
     const prog = cardEl.querySelector('.series-progress');
     if (prog) prog.textContent = count + '/3 esta semana';
+
+    const last = lastSessionValue(exName);
+    const pesoInput = cardEl.querySelector('.inp-peso');
+    const repsInput = cardEl.querySelector('.inp-reps');
+    if (last && isTimedExercise(exName) && repsInput) {
+      repsInput.placeholder = 'Últ: ' + last.reps + 's';
+    } else {
+      if (last && pesoInput) pesoInput.placeholder = 'Últ: ' + last.peso + 'kg';
+      if (last && repsInput) repsInput.placeholder = 'Últ: ' + last.reps;
+    }
   });
 }
 
@@ -1248,12 +1294,18 @@ function cancelEditDraft(){
 
 function saveEditDraft(id){
   const row = document.querySelector(`[data-draft-id="${id}"]`);
-  const peso = row.querySelector('.edit-peso').value.replace(',', '.').trim();
-  const reps = row.querySelector('.edit-reps').value;
-  const series = row.querySelector('.edit-series').value;
   const entry = draftEntries.find(e => e.id === id);
-  if (entry && peso && reps) {
-    entry.peso = peso; entry.reps = reps; entry.series = series || entry.series;
+  if (!entry) { editingDraftId = null; renderDraftList(); return; }
+  if (isTimedExercise(entry.ejercicio)) {
+    const reps = row.querySelector('.edit-reps').value;
+    if (reps) entry.reps = reps;
+  } else {
+    const peso = row.querySelector('.edit-peso').value.replace(',', '.').trim();
+    const reps = row.querySelector('.edit-reps').value;
+    const series = row.querySelector('.edit-series').value;
+    if (peso && reps) {
+      entry.peso = peso; entry.reps = reps; entry.series = series || entry.series;
+    }
   }
   editingDraftId = null;
   persistDraft();
@@ -1271,7 +1323,19 @@ function renderDraftList(){
     return;
   }
   listEl.innerHTML = draftEntries.map(e => {
+    const timed = isTimedExercise(e.ejercicio);
     if (editingDraftId === e.id) {
+      if (timed) {
+        return `
+          <div class="draft-item" data-draft-id="${e.id}">
+            <div class="draft-edit-form">
+              <input class="edit-reps" type="number" inputmode="numeric" value="${e.reps}" placeholder="segundos">
+              <button class="draft-edit-save" onclick="saveEditDraft('${e.id}')">OK</button>
+            </div>
+            <button class="draft-del" onclick="cancelEditDraft()">✕</button>
+          </div>
+        `;
+      }
       return `
         <div class="draft-item" data-draft-id="${e.id}">
           <div class="draft-edit-form">
@@ -1286,7 +1350,7 @@ function renderDraftList(){
     }
     return `
       <div class="draft-item" data-draft-id="${e.id}">
-        <div class="di-text">${e.ejercicio}<div class="di-sub">${e.peso} kg · ${e.reps} reps · ${e.series} series · ${e.perfil}</div></div>
+        <div class="di-text">${e.ejercicio}<div class="di-sub">${timed ? e.reps + ' seg' : e.peso + ' kg · ' + e.reps + ' reps'} · ${e.series} series · ${e.perfil}</div></div>
         <button class="draft-edit" onclick="startEditDraft('${e.id}')">✏️</button>
         <button class="draft-del" onclick="removeDraft('${e.id}')">✕</button>
       </div>
@@ -1334,16 +1398,29 @@ function persistPending(){
 
 function addPendingRow(logId){
   const box = document.getElementById(logId);
-  const peso = box.querySelector('.inp-peso').value.replace(',', '.').trim();
-  const reps = box.querySelector('.inp-reps').value;
-  if (!peso || !reps || isNaN(parseFloat(peso))) {
-    showToast('Falta peso o reps');
-    return;
+  const wrap = document.getElementById('pendingWrap-' + logId);
+  const ejercicio = wrap ? wrap.dataset.ejercicio : '';
+  const timed = isTimedExercise(ejercicio);
+  let peso = '0', reps;
+  if (timed) {
+    reps = box.querySelector('.inp-reps').value.trim();
+    if (!reps || isNaN(parseFloat(reps))) {
+      showToast('Falta el tiempo en segundos');
+      return;
+    }
+  } else {
+    peso = box.querySelector('.inp-peso').value.replace(',', '.').trim();
+    reps = box.querySelector('.inp-reps').value;
+    if (!peso || !reps || isNaN(parseFloat(peso))) {
+      showToast('Falta peso o reps');
+      return;
+    }
   }
   if (!pendingRows[logId]) pendingRows[logId] = [];
   pendingRows[logId].push({ peso, reps });
   persistPending();
-  box.querySelector('.inp-peso').value = '';
+  const pesoEl = box.querySelector('.inp-peso');
+  if (pesoEl) pesoEl.value = '';
   box.querySelector('.inp-reps').value = '';
   renderPendingWrap(logId);
 }
@@ -1371,6 +1448,7 @@ function renderPendingWrap(logId){
   const wrap = document.getElementById('pendingWrap-' + logId);
   if (!wrap) return;
   const rows = pendingRows[logId] || [];
+  const timed = isTimedExercise(wrap.dataset.ejercicio);
   if (rows.length === 0) {
     wrap.innerHTML = '';
     return;
@@ -1379,7 +1457,7 @@ function renderPendingWrap(logId){
     <div class="pending-list">
       ${rows.map((r, i) => `
         <div class="pending-row">
-          <span>Serie ${i + 1}: ${r.peso} kg × ${r.reps} reps</span>
+          <span>Serie ${i + 1}: ${timed ? r.reps + ' seg' : r.peso + ' kg × ' + r.reps + ' reps'}</span>
           <button class="pending-del" onclick="removePendingRow('${logId}', ${i})">✕</button>
         </div>
       `).join('')}
@@ -1502,6 +1580,11 @@ const DAYS = [
 
 let currentDay = 0;
 
+const TIMED_EXERCISES = ['Planchas abdominales'];
+function isTimedExercise(name){
+  return TIMED_EXERCISES.includes(name);
+}
+
 function isDayComplete(day){
   const exerciseNames = day.groups.flatMap(g => g.exercises.map(ex => ex.name));
   return exerciseNames.length > 0 && exerciseNames.every(
@@ -1575,8 +1658,10 @@ function renderDay(){
           <div class="howto"><b>Cómo hacerlo:</b> ${ex.howTo}</div>
           <button class="log-toggle" onclick="toggleLog('${logId}')">📈 Registrar serie</button>
           <div class="log-form" id="${logId}">
-            <input class="inp-peso" type="text" inputmode="decimal" placeholder="Peso kg">
-            <input class="inp-reps" type="number" inputmode="numeric" placeholder="Reps">
+            ${isTimedExercise(ex.name)
+              ? `<input class="inp-reps" type="number" inputmode="numeric" placeholder="Segundos">`
+              : `<input class="inp-peso" type="text" inputmode="decimal" placeholder="Peso kg">
+                 <input class="inp-reps" type="number" inputmode="numeric" placeholder="Reps">`}
             <button class="log-add" onclick="addPendingRow('${logId}')">+ Añadir</button>
           </div>
           <div class="pending-wrap" id="pendingWrap-${logId}" data-dia="${day.name.replace(/"/g,'&quot;')}" data-grupo="${g.label.replace(/"/g,'&quot;')}" data-ejercicio="${ex.name.replace(/"/g,'&quot;')}"></div>
