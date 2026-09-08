@@ -76,6 +76,11 @@
     border-color:var(--blue);
     color:#fff;
   }
+  .daytab.done{
+    border-color:var(--green);
+    background:rgba(76,175,125,0.15);
+    color:#bdf0d5;
+  }
 
   main{padding:6px 16px 0;}
 
@@ -692,6 +697,7 @@ function selectProfile(name){
   localStorage.setItem('profile', name);
   document.getElementById('profileScreen').style.display = 'none';
   updateProfileIndicator();
+  renderTabs();
 }
 
 function showProfileScreen(){
@@ -731,6 +737,7 @@ async function loadMetrics(force){
     populateExerciseSelect();
     renderProgressChart();
     renderVolumeChart();
+    renderTabs();
     btn.textContent = '🔄 Actualizar datos';
   } catch (err) {
     btn.textContent = '⚠️ No se pudo cargar — reintentar';
@@ -785,6 +792,7 @@ async function deleteHist(id){
   populateExerciseSelect();
   renderProgressChart();
   renderVolumeChart();
+  renderTabs();
 }
 
 function renderHistorial(){
@@ -1142,10 +1150,21 @@ function finishDay(){
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ entries: draftEntries })
   }).then(() => {}).catch(() => {});
+
+  if (!window._progressCache) window._progressCache = [];
+  draftEntries.forEach(e => {
+    window._progressCache.push({
+      'Fecha': e.fecha, 'Perfil': e.perfil, 'Día': e.dia, 'Grupo': e.grupo,
+      'Ejercicio': e.ejercicio, 'Peso (kg)': e.peso, 'Reps': e.reps, 'Series': e.series,
+      'Nota': e.nota, 'ID': e.id
+    });
+  });
+
   showToast('Día enviado ✓ (' + count + ' series)');
   draftEntries = [];
   persistDraft();
   renderDraftList();
+  renderTabs();
 }
 
 function saveLog(id, dia, grupo, ejercicio, defaultSeries){
@@ -1163,7 +1182,7 @@ function addPendingRow(logId){
   const box = document.getElementById(logId);
   const peso = box.querySelector('.inp-peso').value.replace(',', '.').trim();
   const reps = box.querySelector('.inp-reps').value;
-  if (!peso || !reps) {
+  if (!peso || !reps || isNaN(parseFloat(peso))) {
     showToast('Falta peso o reps');
     return;
   }
@@ -1329,16 +1348,36 @@ const DAYS = [
 
 let currentDay = 0;
 
+function isDayComplete(day){
+  const profile = getProfile();
+  const cache = window._progressCache || [];
+  const rows = cache.filter(r => (r['Perfil'] || '') === profile && r['Día'] === day.name);
+  const exerciseNames = day.groups.flatMap(g => g.exercises.map(ex => ex.name));
+  return exerciseNames.length > 0 && exerciseNames.every(
+    name => rows.filter(r => r['Ejercicio'] === name).length >= 3
+  );
+}
+
 function renderTabs(){
   const wrap = document.getElementById('daytabs');
   wrap.innerHTML = '';
   DAYS.forEach((d, i) => {
     const b = document.createElement('button');
-    b.className = 'daytab' + (i===currentDay ? ' active' : '');
-    b.textContent = d.name.split('·')[0].trim();
+    const complete = isDayComplete(d);
+    b.className = 'daytab' + (i===currentDay ? ' active' : '') + (complete ? ' done' : '');
+    b.textContent = d.name.split('·')[0].trim() + (complete ? ' ✓' : '');
     b.onclick = () => { currentDay = i; renderTabs(); renderDay(); };
     wrap.appendChild(b);
   });
+}
+
+async function fetchProgressSilently(){
+  try {
+    const res = await fetch(getSheetUrl());
+    const data = await res.json();
+    window._progressCache = data;
+    renderTabs();
+  } catch (e) {}
 }
 
 function renderDay(){
@@ -1403,6 +1442,7 @@ function renderDay(){
 renderTabs();
 renderDay();
 renderDraftList();
+fetchProgressSilently();
 
 if (getProfile()) {
   document.getElementById('profileScreen').style.display = 'none';
