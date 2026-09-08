@@ -698,6 +698,7 @@ function selectProfile(name){
   document.getElementById('profileScreen').style.display = 'none';
   updateProfileIndicator();
   renderTabs();
+  updateCardHighlights();
 }
 
 function showProfileScreen(){
@@ -738,6 +739,7 @@ async function loadMetrics(force){
     renderProgressChart();
     renderVolumeChart();
     renderTabs();
+    updateCardHighlights();
     btn.textContent = '🔄 Actualizar datos';
   } catch (err) {
     btn.textContent = '⚠️ No se pudo cargar — reintentar';
@@ -793,6 +795,7 @@ async function deleteHist(id){
   renderProgressChart();
   renderVolumeChart();
   renderTabs();
+  updateCardHighlights();
 }
 
 function renderHistorial(){
@@ -1052,12 +1055,34 @@ function persistDraft(){
   localStorage.setItem('draftEntries', JSON.stringify(draftEntries));
 }
 
+function getWeekStart(){
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  const dow = (d.getDay() + 6) % 7; // 0=lunes ... 6=domingo
+  d.setDate(d.getDate() - dow);
+  return d;
+}
+
+function weeklySeriesCount(dia, ejercicio){
+  const profile = getProfile();
+  const weekStart = getWeekStart();
+  const cache = window._progressCache || [];
+  const sheetCount = cache.filter(r => {
+    if ((r['Perfil'] || '') !== profile) return false;
+    if (r['Día'] !== dia || r['Ejercicio'] !== ejercicio) return false;
+    const f = new Date(String(r['Fecha']).slice(0,10));
+    return f >= weekStart;
+  }).length;
+  const draftCount = draftEntries.filter(e => e.dia === dia && e.ejercicio === ejercicio).length;
+  return sheetCount + draftCount;
+}
+
 function updateCardHighlights(){
   const day = DAYS[currentDay];
   if (!day) return;
   document.querySelectorAll('#main .card[data-exercise]').forEach(cardEl => {
     const exName = cardEl.getAttribute('data-exercise');
-    const count = draftEntries.filter(e => e.dia === day.name && e.ejercicio === exName).length;
+    const count = weeklySeriesCount(day.name, exName);
     cardEl.classList.toggle('done', count >= 3);
   });
 }
@@ -1349,12 +1374,9 @@ const DAYS = [
 let currentDay = 0;
 
 function isDayComplete(day){
-  const profile = getProfile();
-  const cache = window._progressCache || [];
-  const rows = cache.filter(r => (r['Perfil'] || '') === profile && r['Día'] === day.name);
   const exerciseNames = day.groups.flatMap(g => g.exercises.map(ex => ex.name));
   return exerciseNames.length > 0 && exerciseNames.every(
-    name => rows.filter(r => r['Ejercicio'] === name).length >= 3
+    name => weeklySeriesCount(day.name, name) >= 3
   );
 }
 
@@ -1377,6 +1399,7 @@ async function fetchProgressSilently(){
     const data = await res.json();
     window._progressCache = data;
     renderTabs();
+    updateCardHighlights();
   } catch (e) {}
 }
 
