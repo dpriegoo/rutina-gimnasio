@@ -1072,16 +1072,35 @@ function getWeightTrend(){
   return { pesoActual, pesoHaceSemana };
 }
 
+function daysSinceLastWeight(){
+  const weights = window._weightHistory || [];
+  if (weights.length === 0) return null;
+  const sorted = weights.slice().sort((a,b) => a.fecha.localeCompare(b.fecha));
+  const last = sorted[sorted.length - 1].fecha;
+  const lastDate = parseLocalDate(last);
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.round((today - lastDate) / (24*60*60*1000));
+}
+
 function renderWeightTrend(){
   const el = document.getElementById('weightTrendText');
   const { pesoActual, pesoHaceSemana } = getWeightTrend();
-  if (!pesoActual) { el.textContent = 'Aún no has registrado ningún peso.'; return; }
+  const dias = daysSinceLastWeight();
+
+  if (!pesoActual) {
+    el.innerHTML = 'Aún no has registrado ningún peso. Para una tendencia fiable, ideal pesarse cada 2-3 días (o a diario) siempre en las mismas condiciones.';
+    return;
+  }
+
+  let text = 'Peso actual: ' + pesoActual + ' kg';
   if (pesoHaceSemana) {
     const delta = Math.round((pesoActual - pesoHaceSemana) * 10) / 10;
-    el.textContent = 'Peso actual: ' + pesoActual + ' kg (' + (delta >= 0 ? '+' : '') + delta + ' kg vs. hace una semana)';
-  } else {
-    el.textContent = 'Peso actual: ' + pesoActual + ' kg';
+    text += ' (' + (delta >= 0 ? '+' : '') + delta + ' kg vs. hace una semana)';
   }
+  if (dias !== null && dias >= 3) {
+    text += '<br><span style="color:var(--amber);">⚠️ Han pasado ' + dias + ' días desde tu último peso — te iría bien registrar uno hoy.</span>';
+  }
+  el.innerHTML = text;
 }
 
 async function saveHeightValue(){
