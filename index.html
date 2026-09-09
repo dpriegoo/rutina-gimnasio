@@ -952,7 +952,7 @@ function showProfileScreen(){
 function updateProfileIndicator(){
   const p = getProfile();
   const el = document.getElementById('profileIndicator');
-  el.textContent = p ? ('👤 ' + p + ' · Cerrar sesión') : '';
+  el.textContent = p ? ('👤 ' + p + ' · cerrar sesión') : '';
 }
 
 // ---- View switching ----
@@ -1628,7 +1628,45 @@ function renderWeekSummary(){
       <div class="sum-title">Volumen esta semana: ${profile} vs. ${otherProfile}</div>
       ${barsHtml}
     </div>
+
+    <div class="sum-card" id="geminiCard">
+      <div class="sum-title">💡 Consejo de la semana</div>
+      <div id="geminiAdviceText" class="metric-empty" style="padding:8px 0; text-align:left;">Generando consejo…</div>
+    </div>
   `;
+
+  loadGeminiAdvice(profile, {
+    days: trainedDates.size,
+    volThis: volThis,
+    volLast: volLast,
+    improvements: improvements.slice(0, 5).map(i => i.ex + ' (+' + i.delta + 'kg)').join(', ')
+  });
+}
+
+function loadGeminiAdvice(profile, stats){
+  const today = localDateStr();
+  const cacheKey = 'geminiAdvice_' + profile + '_' + today;
+  const cached = localStorage.getItem(cacheKey);
+  const textEl = document.getElementById('geminiAdviceText');
+  if (cached) {
+    textEl.textContent = cached;
+    textEl.className = '';
+    return;
+  }
+  postToSheet({ action: 'advice', stats: stats })
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.advice) {
+        localStorage.setItem(cacheKey, data.advice);
+        textEl.textContent = data.advice;
+        textEl.className = '';
+      } else {
+        textEl.textContent = 'No se pudo generar el consejo esta vez. Prueba a reabrir el resumen más tarde.';
+      }
+    })
+    .catch(() => {
+      textEl.textContent = 'No se pudo generar el consejo esta vez. Prueba a reabrir el resumen más tarde.';
+    });
 }
 
 function weeklySeriesCount(dia, ejercicio){
