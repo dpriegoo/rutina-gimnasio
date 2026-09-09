@@ -187,6 +187,11 @@
     margin-top:2px;
   }
   .card.done .series-progress{color:var(--green);}
+  .beat-last-week{
+    font-size:11px;
+    color:var(--amber);
+    margin-top:2px;
+  }
   .done-badge{
     display:none;
     color:var(--green);
@@ -272,43 +277,6 @@
     line-height:1.42;
   }
   .howto b{color:var(--text); font-weight:600;}
-
-  .timer-fab{
-    position:fixed;
-    bottom:22px;
-    right:18px;
-    width:64px;
-    height:64px;
-    border-radius:50%;
-    background:var(--blue);
-    color:#fff;
-    border:none;
-    box-shadow:0 4px 14px rgba(0,0,0,0.4);
-    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
-    font-size:13px;
-    font-weight:700;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    line-height:1.1;
-    z-index:60;
-    transition:background 0.2s, transform 0.15s;
-  }
-  .timer-fab .timer-icon{font-size:18px; margin-bottom:1px;}
-  .timer-fab.running{
-    background:var(--green);
-    color:#0d1f16;
-  }
-  .timer-fab.done{
-    background:#e0656a;
-    color:#fff;
-    animation:timerPulse 0.6s ease-in-out infinite;
-  }
-  @keyframes timerPulse{
-    0%, 100% { transform:scale(1); }
-    50% { transform:scale(1.12); }
-  }
 
   .log-toggle{
     margin-top:8px;
@@ -404,30 +372,6 @@
     transform:translateX(-50%) translateY(0);
   }
 
-  .draft-section{
-    margin:26px 16px 0;
-    background:var(--card);
-    border:1px solid var(--card-border);
-    border-radius:14px;
-    padding:14px;
-  }
-  .draft-title{
-    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
-    font-size:14.5px;
-    font-weight:600;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:8px;
-  }
-  .draft-badge{
-    background:var(--blue);
-    color:#fff;
-    border-radius:10px;
-    padding:1px 9px;
-    font-size:12px;
-    font-weight:600;
-  }
   .draft-empty{color:var(--muted); font-size:13px; padding:6px 0;}
   .draft-item{
     display:flex;
@@ -485,19 +429,6 @@
     font-size:12px;
     font-weight:600;
   }
-  .finish-btn{
-    width:100%;
-    margin-top:12px;
-    background:var(--green);
-    color:#0d1f16;
-    border:none;
-    border-radius:10px;
-    padding:13px;
-    font-weight:700;
-    font-size:14.5px;
-  }
-  .finish-btn:disabled{opacity:0.35;}
-
   .profile-screen{
     position:fixed;
     inset:0;
@@ -864,15 +795,6 @@
 </div>
 
 <main id="main"></main>
-
-<div class="draft-section">
-  <div class="draft-title">
-    <span>Borrador de hoy</span>
-    <span class="draft-badge" id="draftCount">0</span>
-  </div>
-  <div id="draftList"></div>
-  <button class="finish-btn" id="finishBtn" onclick="finishDay()" disabled>✅ Terminar día y enviar</button>
-</div>
 </div>
 
 <div id="metricasView" style="display:none;">
@@ -953,11 +875,6 @@
 </div>
 
 <div class="toast" id="toast">Guardado ✓</div>
-
-<button class="timer-fab" id="timerFab" onclick="toggleRestTimer()">
-  <span class="timer-icon">⏱️</span>
-  <span id="timerLabel">3:00</span>
-</button>
 
 <script>
 // ---- Login real con Google ----
@@ -1663,98 +1580,10 @@ function showToast(msg){
   window._toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-// ---- Cronómetro de descanso (3 min) ----
-const REST_SECONDS = 180;
-let restRemaining = REST_SECONDS;
-let restTimerId = null;
-let restState = 'idle'; // idle | running | done
-
-function formatMMSS(s){
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return m + ':' + String(sec).padStart(2, '0');
-}
-
-function playBeep(){
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    for (let i = 0; i < 3; i++) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 880;
-      const start = ctx.currentTime + i * 0.35;
-      gain.gain.setValueAtTime(0.25, start);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
-      osc.start(start);
-      osc.stop(start + 0.28);
-    }
-  } catch (e) {}
-}
-
-function toggleRestTimer(){
-  if (restState === 'running') {
-    stopRestTimer(true);
-    return;
-  }
-  if (restState === 'done') {
-    stopRestTimer(true);
-    return;
-  }
-  startRestTimer();
-}
-
-function startRestTimer(){
-  restState = 'running';
-  restRemaining = REST_SECONDS;
-  const fab = document.getElementById('timerFab');
-  fab.classList.add('running');
-  fab.classList.remove('done');
-  updateRestLabel();
-  restTimerId = setInterval(() => {
-    restRemaining--;
-    updateRestLabel();
-    if (restRemaining <= 0) {
-      finishRestTimer();
-    }
-  }, 1000);
-}
-
-function finishRestTimer(){
-  clearInterval(restTimerId);
-  restState = 'done';
-  const fab = document.getElementById('timerFab');
-  fab.classList.remove('running');
-  fab.classList.add('done');
-  document.getElementById('timerLabel').textContent = '¡Ya!';
-  if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
-  playBeep();
-}
-
-function stopRestTimer(reset){
-  clearInterval(restTimerId);
-  restState = 'idle';
-  const fab = document.getElementById('timerFab');
-  fab.classList.remove('running', 'done');
-  restRemaining = REST_SECONDS;
-  if (reset) updateRestLabel();
-}
-
-function updateRestLabel(){
-  document.getElementById('timerLabel').textContent = formatMMSS(restRemaining);
-}
 
 function toggleLog(id){
   const form = document.getElementById(id);
   form.classList.toggle('open');
-}
-
-// ---- Draft (borrador de hoy) ----
-let draftEntries = JSON.parse(localStorage.getItem('draftEntries') || '[]');
-
-function persistDraft(){
-  localStorage.setItem('draftEntries', JSON.stringify(draftEntries));
 }
 
 function localDateStr(d){
@@ -2092,7 +1921,7 @@ function weeklySeriesCount(dia, ejercicio){
   const profile = getProfile();
   const weekStart = getWeekStart();
   const cache = window._progressCache || [];
-  const sheetCount = cache
+  return cache
     .filter(r => {
       if ((r['Perfil'] || '') !== profile) return false;
       if (r['Día'] !== dia || r['Ejercicio'] !== ejercicio) return false;
@@ -2100,10 +1929,6 @@ function weeklySeriesCount(dia, ejercicio){
       return f >= weekStart;
     })
     .reduce((sum, r) => sum + (Number(r['Series']) || 0), 0);
-  const draftCount = draftEntries
-    .filter(e => e.dia === dia && e.ejercicio === ejercicio)
-    .reduce((sum, e) => sum + (Number(e.series) || 0), 0);
-  return sheetCount + draftCount;
 }
 
 function lastSessionValue(ejercicio){
@@ -2112,13 +1937,39 @@ function lastSessionValue(ejercicio){
   const fromSheet = cache
     .filter(r => (r['Perfil'] || '') === profile && r['Ejercicio'] === ejercicio)
     .map(r => ({ fecha: String(r['Fecha']).slice(0,10), peso: r['Peso (kg)'], reps: r['Reps'] }));
-  const fromDraft = draftEntries
-    .filter(e => e.ejercicio === ejercicio)
-    .map(e => ({ fecha: e.fecha, peso: e.peso, reps: e.reps }));
-  const combined = fromSheet.concat(fromDraft);
-  if (combined.length === 0) return null;
-  combined.sort((a, b) => a.fecha.localeCompare(b.fecha));
-  return combined[combined.length - 1];
+  if (fromSheet.length === 0) return null;
+  fromSheet.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  return fromSheet[fromSheet.length - 1];
+}
+
+function lastWeekBestMark(dia, ejercicio){
+  const profile = getProfile();
+  const weekStart = getWeekStart();
+  const lastWeekStart = getWeekStartOffset(-1);
+  const cache = window._progressCache || [];
+  const rows = cache.filter(r => {
+    if ((r['Perfil'] || '') !== profile) return false;
+    if (r['Día'] !== dia || r['Ejercicio'] !== ejercicio) return false;
+    const f = parseLocalDate(r['Fecha']);
+    return f >= lastWeekStart && f < weekStart;
+  });
+  if (rows.length === 0) return null;
+
+  if (isTimedExercise(ejercicio)) {
+    let best = rows[0];
+    rows.forEach(r => { if ((Number(r['Reps']) || 0) > (Number(best['Reps']) || 0)) best = r; });
+    return { timed: true, reps: Number(best['Reps']) || 0 };
+  }
+
+  let best = rows[0];
+  let bestRM = 0;
+  rows.forEach(r => {
+    const p = Number(r['Peso (kg)']) || 0;
+    const rp = Number(r['Reps']) || 0;
+    const rm = rp ? p * (1 + rp / 30) : 0;
+    if (rm > bestRM) { bestRM = rm; best = r; }
+  });
+  return { timed: false, peso: Number(best['Peso (kg)']) || 0, reps: Number(best['Reps']) || 0 };
 }
 
 function updateCardHighlights(){
@@ -2132,6 +1983,18 @@ function updateCardHighlights(){
     const prog = cardEl.querySelector('.series-progress');
     if (prog) prog.textContent = count + '/3 esta semana';
 
+    const beatEl = cardEl.querySelector('.beat-last-week');
+    if (beatEl) {
+      const lastWeek = lastWeekBestMark(diaForCount, exName);
+      if (!lastWeek) {
+        beatEl.textContent = '';
+      } else if (lastWeek.timed) {
+        beatEl.textContent = '🎯 Supera: ' + lastWeek.reps + 's (semana pasada)';
+      } else {
+        beatEl.textContent = '🎯 Supera: ' + lastWeek.peso + 'kg × ' + lastWeek.reps + ' (semana pasada)';
+      }
+    }
+
     const last = lastSessionValue(exName);
     const pesoInput = cardEl.querySelector('.inp-peso');
     const repsInput = cardEl.querySelector('.inp-reps');
@@ -2142,128 +2005,6 @@ function updateCardHighlights(){
       if (last && repsInput) repsInput.placeholder = 'Últ: ' + last.reps;
     }
   });
-}
-
-function addDraft(dia, grupo, ejercicio, peso, reps, series){
-  draftEntries.push({
-    id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-    fecha: localDateStr(),
-    perfil: getProfile() || 'Sin perfil',
-    dia: dia, grupo: grupo, ejercicio: ejercicio,
-    peso: peso, reps: reps, series: series, nota: ''
-  });
-  persistDraft();
-  renderDraftList();
-}
-
-function removeDraft(id){
-  draftEntries = draftEntries.filter(e => e.id !== id);
-  persistDraft();
-  renderDraftList();
-}
-
-let editingDraftId = null;
-
-function startEditDraft(id){
-  editingDraftId = id;
-  renderDraftList();
-}
-
-function cancelEditDraft(){
-  editingDraftId = null;
-  renderDraftList();
-}
-
-function saveEditDraft(id){
-  const row = document.querySelector(`[data-draft-id="${id}"]`);
-  const entry = draftEntries.find(e => e.id === id);
-  if (!entry) { editingDraftId = null; renderDraftList(); return; }
-  if (isTimedExercise(entry.ejercicio)) {
-    const reps = row.querySelector('.edit-reps').value;
-    if (reps) entry.reps = reps;
-  } else {
-    const peso = row.querySelector('.edit-peso').value.replace(',', '.').trim();
-    const reps = row.querySelector('.edit-reps').value;
-    const series = row.querySelector('.edit-series').value;
-    if (peso && reps) {
-      entry.peso = peso; entry.reps = reps; entry.series = series || entry.series;
-    }
-  }
-  editingDraftId = null;
-  persistDraft();
-  renderDraftList();
-}
-
-function renderDraftList(){
-  const listEl = document.getElementById('draftList');
-  const countEl = document.getElementById('draftCount');
-  const btn = document.getElementById('finishBtn');
-  countEl.textContent = draftEntries.length;
-  btn.disabled = draftEntries.length === 0;
-  if (draftEntries.length === 0){
-    listEl.innerHTML = '<div class="draft-empty">Todavía no has registrado ninguna serie hoy.</div>';
-    return;
-  }
-  listEl.innerHTML = draftEntries.map(e => {
-    const timed = isTimedExercise(e.ejercicio);
-    if (editingDraftId === e.id) {
-      if (timed) {
-        return `
-          <div class="draft-item" data-draft-id="${e.id}">
-            <div class="draft-edit-form">
-              <input class="edit-reps" type="number" inputmode="numeric" value="${e.reps}" placeholder="segundos">
-              <button class="draft-edit-save" onclick="saveEditDraft('${e.id}')">OK</button>
-            </div>
-            <button class="draft-del" onclick="cancelEditDraft()">✕</button>
-          </div>
-        `;
-      }
-      return `
-        <div class="draft-item" data-draft-id="${e.id}">
-          <div class="draft-edit-form">
-            <input class="edit-peso" type="text" inputmode="decimal" value="${e.peso}" placeholder="kg">
-            <input class="edit-reps" type="number" inputmode="numeric" value="${e.reps}" placeholder="reps">
-            <input class="edit-series" type="number" inputmode="numeric" value="${e.series}" placeholder="series">
-            <button class="draft-edit-save" onclick="saveEditDraft('${e.id}')">OK</button>
-          </div>
-          <button class="draft-del" onclick="cancelEditDraft()">✕</button>
-        </div>
-      `;
-    }
-    return `
-      <div class="draft-item" data-draft-id="${e.id}">
-        <div class="di-text">${e.ejercicio}<div class="di-sub">${timed ? e.reps + ' seg' : e.peso + ' kg · ' + e.reps + ' reps'} · ${e.series} series · ${e.perfil}</div></div>
-        <button class="draft-edit" onclick="startEditDraft('${e.id}')">✏️</button>
-        <button class="draft-del" onclick="removeDraft('${e.id}')">✕</button>
-      </div>
-    `;
-  }).join('');
-  updateCardHighlights();
-}
-
-function finishDay(){
-  if (draftEntries.length === 0) { showToast('No hay series en el borrador'); return; }
-  const count = draftEntries.length;
-  postToSheet({ entries: draftEntries }).then(() => {}).catch(() => {});
-
-  if (!window._progressCache) window._progressCache = [];
-  draftEntries.forEach(e => {
-    window._progressCache.push({
-      'Fecha': e.fecha, 'Perfil': e.perfil, 'Día': e.dia, 'Grupo': e.grupo,
-      'Ejercicio': e.ejercicio, 'Peso (kg)': e.peso, 'Reps': e.reps, 'Series': e.series,
-      'Nota': e.nota, 'ID': e.id
-    });
-  });
-
-  showToast('Día enviado ✓ (' + count + ' series)');
-  draftEntries = [];
-  persistDraft();
-  renderDraftList();
-  renderTabs();
-}
-
-function saveLog(id, dia, grupo, ejercicio, defaultSeries){
-  // deprecated, kept as no-op in case of stale cached references
 }
 
 // ---- Pending rows per card (acumular antes de aceptar) ----
@@ -2308,17 +2049,39 @@ function removePendingRow(logId, idx){
   renderPendingWrap(logId);
 }
 
-function acceptPending(logId){
+async function acceptPending(logId){
   const wrap = document.getElementById('pendingWrap-' + logId);
   if (!wrap) return;
   const dia = wrap.dataset.dia, grupo = wrap.dataset.grupo, ejercicio = wrap.dataset.ejercicio;
   const rows = pendingRows[logId] || [];
   if (rows.length === 0) return;
-  rows.forEach(r => addDraft(dia, grupo, ejercicio, r.peso, r.reps, 1));
-  showToast('Añadido al borrador ✓ (' + rows.length + (rows.length > 1 ? ' series)' : ' serie)'));
+
+  const entries = rows.map(r => ({
+    fecha: localDateStr(),
+    perfil: getProfile(),
+    dia: dia, grupo: grupo, ejercicio: ejercicio,
+    peso: r.peso, reps: r.reps, series: 1,
+    id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+    nota: '',
+  }));
+
+  postToSheet({ entries: entries }).then(() => {}).catch(() => {});
+
+  if (!window._progressCache) window._progressCache = [];
+  entries.forEach(entry => {
+    window._progressCache.push({
+      'Fecha': entry.fecha, 'Perfil': entry.perfil, 'Día': entry.dia, 'Grupo': entry.grupo,
+      'Ejercicio': entry.ejercicio, 'Peso (kg)': entry.peso, 'Reps': entry.reps, 'Series': entry.series,
+      'Nota': '', 'ID': entry.id,
+    });
+  });
+
+  showToast('Guardado ✓ (' + rows.length + (rows.length > 1 ? ' series)' : ' serie)'));
   pendingRows[logId] = [];
   persistPending();
   renderPendingWrap(logId);
+  renderTabs();
+  updateCardHighlights();
 }
 
 function renderPendingWrap(logId){
@@ -2576,6 +2339,7 @@ function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
         <div class="sets">${ex.sets}</div>
       </div>
       <div class="series-progress"></div>
+      <div class="beat-last-week"></div>
       <div class="machine">
         <div class="machine-row"><span class="tag primary">USA</span><span class="txt">${ex.primary}</span></div>
         <div class="machine-row"><span class="tag alt">SI OCUPADA</span></div>
@@ -2660,7 +2424,6 @@ function renderDay(){
 loadCachedProgress();
 renderTabs();
 renderDay();
-renderDraftList();
 initGoogleSignIn();
 
 if (getProfile() && getIdToken()) {
