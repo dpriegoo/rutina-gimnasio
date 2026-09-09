@@ -1105,6 +1105,19 @@ function computeMovingAverage(sorted){
   });
 }
 
+function dailyVolumeMap(){
+  const profile = getProfile();
+  const cache = window._progressCache || [];
+  const map = {};
+  cache
+    .filter(r => (r['Perfil'] || '') === profile)
+    .forEach(r => {
+      const f = String(r['Fecha']).slice(0, 10);
+      map[f] = (map[f] || 0) + rowVolume(r);
+    });
+  return map;
+}
+
 function renderWeightChart(){
   const subEl = document.getElementById('weightChartSub');
   const ctx = document.getElementById('weightChart');
@@ -1124,15 +1137,26 @@ function renderWeightChart(){
   const labels = sorted.map(w => w.fecha.slice(5));
   const raw = sorted.map(w => w.peso);
   const movingAvg = computeMovingAverage(sorted);
+  const volMap = dailyVolumeMap();
+  const volData = sorted.map(w => Math.round(volMap[w.fecha] || 0));
 
-  subEl.textContent = 'Puntos: peso de cada día · línea gruesa: media móvil de 7 días (la tendencia real)';
+  subEl.textContent = 'Puntos y línea verde: peso (media 7 días) · barras ámbar: volumen movido ese día en el gimnasio';
 
   weightChartInstance = new Chart(ctx, {
-    type: 'line',
     data: {
       labels: labels,
       datasets: [
         {
+          type: 'bar',
+          label: 'Volumen ese día (kg)',
+          data: volData,
+          backgroundColor: 'rgba(242,169,59,0.35)',
+          yAxisID: 'y1',
+          order: 3,
+          borderRadius: 3,
+        },
+        {
+          type: 'line',
           label: 'Peso (kg)',
           data: raw,
           borderColor: 'rgba(63,124,240,0.35)',
@@ -1141,8 +1165,11 @@ function renderWeightChart(){
           pointBackgroundColor: 'rgba(63,124,240,0.6)',
           borderWidth: 1,
           tension: 0.2,
+          yAxisID: 'y',
+          order: 2,
         },
         {
+          type: 'line',
           label: 'Media 7 días',
           data: movingAvg,
           borderColor: '#4caf7d',
@@ -1151,6 +1178,8 @@ function renderWeightChart(){
           borderWidth: 3,
           tension: 0.3,
           fill: true,
+          yAxisID: 'y',
+          order: 1,
         }
       ]
     },
@@ -1162,7 +1191,8 @@ function renderWeightChart(){
       },
       scales: {
         x: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } },
-        y: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } }
+        y: { position: 'left', ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' }, title: { display: true, text: 'kg corporales', color: '#9aa1ab', font: { size: 10 } } },
+        y1: { position: 'right', ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { display: false }, title: { display: true, text: 'volumen gym (kg)', color: '#9aa1ab', font: { size: 10 } } }
       }
     }
   });
