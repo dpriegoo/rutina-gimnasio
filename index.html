@@ -731,6 +731,27 @@
 
   .metric-empty{color:var(--muted); font-size:13px; text-align:center; padding:20px 0;}
 
+  .gemini-loading{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    color:var(--muted);
+    font-size:13px;
+    padding:8px 0;
+  }
+  .gemini-spinner{
+    flex:0 0 auto;
+    width:16px;
+    height:16px;
+    border:2px solid var(--card-border);
+    border-top-color:var(--amber);
+    border-radius:50%;
+    animation:geminiSpin 0.8s linear infinite;
+  }
+  @keyframes geminiSpin{
+    to { transform:rotate(360deg); }
+  }
+
   .chart-wrap{
     position:relative;
     height:220px;
@@ -1653,6 +1674,8 @@ function loadGeminiAdvice(profile, stats){
     textEl.className = '';
     return;
   }
+  textEl.className = '';
+  textEl.innerHTML = '<div class="gemini-loading"><div class="gemini-spinner"></div><span>Generando consejo… puede tardar hasta 30s la primera vez del día</span></div>';
   postToSheet({ action: 'advice', stats: stats })
     .then(res => res.json())
     .then(data => {
