@@ -150,6 +150,31 @@
     display:flex;
     gap:12px;
     transition:border-color 0.2s, background 0.2s;
+    position:relative;
+  }
+  .borrow-badge{
+    display:inline-block;
+    background:rgba(242,169,59,0.18);
+    color:var(--amber);
+    font-size:10px;
+    font-weight:700;
+    padding:2px 6px;
+    border-radius:6px;
+    margin-left:6px;
+    vertical-align:middle;
+  }
+  .borrow-remove{
+    position:absolute;
+    top:10px;
+    right:10px;
+    background:var(--icon-bg);
+    border:1px solid var(--card-border);
+    color:var(--muted);
+    width:22px;
+    height:22px;
+    border-radius:7px;
+    font-size:12px;
+    line-height:1;
   }
   .card.done{
     border-color:var(--green);
@@ -1821,42 +1846,6 @@ function hideWeekSummary(){
   document.getElementById('summaryScreen').style.display = 'none';
 }
 
-async function logPendingExercise(id, name, grupo, diaName){
-  const pesoEl = document.getElementById(id + '-peso');
-  const repsEl = document.getElementById(id + '-reps');
-  const peso = pesoEl.value.replace(',', '.').trim();
-  const reps = repsEl.value;
-  if (!peso || !reps || isNaN(parseFloat(peso))) {
-    showToast('Falta peso o reps');
-    return;
-  }
-  const entry = {
-    fecha: localDateStr(),
-    perfil: getProfile(),
-    dia: diaName,
-    grupo: grupo,
-    ejercicio: name,
-    peso: peso,
-    reps: reps,
-    series: 1,
-    id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-  };
-  try {
-    await postToSheet({ entries: [entry] });
-  } catch (e) {}
-
-  if (!window._progressCache) window._progressCache = [];
-  window._progressCache.push({
-    'Fecha': entry.fecha, 'Perfil': entry.perfil, 'Día': entry.dia, 'Grupo': entry.grupo,
-    'Ejercicio': entry.ejercicio, 'Peso (kg)': entry.peso, 'Reps': entry.reps, 'Series': entry.series,
-    'Nota': '', 'ID': entry.id
-  });
-  showToast('Serie registrada ✓ en ' + diaName.split('·')[0].trim());
-  renderTabs();
-  updateCardHighlights();
-  renderWeekSummary();
-}
-
 function findExerciseGroup(exerciseName){
   let group = null;
   DAYS.forEach(day => {
@@ -2002,14 +1991,10 @@ function renderWeekSummary(){
               ${m.recommendedDay ? `
                 <div class="metric-sub" style="margin-top:4px; margin-bottom:6px; text-align:left;">
                   ${m.recommendedDay.sameExercise
-                    ? 'No queda otro día con ese músculo suelto, así que tocaría repetir este mismo ejercicio en la sesión de ' + m.recommendedDay.dayLabel + '. No es lo ideal (mejor repartido que junto), pero si no hay otro hueco esta semana, hazlo al final de esa sesión, contando como de ' + p.dayLabel + '.'
-                    : 'Aprovecha esa sesión (trabaja el mismo músculo, sin repetir este ejercicio) para añadir esta serie, contando igualmente como de ' + p.dayLabel + '.'}
+                    ? 'No queda otro día con ese músculo suelto, así que tocaría repetir este mismo ejercicio en la sesión de ' + m.recommendedDay.dayLabel + '. No es lo ideal (mejor repartido que junto), pero si no hay otro hueco esta semana, añádelo igualmente.'
+                    : 'Aprovecha esa sesión (trabaja el mismo músculo, sin repetir este ejercicio).'}
                 </div>
-                <div class="draft-edit-form">
-                  <input class="edit-peso" type="text" inputmode="decimal" placeholder="kg" id="${m.id}-peso">
-                  <input class="edit-reps" type="number" inputmode="numeric" placeholder="reps" id="${m.id}-reps">
-                  <button class="draft-edit-save" onclick="logPendingExercise('${m.id}','${m.name.replace(/'/g,"\\'")}','${m.grupo.replace(/'/g,"\\'")}','${m.originalDayName.replace(/'/g,"\\'")}')">+ Añadir</button>
-                </div>
+                <button class="accept-btn" onclick="addBorrowedExercise('${m.recommendedDay.dayName.replace(/'/g,"\\'")}','${m.name.replace(/'/g,"\\'")}','${m.grupo.replace(/'/g,"\\'")}','${m.originalDayName.replace(/'/g,"\\'")}')">+ Añadir a ${m.recommendedDay.dayLabel}</button>
               ` : ''}
             </div>
           `).join('')}
@@ -2141,7 +2126,8 @@ function updateCardHighlights(){
   if (!day) return;
   document.querySelectorAll('#main .card[data-exercise]').forEach(cardEl => {
     const exName = cardEl.getAttribute('data-exercise');
-    const count = weeklySeriesCount(day.name, exName);
+    const diaForCount = cardEl.getAttribute('data-borrow-dia') || day.name;
+    const count = weeklySeriesCount(diaForCount, exName);
     cardEl.classList.toggle('done', count >= 3);
     const prog = cardEl.querySelector('.series-progress');
     if (prog) prog.textContent = count + '/3 esta semana';
@@ -2537,6 +2523,78 @@ function loadCachedProgress(){
   } catch (e) {}
 }
 
+let borrowedExercises = JSON.parse(localStorage.getItem('borrowedExercises') || '{}');
+
+function findExerciseObjInDay(exerciseName, dayName){
+  let found = null;
+  DAYS.forEach(day => {
+    if (day.name !== dayName) return;
+    day.groups.forEach(g => {
+      g.exercises.forEach(ex => {
+        if (ex.name === exerciseName) found = ex;
+      });
+    });
+  });
+  return found;
+}
+
+function addBorrowedExercise(targetDayName, exerciseName, grupo, originalDayName){
+  const exObj = findExerciseObjInDay(exerciseName, originalDayName);
+  if (!exObj) return;
+  if (!borrowedExercises[targetDayName]) borrowedExercises[targetDayName] = [];
+  const already = borrowedExercises[targetDayName].some(b => b.name === exerciseName && b.originalDayName === originalDayName);
+  if (already) {
+    showToast('Ya está añadido a ese día');
+    return;
+  }
+  borrowedExercises[targetDayName].push({
+    name: exObj.name, sets: exObj.sets, icon: exObj.icon, primary: exObj.primary,
+    alts: exObj.alts, howTo: exObj.howTo, grupo: grupo,
+    originalDayName: originalDayName,
+    originalDayLabel: originalDayName.split('·')[0].trim(),
+  });
+  localStorage.setItem('borrowedExercises', JSON.stringify(borrowedExercises));
+  showToast('Añadido a ' + targetDayName.split('·')[0].trim() + ' ✓');
+  renderDay();
+}
+
+function removeBorrowedExercise(targetDayName, idx){
+  if (borrowedExercises[targetDayName]) {
+    borrowedExercises[targetDayName].splice(idx, 1);
+    if (borrowedExercises[targetDayName].length === 0) delete borrowedExercises[targetDayName];
+    localStorage.setItem('borrowedExercises', JSON.stringify(borrowedExercises));
+  }
+  renderDay();
+}
+
+function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
+  return `
+    <div class="icon-box">${ICONS[ex.icon] || ''}</div>
+    <div class="card-body">
+      <div class="card-top">
+        <div class="exname">${ex.name}<span class="zone-badge" style="background:${ZONE_META[ICON_TO_ZONE[ex.icon]].color}" title="${ZONE_META[ICON_TO_ZONE[ex.icon]].label}">${ZONE_META[ICON_TO_ZONE[ex.icon]].icon}</span>${extraBadgeHtml || ''}<span class="done-badge">✓ hecho</span></div>
+        <div class="sets">${ex.sets}</div>
+      </div>
+      <div class="series-progress"></div>
+      <div class="machine">
+        <div class="machine-row"><span class="tag primary">USA</span><span class="txt">${ex.primary}</span></div>
+        <div class="machine-row"><span class="tag alt">SI OCUPADA</span></div>
+        <div class="alt-list">${ex.alts.join(' &nbsp;·&nbsp; ')}</div>
+      </div>
+      <div class="howto"><b>Cómo hacerlo:</b> ${ex.howTo}</div>
+      <button class="log-toggle" onclick="toggleLog('${logId}')">📈 Registrar serie</button>
+      <div class="log-form" id="${logId}">
+        ${isTimedExercise(ex.name)
+          ? `<input class="inp-reps" type="number" inputmode="numeric" placeholder="Segundos">`
+          : `<input class="inp-peso" type="text" inputmode="decimal" placeholder="Peso kg">
+             <input class="inp-reps" type="number" inputmode="numeric" placeholder="Reps">`}
+        <button class="log-add" onclick="addPendingRow('${logId}')">+ Añadir</button>
+      </div>
+      <div class="pending-wrap" id="pendingWrap-${logId}" data-dia="${dia.replace(/"/g,'&quot;')}" data-grupo="${grupo.replace(/"/g,'&quot;')}" data-ejercicio="${ex.name.replace(/"/g,'&quot;')}"></div>
+    </div>
+  `;
+}
+
 function renderDay(){
   const day = DAYS[currentDay];
   const main = document.getElementById('main');
@@ -2560,41 +2618,41 @@ function renderDay(){
 
     g.exercises.forEach((ex, exIdx) => {
       const logId = 'log-' + currentDay + '-' + g.label.replace(/\s/g,'') + '-' + exIdx;
-      const defaultSeries = (ex.sets.split('·')[0] || '3').trim();
       const card = document.createElement('div');
       card.className = 'card';
       card.setAttribute('data-exercise', ex.name);
-      card.innerHTML = `
-        <div class="icon-box">${ICONS[ex.icon] || ''}</div>
-        <div class="card-body">
-          <div class="card-top">
-            <div class="exname">${ex.name}<span class="zone-badge" style="background:${ZONE_META[ICON_TO_ZONE[ex.icon]].color}" title="${ZONE_META[ICON_TO_ZONE[ex.icon]].label}">${ZONE_META[ICON_TO_ZONE[ex.icon]].icon}</span><span class="done-badge">✓ hecho</span></div>
-            <div class="sets">${ex.sets}</div>
-          </div>
-          <div class="series-progress"></div>
-          <div class="machine">
-            <div class="machine-row"><span class="tag primary">USA</span><span class="txt">${ex.primary}</span></div>
-            <div class="machine-row"><span class="tag alt">SI OCUPADA</span></div>
-            <div class="alt-list">${ex.alts.join(' &nbsp;·&nbsp; ')}</div>
-          </div>
-          <div class="howto"><b>Cómo hacerlo:</b> ${ex.howTo}</div>
-          <button class="log-toggle" onclick="toggleLog('${logId}')">📈 Registrar serie</button>
-          <div class="log-form" id="${logId}">
-            ${isTimedExercise(ex.name)
-              ? `<input class="inp-reps" type="number" inputmode="numeric" placeholder="Segundos">`
-              : `<input class="inp-peso" type="text" inputmode="decimal" placeholder="Peso kg">
-                 <input class="inp-reps" type="number" inputmode="numeric" placeholder="Reps">`}
-            <button class="log-add" onclick="addPendingRow('${logId}')">+ Añadir</button>
-          </div>
-          <div class="pending-wrap" id="pendingWrap-${logId}" data-dia="${day.name.replace(/"/g,'&quot;')}" data-grupo="${g.label.replace(/"/g,'&quot;')}" data-ejercicio="${ex.name.replace(/"/g,'&quot;')}"></div>
-        </div>
-      `;
+      card.innerHTML = buildCardHTML(ex, day.name, g.label, logId, '');
       groupEl.appendChild(card);
       renderPendingWrap(logId);
     });
 
     main.appendChild(groupEl);
   });
+
+  const borrowed = borrowedExercises[day.name] || [];
+  if (borrowed.length > 0) {
+    const groupEl = document.createElement('div');
+    groupEl.className = 'group';
+    const label = document.createElement('div');
+    label.className = 'group-label';
+    label.innerHTML = '<span class="dot" style="background:var(--amber);"></span>Pendiente de otros días';
+    groupEl.appendChild(label);
+
+    borrowed.forEach((ex, bIdx) => {
+      const logId = 'borrow-' + currentDay + '-' + bIdx;
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.setAttribute('data-exercise', ex.name);
+      card.setAttribute('data-borrow-dia', ex.originalDayName);
+      const badge = `<span class="borrow-badge" title="Pendiente de ${ex.originalDayLabel}">de ${ex.originalDayLabel}</span>`;
+      card.innerHTML = buildCardHTML(ex, ex.originalDayName, ex.grupo, logId, badge) +
+        `<button class="borrow-remove" onclick="removeBorrowedExercise('${day.name.replace(/'/g,"\\'")}', ${bIdx})" title="Quitar">✕</button>`;
+      groupEl.appendChild(card);
+      renderPendingWrap(logId);
+    });
+
+    main.appendChild(groupEl);
+  }
 
   updateCardHighlights();
 }
