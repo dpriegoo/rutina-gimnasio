@@ -851,6 +851,12 @@
   </div>
 
   <div class="metric-card">
+    <div class="metric-title">Peso corporal</div>
+    <div class="metric-sub" id="weightChartSub">Puntos: peso de cada día · línea gruesa: media móvil de 7 días (la tendencia real)</div>
+    <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+  </div>
+
+  <div class="metric-card">
     <div class="metric-title">Constancia</div>
     <div class="metric-sub" id="heatmapSub">Últimos ~3 meses</div>
     <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmapGrid"></div></div>
@@ -1056,6 +1062,7 @@ async function loadBodyStats(){
     window._weightHistory = Array.isArray(weightsRes) ? weightsRes : [];
     if (window._height) document.getElementById('heightInput').value = window._height;
     renderWeightTrend();
+    renderWeightChart();
   } catch (e) {}
 }
 
@@ -1080,6 +1087,85 @@ function daysSinceLastWeight(){
   const lastDate = parseLocalDate(last);
   const today = new Date(); today.setHours(0,0,0,0);
   return Math.round((today - lastDate) / (24*60*60*1000));
+}
+
+let weightChartInstance = null;
+
+function computeMovingAverage(sorted){
+  return sorted.map(w => {
+    const d = parseLocalDate(w.fecha);
+    const windowStart = new Date(d);
+    windowStart.setDate(windowStart.getDate() - 6);
+    const inWindow = sorted.filter(x => {
+      const xd = parseLocalDate(x.fecha);
+      return xd >= windowStart && xd <= d;
+    });
+    const avg = inWindow.reduce((s, x) => s + x.peso, 0) / inWindow.length;
+    return Math.round(avg * 10) / 10;
+  });
+}
+
+function renderWeightChart(){
+  const subEl = document.getElementById('weightChartSub');
+  const ctx = document.getElementById('weightChart');
+  if (weightChartInstance) { weightChartInstance.destroy(); weightChartInstance = null; }
+
+  const weights = window._weightHistory || [];
+  if (!window.Chart) {
+    subEl.textContent = '⚠️ No se pudo cargar la librería de gráficos.';
+    return;
+  }
+  if (weights.length === 0) {
+    subEl.textContent = 'Registra algún peso para ver la gráfica.';
+    return;
+  }
+
+  const sorted = weights.slice().sort((a,b) => a.fecha.localeCompare(b.fecha));
+  const labels = sorted.map(w => w.fecha.slice(5));
+  const raw = sorted.map(w => w.peso);
+  const movingAvg = computeMovingAverage(sorted);
+
+  subEl.textContent = 'Puntos: peso de cada día · línea gruesa: media móvil de 7 días (la tendencia real)';
+
+  weightChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Peso (kg)',
+          data: raw,
+          borderColor: 'rgba(63,124,240,0.35)',
+          backgroundColor: 'transparent',
+          pointRadius: 3,
+          pointBackgroundColor: 'rgba(63,124,240,0.6)',
+          borderWidth: 1,
+          tension: 0.2,
+        },
+        {
+          label: 'Media 7 días',
+          data: movingAvg,
+          borderColor: '#4caf7d',
+          backgroundColor: 'rgba(76,175,125,0.12)',
+          pointRadius: 0,
+          borderWidth: 3,
+          tension: 0.3,
+          fill: true,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, labels: { color: '#9aa1ab', font: { size: 11 }, boxWidth: 12 } }
+      },
+      scales: {
+        x: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } },
+        y: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } }
+      }
+    }
+  });
 }
 
 function renderWeightTrend(){
@@ -1125,6 +1211,7 @@ async function saveWeightValue(){
     window._weightHistory.push({ fecha: today, peso: parseFloat(val) });
     document.getElementById('weightInput').value = '';
     renderWeightTrend();
+    renderWeightChart();
     showToast('Peso registrado ✓');
   } catch(e) {
     showToast('No se pudo registrar el peso');
