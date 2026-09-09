@@ -13,6 +13,7 @@
 <link rel="icon" href="data:,">
 <title>IronLog · Rutina de fuerza</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js" defer></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
     --bg:#111316;
@@ -763,17 +764,9 @@
 <body>
 
 <div class="profile-screen" id="profileScreen">
-  <div class="profile-title">¿Quién entrena hoy?</div>
-  <div class="profile-grid">
-    <button class="profile-card" onclick="selectProfile('David')">
-      <div class="avatar" style="background:#3f7cf0;">D</div>
-      <span>David</span>
-    </button>
-    <button class="profile-card" onclick="selectProfile('Pedro')">
-      <div class="avatar" style="background:#f2a93b;">P</div>
-      <span>Pedro</span>
-    </button>
-  </div>
+  <div class="profile-title">Inicia sesión para entrar</div>
+  <div id="googleSignInBtn"></div>
+  <div id="loginError" style="color:#e0656a; font-size:13px; display:none; max-width:260px; text-align:center;"></div>
 </div>
 
 <header>
@@ -872,27 +865,94 @@
 </button>
 
 <script>
-// ---- Profile (selector estilo Netflix) ----
+// ---- Login real con Google ----
+const GOOGLE_CLIENT_ID = '681503048133-btp3sc7qud8libfnglb2tc728uir57n6.apps.googleusercontent.com';
+const EMAIL_TO_PROFILE = {
+  'dpriegooliva@gmail.com': 'David',
+  'valleromeropedro@gmail.com': 'Pedro'
+};
+
 function getProfile(){
   return localStorage.getItem('profile');
 }
 
-function selectProfile(name){
-  localStorage.setItem('profile', name);
+function getIdToken(){
+  return localStorage.getItem('idToken') || '';
+}
+
+function decodeJwt(token){
+  try {
+    const payload = token.split('.')[1];
+    const json = decodeURIComponent(
+      atob(payload.replace(/-/g,'+').replace(/_/g,'/'))
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(json);
+  } catch(e) { return null; }
+}
+
+function handleCredentialResponse(response){
+  const errEl = document.getElementById('loginError');
+  const payload = decodeJwt(response.credential);
+  if (!payload || !payload.email) {
+    errEl.textContent = 'No se pudo verificar la cuenta.';
+    errEl.style.display = 'block';
+    return;
+  }
+  const profile = EMAIL_TO_PROFILE[payload.email];
+  if (!profile) {
+    errEl.textContent = 'La cuenta ' + payload.email + ' no tiene acceso a esta app.';
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+  localStorage.setItem('idToken', response.credential);
+  localStorage.setItem('profile', profile);
   document.getElementById('profileScreen').style.display = 'none';
   updateProfileIndicator();
   renderTabs();
   updateCardHighlights();
+  fetchProgressSilently();
+}
+
+function initGoogleSignIn(){
+  if (!window.google || !google.accounts || !google.accounts.id) {
+    setTimeout(initGoogleSignIn, 300);
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleCredentialResponse
+  });
+  const btn = document.getElementById('googleSignInBtn');
+  if (btn) {
+    google.accounts.id.renderButton(btn, { theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with' });
+  }
+}
+
+function handleUnauthorized(){
+  localStorage.removeItem('profile');
+  localStorage.removeItem('idToken');
+  document.getElementById('loginError').textContent = 'Tu sesión ha caducado, inicia sesión de nuevo.';
+  document.getElementById('loginError').style.display = 'block';
+  document.getElementById('profileScreen').style.display = 'flex';
+  updateProfileIndicator();
 }
 
 function showProfileScreen(){
+  localStorage.removeItem('profile');
+  localStorage.removeItem('idToken');
+  document.getElementById('loginError').style.display = 'none';
   document.getElementById('profileScreen').style.display = 'flex';
+  updateProfileIndicator();
 }
 
 function updateProfileIndicator(){
   const p = getProfile();
   const el = document.getElementById('profileIndicator');
-  el.textContent = p ? ('👤 ' + p + ' · cambiar') : '';
+  el.textContent = p ? ('👤 ' + p + ' · cerrar sesión') : '';
 }
 
 // ---- View switching ----
@@ -917,8 +977,9 @@ async function loadMetrics(force){
   const btn = document.getElementById('refreshBtn');
   btn.textContent = '⏳ Cargando…';
   try {
-    const res = await fetch(getSheetUrl());
+    const res = await fetch(getSheetUrlWithSecret());
     const data = await res.json();
+    if (data && data.error === 'unauthorized') { handleUnauthorized(); return; }
     window._progressCache = data;
     try { localStorage.setItem('progressCache', JSON.stringify(data)); } catch(e) {}
     renderHeatmap();
@@ -961,11 +1022,7 @@ async function saveEditHist(id){
     series = row.querySelector('.edit-series').value;
   }
   try {
-    await fetch(getSheetUrl(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'update', id, peso, reps, series })
-    });
+    await postToSheet({ action: 'update', id, peso, reps, series });
   } catch(e) {}
   const row2 = window._progressCache.find(r => String(r['ID']) === String(id));
   if (row2) { row2['Peso (kg)'] = peso; row2['Reps'] = reps; row2['Series'] = series; }
@@ -978,11 +1035,7 @@ async function saveEditHist(id){
 
 async function deleteHist(id){
   try {
-    await fetch(getSheetUrl(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'delete', id })
-    });
+    await postToSheet({ action: 'delete', id });
   } catch(e) {}
   window._progressCache = window._progressCache.filter(r => String(r['ID']) !== String(id));
   showToast('Registro borrado ✓');
@@ -1290,6 +1343,21 @@ const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwgIxhB_Pym24
 
 function getSheetUrl(){
   return localStorage.getItem('sheetUrl') || DEFAULT_SHEET_URL;
+}
+
+function getSheetUrlWithSecret(){
+  const base = getSheetUrl();
+  const sep = base.includes('?') ? '&' : '?';
+  return base + sep + 'idToken=' + encodeURIComponent(getIdToken());
+}
+
+function postToSheet(payload){
+  const body = Object.assign({}, payload, { idToken: getIdToken() });
+  return fetch(getSheetUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(body)
+  });
 }
 
 function showToast(msg){
@@ -1719,13 +1787,8 @@ function renderDraftList(){
 
 function finishDay(){
   if (draftEntries.length === 0) { showToast('No hay series en el borrador'); return; }
-  const sheetUrl = getSheetUrl();
   const count = draftEntries.length;
-  fetch(sheetUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ entries: draftEntries })
-  }).then(() => {}).catch(() => {});
+  postToSheet({ entries: draftEntries }).then(() => {}).catch(() => {});
 
   if (!window._progressCache) window._progressCache = [];
   draftEntries.forEach(e => {
@@ -1964,9 +2027,11 @@ function renderTabs(){
 }
 
 async function fetchProgressSilently(){
+  if (!getIdToken()) return;
   try {
-    const res = await fetch(getSheetUrl());
+    const res = await fetch(getSheetUrlWithSecret());
     const data = await res.json();
+    if (data && data.error === 'unauthorized') { handleUnauthorized(); return; }
     window._progressCache = data;
     try { localStorage.setItem('progressCache', JSON.stringify(data)); } catch(e) {}
     renderTabs();
@@ -2047,11 +2112,12 @@ loadCachedProgress();
 renderTabs();
 renderDay();
 renderDraftList();
-fetchProgressSilently();
+initGoogleSignIn();
 
-if (getProfile()) {
+if (getProfile() && getIdToken()) {
   document.getElementById('profileScreen').style.display = 'none';
   updateProfileIndicator();
+  fetchProgressSilently();
 } else {
   updateProfileIndicator();
 }
