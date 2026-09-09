@@ -1821,6 +1821,61 @@ function hideWeekSummary(){
   document.getElementById('summaryScreen').style.display = 'none';
 }
 
+function findExerciseGroup(exerciseName){
+  let group = null;
+  DAYS.forEach(day => {
+    day.groups.forEach(g => {
+      if (g.exercises.some(ex => ex.name === exerciseName)) group = g.label;
+    });
+  });
+  return group;
+}
+
+function recommendDayForExercise(exerciseName, sourceDayIdx){
+  const group = findExerciseGroup(exerciseName);
+  const candidates = DAYS.map((day, idx) => {
+    if (idx === sourceDayIdx) return null;
+    const matchingGroups = day.groups.filter(g => g.label === group);
+    const groupExerciseCount = matchingGroups.reduce((s, g) => s + g.exercises.length, 0);
+    return {
+      dayLabel: day.name.split('·')[0].trim(),
+      hasGroup: matchingGroups.length > 0,
+      done: isDayComplete(day),
+      groupExerciseCount: groupExerciseCount,
+    };
+  }).filter(Boolean);
+
+  // Preferido: día que ya trabaja ese mismo músculo, aún no completado esta semana,
+  // priorizando el que menos volumen extra de ese músculo ya tiene (para no sobrecargar)
+  const best = candidates
+    .filter(c => c.hasGroup && !c.done)
+    .sort((a, b) => a.groupExerciseCount - b.groupExerciseCount)[0];
+  if (best) return best.dayLabel;
+
+  // Si no hay ninguno con ese músculo libre, cualquier día no completado
+  const fallback = candidates.filter(c => !c.done)[0];
+  if (fallback) return fallback.dayLabel;
+
+  return null; // ya no queda hueco esta semana
+}
+
+function pendingFromPartialDays(){
+  const pending = [];
+  DAYS.forEach((day, dayIdx) => {
+    const exerciseNames = day.groups.flatMap(g => g.exercises.map(ex => ex.name));
+    const counts = exerciseNames.map(name => weeklySeriesCount(day.name, name));
+    const anyStarted = counts.some(c => c > 0);
+    const allDone = counts.every(c => c >= 3);
+    if (anyStarted && !allDone) {
+      const missing = exerciseNames
+        .filter((name, i) => counts[i] < 3)
+        .map(name => ({ name: name, recommendedDay: recommendDayForExercise(name, dayIdx) }));
+      pending.push({ dayLabel: day.name.split('·')[0].trim(), missing: missing });
+    }
+  });
+  return pending;
+}
+
 function renderWeekSummary(){
   const profile = getProfile();
   const otherProfile = profile === 'David' ? 'Pedro' : 'David';
@@ -1878,6 +1933,21 @@ function renderWeekSummary(){
     </div>
   `;
 
+  // Ejercicios pendientes de días empezados pero no completados
+  const pending = pendingFromPartialDays();
+  const pendingHtml = pending.length === 0 ? '' : `
+    <div class="sum-card">
+      <div class="sum-title">⚠️ Ejercicios pendientes de esta semana</div>
+      <div class="metric-sub" style="margin-bottom:10px;">Días que empezaste pero no terminaste — te sugiero en qué otro día encajarlos, evitando repetir el mismo músculo en exceso</div>
+      ${pending.map(p => `
+        <div style="margin-bottom:8px;">
+          <div style="font-size:12.5px; font-weight:700; color:var(--amber); margin-bottom:4px;">${p.dayLabel}</div>
+          ${p.missing.map(m => `<div class="sum-improve-row"><span>${m.name}</span><span class="sum-improve-delta" style="color:var(--blue);">${m.recommendedDay ? '→ ' + m.recommendedDay : 'la semana que viene'}</span></div>`).join('')}
+        </div>
+      `).join('')}
+    </div>
+  `;
+
   body.innerHTML = `
     <div class="sum-card">
       <div class="sum-title">Días entrenados esta semana</div>
@@ -1885,6 +1955,7 @@ function renderWeekSummary(){
       <div class="sum-days">${dayPills}</div>
     </div>
 
+    ${pendingHtml}
     <div class="sum-card">
       <div class="sum-title">Volumen total esta semana</div>
       <div class="sum-big">${volThis.toLocaleString('es-ES')} kg</div>
