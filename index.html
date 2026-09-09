@@ -751,6 +751,18 @@
   @keyframes geminiSpin{
     to { transform:rotate(360deg); }
   }
+  .gemini-regen-btn{
+    flex:0 0 auto;
+    background:linear-gradient(135deg, rgba(63,124,240,0.18), rgba(242,169,59,0.18));
+    border:1px solid var(--card-border);
+    color:var(--text);
+    width:28px;
+    height:28px;
+    border-radius:9px;
+    font-size:14px;
+    line-height:1;
+  }
+  .gemini-regen-btn:active{ opacity:0.6; }
 
   .chart-wrap{
     position:relative;
@@ -1651,17 +1663,32 @@ function renderWeekSummary(){
     </div>
 
     <div class="sum-card" id="geminiCard">
-      <div class="sum-title">💡 Consejo de la semana</div>
+      <div class="sum-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>💡 Consejo de la semana</span>
+        <button class="gemini-regen-btn" onclick="regenerateAdvice()" title="Regenerar consejo">✨</button>
+      </div>
       <div id="geminiAdviceText" class="metric-empty" style="padding:8px 0; text-align:left;">Generando consejo…</div>
     </div>
   `;
 
-  loadGeminiAdvice(profile, {
+  const statsForAdvice = {
     days: trainedDates.size,
     volThis: volThis,
     volLast: volLast,
     improvements: improvements.slice(0, 5).map(i => i.ex + ' (+' + i.delta + 'kg)').join(', ')
-  });
+  };
+  window._lastAdviceProfile = profile;
+  window._lastAdviceStats = statsForAdvice;
+  loadGeminiAdvice(profile, statsForAdvice);
+}
+
+function regenerateAdvice(){
+  const profile = window._lastAdviceProfile;
+  const stats = window._lastAdviceStats;
+  if (!profile || !stats) return;
+  const today = localDateStr();
+  localStorage.removeItem('geminiAdvice_' + profile + '_' + today);
+  loadGeminiAdvice(profile, stats);
 }
 
 function loadGeminiAdvice(profile, stats){
