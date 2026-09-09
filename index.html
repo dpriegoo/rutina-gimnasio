@@ -977,8 +977,7 @@ async function loadMetrics(force){
   const btn = document.getElementById('refreshBtn');
   btn.textContent = '⏳ Cargando…';
   try {
-    const res = await fetch(getSheetUrlWithSecret());
-    const data = await res.json();
+    const data = await fetchSheetData();
     if (data && data.error === 'unauthorized') { handleUnauthorized(); return; }
     window._progressCache = data;
     try { localStorage.setItem('progressCache', JSON.stringify(data)); } catch(e) {}
@@ -1345,12 +1344,6 @@ function getSheetUrl(){
   return localStorage.getItem('sheetUrl') || DEFAULT_SHEET_URL;
 }
 
-function getSheetUrlWithSecret(){
-  const base = getSheetUrl();
-  const sep = base.includes('?') ? '&' : '?';
-  return base + sep + 'idToken=' + encodeURIComponent(getIdToken());
-}
-
 function postToSheet(payload){
   const body = Object.assign({}, payload, { idToken: getIdToken() });
   return fetch(getSheetUrl(), {
@@ -1358,6 +1351,11 @@ function postToSheet(payload){
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify(body)
   });
+}
+
+async function fetchSheetData(){
+  const res = await postToSheet({ action: 'list' });
+  return res.json();
 }
 
 function showToast(msg){
@@ -2029,8 +2027,7 @@ function renderTabs(){
 async function fetchProgressSilently(){
   if (!getIdToken()) return;
   try {
-    const res = await fetch(getSheetUrlWithSecret());
-    const data = await res.json();
+    const data = await fetchSheetData();
     if (data && data.error === 'unauthorized') { handleUnauthorized(); return; }
     window._progressCache = data;
     try { localStorage.setItem('progressCache', JSON.stringify(data)); } catch(e) {}
