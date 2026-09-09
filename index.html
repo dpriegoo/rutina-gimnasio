@@ -2065,7 +2065,19 @@ async function acceptPending(logId){
     nota: '',
   }));
 
-  postToSheet({ entries: entries }).then(() => {}).catch(() => {});
+  let confirmed = false;
+  try {
+    const res = await postToSheet({ entries: entries });
+    const data = await res.json();
+    confirmed = !!(data && data.ok);
+  } catch (e) {
+    confirmed = false;
+  }
+
+  if (!confirmed) {
+    showToast('⚠️ No se pudo guardar, revisa tu conexión y vuelve a pulsar Aceptar');
+    return;
+  }
 
   if (!window._progressCache) window._progressCache = [];
   entries.forEach(entry => {
