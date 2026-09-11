@@ -109,6 +109,11 @@
     background:rgba(76,175,125,0.15);
     color:#bdf0d5;
   }
+  .daytab.partial{
+    border-color:var(--amber);
+    background:rgba(242,169,59,0.15);
+    color:#ffe3b8;
+  }
 
   main{padding:6px 16px 0;}
 
@@ -1769,7 +1774,7 @@ function recommendDayForExercise(exerciseName, sourceDayIdx){
       dayLabel: day.name.split('·')[0].trim(),
       hasGroup: matchingGroups.length > 0,
       hasExact: hasExact,
-      done: isDayComplete(day),
+      started: isDayStarted(day),
       groupExerciseCount: groupExerciseCount,
     };
   }).filter(Boolean);
@@ -1777,18 +1782,20 @@ function recommendDayForExercise(exerciseName, sourceDayIdx){
   // Preferido: mismo músculo pero SIN el mismo ejercicio exacto — así es una sesión
   // realmente separada, no repetir el ejercicio dos veces el mismo rato.
   // Prioriza el día con menos ejercicios de ese grupo (para no sobrecargarlo).
+  // Solo se recomiendan días que todavía no se han empezado esta semana —
+  // un día en el que ya has entrenado (aunque no esté al 100%) ya es una sesión cerrada.
   const bestDifferent = candidates
-    .filter(c => c.hasGroup && !c.hasExact && !c.done)
+    .filter(c => c.hasGroup && !c.hasExact && !c.started)
     .sort((a, b) => a.groupExerciseCount - b.groupExerciseCount)[0];
   if (bestDifferent) return { dayLabel: bestDifferent.dayLabel, dayName: bestDifferent.dayName, sameExercise: false };
 
   // Si no hay otra opción, el mismo ejercicio exacto (implica hacerlo dos veces esa sesión —
   // no es lo ideal, pero mejor que saltárselo del todo)
-  const sameExerciseDay = candidates.filter(c => c.hasExact && !c.done)[0];
+  const sameExerciseDay = candidates.filter(c => c.hasExact && !c.started)[0];
   if (sameExerciseDay) return { dayLabel: sameExerciseDay.dayLabel, dayName: sameExerciseDay.dayName, sameExercise: true };
 
-  // Cualquier día no completado, aunque no comparta músculo
-  const fallback = candidates.filter(c => !c.done)[0];
+  // Cualquier día no empezado, aunque no comparta músculo
+  const fallback = candidates.filter(c => !c.started)[0];
   if (fallback) return { dayLabel: fallback.dayLabel, dayName: fallback.dayName, sameExercise: false };
 
   return null; // ya no queda hueco esta semana
@@ -2333,14 +2340,20 @@ function isDayComplete(day){
   );
 }
 
+function isDayStarted(day){
+  const exerciseNames = day.groups.flatMap(g => g.exercises.map(ex => ex.name));
+  return exerciseNames.some(name => weeklySeriesCount(day.name, name) > 0);
+}
+
 function renderTabs(){
   const wrap = document.getElementById('daytabs');
   wrap.innerHTML = '';
   DAYS.forEach((d, i) => {
     const b = document.createElement('button');
     const complete = isDayComplete(d);
-    b.className = 'daytab' + (i===currentDay ? ' active' : '') + (complete ? ' done' : '');
-    b.textContent = d.name.split('·')[0].trim() + (complete ? ' ✓' : '');
+    const partial = !complete && isDayStarted(d);
+    b.className = 'daytab' + (i===currentDay ? ' active' : '') + (complete ? ' done' : '') + (partial ? ' partial' : '');
+    b.textContent = d.name.split('·')[0].trim() + (complete ? ' ✓' : (partial ? ' …' : ''));
     b.onclick = () => { currentDay = i; renderTabs(); renderDay(); };
     wrap.appendChild(b);
   });
