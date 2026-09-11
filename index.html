@@ -2115,7 +2115,7 @@ function addPendingRow(logId){
     }
   }
   if (!pendingRows[logId]) pendingRows[logId] = [];
-  pendingRows[logId].push({ peso, reps });
+  pendingRows[logId].push({ peso, reps, id: Date.now() + '-' + Math.random().toString(36).slice(2, 7) });
   persistPending();
   const pesoEl = box.querySelector('.inp-peso');
   if (pesoEl) pesoEl.value = '';
@@ -2129,7 +2129,10 @@ function removePendingRow(logId, idx){
   renderPendingWrap(logId);
 }
 
+const savingPending = new Set(); // logId de las tarjetas con un guardado en curso, para evitar dobles envíos
+
 async function acceptPending(logId){
+  if (savingPending.has(logId)) return; // ya hay un guardado en curso para esta tarjeta
   const wrap = document.getElementById('pendingWrap-' + logId);
   if (!wrap) return;
   const dia = wrap.dataset.dia, grupo = wrap.dataset.grupo, ejercicio = wrap.dataset.ejercicio;
@@ -2141,9 +2144,12 @@ async function acceptPending(logId){
     perfil: getProfile(),
     dia: dia, grupo: grupo, ejercicio: ejercicio,
     peso: r.peso, reps: r.reps, series: 1,
-    id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+    id: r.id || (Date.now() + '-' + Math.random().toString(36).slice(2, 7)), // fallback por si venía de un pendiente guardado antes de este cambio
     nota: '',
   }));
+
+  savingPending.add(logId);
+  renderPendingWrap(logId);
 
   let confirmed = false;
   try {
@@ -2154,8 +2160,11 @@ async function acceptPending(logId){
     confirmed = false;
   }
 
+  savingPending.delete(logId);
+
   if (!confirmed) {
     showToast('⚠️ No se pudo guardar, revisa tu conexión y vuelve a pulsar Aceptar');
+    renderPendingWrap(logId);
     return;
   }
 
@@ -2185,16 +2194,17 @@ function renderPendingWrap(logId){
     wrap.innerHTML = '';
     return;
   }
+  const saving = savingPending.has(logId);
   wrap.innerHTML = `
     <div class="pending-list">
       ${rows.map((r, i) => `
         <div class="pending-row">
           <span>Serie ${i + 1}: ${timed ? r.reps + ' seg' : r.peso + ' kg × ' + r.reps + ' reps'}</span>
-          <button class="pending-del" onclick="removePendingRow('${logId}', ${i})">✕</button>
+          <button class="pending-del" onclick="removePendingRow('${logId}', ${i})" ${saving ? 'disabled' : ''}>✕</button>
         </div>
       `).join('')}
     </div>
-    <button class="accept-btn" onclick="acceptPending('${logId}')">✅ Aceptar (${rows.length} ${rows.length > 1 ? 'series' : 'serie'})</button>
+    <button class="accept-btn" onclick="acceptPending('${logId}')" ${saving ? 'disabled' : ''}>${saving ? '⏳ Guardando…' : '✅ Aceptar (' + rows.length + (rows.length > 1 ? ' series)' : ' serie)')}</button>
   `;
 }
 
