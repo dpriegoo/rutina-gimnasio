@@ -2369,7 +2369,8 @@ function renderTabs(){
   });
 }
 
-async function fetchProgressSilently(){
+async function fetchProgressSilently(retriesLeft){
+  if (retriesLeft === undefined) retriesLeft = 2; // reintentos automáticos ante fallos de red puntuales
   if (!getIdToken()) return;
   try {
     const data = await fetchSheetData();
@@ -2384,8 +2385,30 @@ async function fetchProgressSilently(){
     ]);
     window._height = heightRes && heightRes.altura ? heightRes.altura : null;
     window._weightHistory = Array.isArray(weightsRes) ? weightsRes : [];
-  } catch (e) {}
+  } catch (e) {
+    if (retriesLeft > 0) {
+      await new Promise(r => setTimeout(r, 1500));
+      return fetchProgressSilently(retriesLeft - 1);
+    }
+    showToast('⚠️ No se pudieron actualizar los datos, revisa tu conexión');
+  }
 }
+
+// Refresco automático: al entrar/volver a la app y cada cierto tiempo mientras
+// esté abierta, para no depender de darle manualmente a "Actualizar datos".
+function refreshProgressIfLoggedIn(){
+  if (getProfile() && getIdToken()) fetchProgressSilently();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshProgressIfLoggedIn();
+});
+window.addEventListener('pageshow', (evt) => {
+  if (evt.persisted) refreshProgressIfLoggedIn(); // vuelta desde el caché de "atrás/adelante" del navegador (típico en iOS al reabrir la app)
+});
+setInterval(() => {
+  if (document.visibilityState === 'visible') refreshProgressIfLoggedIn();
+}, 120000); // cada 2 minutos mientras la app esté visible en primer plano
 
 function loadCachedProgress(){
   try {
