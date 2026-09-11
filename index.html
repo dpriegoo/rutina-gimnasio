@@ -690,6 +690,64 @@
   }
   .heatmap-legend .heatmap-cell{width:10px; height:10px;}
 
+  .muscle-view-toggle{
+    display:flex;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .muscle-view-toggle button{
+    flex:1;
+    padding:8px 0;
+    border-radius:8px;
+    border:1px solid var(--card-border);
+    background:var(--icon-bg);
+    color:var(--muted);
+    font-size:12.5px;
+    font-weight:600;
+  }
+  .muscle-view-toggle button.active{
+    background:var(--blue);
+    border-color:var(--blue);
+    color:#fff;
+  }
+  .muscle-svg-wrap{
+    display:flex;
+    justify-content:center;
+  }
+  .muscle-svg-wrap svg{
+    width:100%;
+    max-width:200px;
+    height:auto;
+  }
+  .muscle-legend-list{
+    margin-top:10px;
+  }
+  .muscle-legend-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:6px 0;
+    border-bottom:1px solid var(--card-border);
+    font-size:13px;
+  }
+  .muscle-legend-row:last-child{border-bottom:none;}
+  .muscle-zone-name{flex:1;}
+  .muscle-zone-status{color:var(--muted); font-size:12px;}
+  .muscle-dot{
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    flex:0 0 auto;
+  }
+  .muscle-scale-legend{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    margin-top:10px;
+    font-size:11px;
+    color:var(--muted);
+  }
+
   .metric-select{
     width:100%;
     background:var(--icon-bg);
@@ -818,6 +876,51 @@
 
 <div id="metricasView" style="display:none;">
   <button class="refresh-btn" onclick="loadMetrics(true)" id="refreshBtn">🔄 Actualizar datos</button>
+
+  <div class="metric-card">
+    <div class="metric-title">Carga muscular esta semana</div>
+    <div class="metric-sub">Comparado con tu propio promedio histórico de cada zona (o, si aún no hay histórico, con lo más trabajado esta semana)</div>
+    <div class="muscle-view-toggle">
+      <button id="muscleViewBtnFront" class="active" onclick="setMuscleView('front')">Frente</button>
+      <button id="muscleViewBtnBack" onclick="setMuscleView('back')">Espalda</button>
+    </div>
+    <div class="muscle-svg-wrap">
+      <svg id="muscleSvgFront" viewBox="0 0 160 380" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="80" cy="24" r="20" fill="var(--icon-bg)" stroke="#3a3f47" stroke-width="1"/>
+        <rect x="72" y="40" width="16" height="12" fill="var(--icon-bg)"/>
+        <ellipse id="zone-hombros-front-L" cx="40" cy="60" rx="16" ry="14" stroke="#3a3f47" stroke-width="1"/>
+        <ellipse id="zone-hombros-front-R" cx="120" cy="60" rx="16" ry="14" stroke="#3a3f47" stroke-width="1"/>
+        <path id="zone-pectoral" d="M50,52 Q80,44 110,52 L106,96 Q80,104 54,96 Z" stroke="#3a3f47" stroke-width="1"/>
+        <rect id="zone-biceps-L" x="18" y="58" width="24" height="130" rx="12" stroke="#3a3f47" stroke-width="1"/>
+        <rect id="zone-biceps-R" x="118" y="58" width="24" height="130" rx="12" stroke="#3a3f47" stroke-width="1"/>
+        <path id="zone-core" d="M56,96 Q80,102 104,96 L98,180 Q80,190 62,180 Z" stroke="#3a3f47" stroke-width="1"/>
+        <rect id="zone-piernas-front-L" x="50" y="182" width="26" height="180" rx="13" stroke="#3a3f47" stroke-width="1"/>
+        <rect id="zone-piernas-front-R" x="84" y="182" width="26" height="180" rx="13" stroke="#3a3f47" stroke-width="1"/>
+      </svg>
+      <svg id="muscleSvgBack" viewBox="0 0 160 380" xmlns="http://www.w3.org/2000/svg" style="display:none;">
+        <circle cx="80" cy="24" r="20" fill="var(--icon-bg)" stroke="#3a3f47" stroke-width="1"/>
+        <rect x="72" y="40" width="16" height="12" fill="var(--icon-bg)"/>
+        <ellipse id="zone-hombros-back-L" cx="40" cy="60" rx="16" ry="14" stroke="#3a3f47" stroke-width="1"/>
+        <ellipse id="zone-hombros-back-R" cx="120" cy="60" rx="16" ry="14" stroke="#3a3f47" stroke-width="1"/>
+        <path id="zone-dorsales" d="M48,52 Q80,44 112,52 L104,110 Q80,120 56,110 Z" stroke="#3a3f47" stroke-width="1"/>
+        <rect id="zone-triceps-L" x="18" y="58" width="24" height="130" rx="12" stroke="#3a3f47" stroke-width="1"/>
+        <rect id="zone-triceps-R" x="118" y="58" width="24" height="130" rx="12" stroke="#3a3f47" stroke-width="1"/>
+        <path d="M56,110 Q80,118 104,110 L100,180 Q80,188 60,180 Z" fill="var(--icon-bg)" stroke="#3a3f47" stroke-width="1"/>
+        <rect id="zone-piernas-back-L" x="50" y="182" width="26" height="180" rx="13" stroke="#3a3f47" stroke-width="1"/>
+        <rect id="zone-piernas-back-R" x="84" y="182" width="26" height="180" rx="13" stroke="#3a3f47" stroke-width="1"/>
+      </svg>
+    </div>
+    <div id="muscleLoadList" class="muscle-legend-list"></div>
+    <div class="muscle-scale-legend">
+      <span>Sin carga</span>
+      <span class="muscle-dot" style="background:var(--card-border)"></span>
+      <span class="muscle-dot" style="background:#1e3a72"></span>
+      <span class="muscle-dot" style="background:#274a94"></span>
+      <span class="muscle-dot" style="background:#3f7cf0"></span>
+      <span class="muscle-dot" style="background:#8ab4ff"></span>
+      <span>Muy alta</span>
+    </div>
+  </div>
 
   <div class="metric-card">
     <div class="metric-title">Mi peso y altura</div>
@@ -1341,6 +1444,154 @@ function myRows(){
   const data = window._progressCache || [];
   const profile = getProfile();
   return data.filter(r => (r['Perfil'] || '') === profile);
+}
+
+// ---- Carga muscular semanal (diagrama frente/espalda) ----
+const MUSCLE_ZONES = {
+  pectoral: { label: 'Pectoral', groups: ['Pectoral'] },
+  hombros:  { label: 'Hombros / Deltoides', groups: ['Deltoides', 'Hombros'] },
+  biceps:   { label: 'Bíceps', groups: ['Bíceps'] },
+  triceps:  { label: 'Tríceps', groups: ['Tríceps'] },
+  dorsales: { label: 'Dorsales', groups: ['Dorsales'] },
+  core:     { label: 'Core', groups: ['Core'] },
+  piernas:  { label: 'Piernas', groups: ['Piernas'] },
+};
+
+const MUSCLE_LOAD_LEVELS = [
+  { label: 'Sin carga',     color: 'var(--card-border)' },
+  { label: 'Carga baja',    color: '#1e3a72' },
+  { label: 'Carga media',   color: '#274a94' },
+  { label: 'Carga alta',    color: '#3f7cf0' },
+  { label: 'Carga muy alta', color: '#8ab4ff' },
+];
+
+// El Día 5 guarda 2 ejercicios distintos bajo la etiqueta genérica "Brazos" en el
+// Excel (para no tocar datos históricos ni la pestaña de rutina). Aquí, solo para
+// este cálculo de volumen por zona, se resuelve cada ejercicio a su grupo real.
+const EXERCISE_GROUP_OVERRIDES = {
+  'Curl predicador bíceps': 'Bíceps',
+  'Extensión de tríceps en polea': 'Tríceps',
+};
+
+function buildExerciseGroupMap(){
+  const map = {};
+  DAYS.forEach(day => day.groups.forEach(g => g.exercises.forEach(ex => {
+    if (map[ex.name]) return;
+    if (EXERCISE_GROUP_OVERRIDES[ex.name]) { map[ex.name] = EXERCISE_GROUP_OVERRIDES[ex.name]; return; }
+    if (g.label === 'Brazos') return; // ambiguo sin override, se ignora para este cálculo
+    map[ex.name] = g.label;
+  })));
+  return map;
+}
+let EXERCISE_GROUP_MAP = null; // se construye la primera vez que hace falta (DAYS aún no existe en este punto del script)
+function getExerciseGroupMap(){
+  if (!EXERCISE_GROUP_MAP) EXERCISE_GROUP_MAP = buildExerciseGroupMap();
+  return EXERCISE_GROUP_MAP;
+}
+
+function preciseGroupForRow(r){
+  const fromExercise = getExerciseGroupMap()[r['Ejercicio']];
+  if (fromExercise) return fromExercise;
+  return r['Grupo'] !== 'Brazos' ? r['Grupo'] : null;
+}
+
+function mondayOf(d){
+  const x = new Date(d);
+  x.setHours(0,0,0,0);
+  const dow = (x.getDay() + 6) % 7;
+  x.setDate(x.getDate() - dow);
+  return x;
+}
+
+function computeMuscleLoad(profile){
+  const cache = window._progressCache || [];
+  const weekStart = getWeekStart();
+  const rows = cache.filter(r => (r['Perfil'] || '') === profile);
+  const zoneKeys = Object.keys(MUSCLE_ZONES);
+
+  const thisWeekVol = {}; zoneKeys.forEach(z => thisWeekVol[z] = 0);
+  const histSum = {}; const histWeeks = {};
+  zoneKeys.forEach(z => { histSum[z] = 0; histWeeks[z] = new Set(); });
+
+  rows.forEach(r => {
+    const g = preciseGroupForRow(r);
+    if (!g) return;
+    const zoneKey = zoneKeys.find(z => MUSCLE_ZONES[z].groups.includes(g));
+    if (!zoneKey) return;
+    const f = parseLocalDate(r['Fecha']);
+    const vol = rowVolume(r);
+    if (f >= weekStart) {
+      thisWeekVol[zoneKey] += vol;
+    } else {
+      histSum[zoneKey] += vol;
+      histWeeks[zoneKey].add(localDateStr(mondayOf(f)));
+    }
+  });
+
+  const maxThisWeek = Math.max(0, ...zoneKeys.map(z => thisWeekVol[z]));
+
+  const result = {};
+  zoneKeys.forEach(z => {
+    const vol = thisWeekVol[z];
+    if (vol <= 0) { result[z] = Object.assign({ level: 0, vol: 0 }, MUSCLE_LOAD_LEVELS[0]); return; }
+    const n = histWeeks[z].size;
+    const histAvg = n > 0 ? histSum[z] / n : null;
+    let level;
+    if (histAvg && histAvg > 0) {
+      const ratio = vol / histAvg;
+      if (ratio < 0.6) level = 1;
+      else if (ratio <= 1.3) level = 2;
+      else if (ratio <= 1.7) level = 3;
+      else level = 4;
+    } else {
+      const ratio = maxThisWeek > 0 ? vol / maxThisWeek : 1;
+      if (ratio < 0.4) level = 1;
+      else if (ratio < 0.75) level = 2;
+      else level = 3;
+    }
+    result[z] = Object.assign({ level: level, vol: vol }, MUSCLE_LOAD_LEVELS[level]);
+  });
+  return result;
+}
+
+let currentMuscleView = 'front';
+
+function setMuscleView(view){
+  currentMuscleView = view;
+  document.getElementById('muscleSvgFront').style.display = view === 'front' ? 'block' : 'none';
+  document.getElementById('muscleSvgBack').style.display = view === 'back' ? 'block' : 'none';
+  document.getElementById('muscleViewBtnFront').classList.toggle('active', view === 'front');
+  document.getElementById('muscleViewBtnBack').classList.toggle('active', view === 'back');
+}
+
+function renderMuscleLoad(){
+  const listEl = document.getElementById('muscleLoadList');
+  if (!listEl) return;
+  const profile = getProfile();
+  if (!profile) { listEl.innerHTML = ''; return; }
+
+  const load = computeMuscleLoad(profile);
+  const setFill = (id, color) => { const el = document.getElementById(id); if (el) el.setAttribute('fill', color); };
+
+  setFill('zone-pectoral', load.pectoral.color);
+  setFill('zone-core', load.core.color);
+  setFill('zone-dorsales', load.dorsales.color);
+  ['L', 'R'].forEach(side => {
+    setFill('zone-hombros-front-' + side, load.hombros.color);
+    setFill('zone-hombros-back-' + side, load.hombros.color);
+    setFill('zone-biceps-' + side, load.biceps.color);
+    setFill('zone-triceps-' + side, load.triceps.color);
+    setFill('zone-piernas-front-' + side, load.piernas.color);
+    setFill('zone-piernas-back-' + side, load.piernas.color);
+  });
+
+  listEl.innerHTML = Object.keys(MUSCLE_ZONES).map(z => `
+    <div class="muscle-legend-row">
+      <span class="muscle-dot" style="background:${load[z].color}"></span>
+      <span class="muscle-zone-name">${MUSCLE_ZONES[z].label}</span>
+      <span class="muscle-zone-status">${load[z].label}</span>
+    </div>
+  `).join('');
 }
 
 function renderHeatmap(){
@@ -2053,6 +2304,7 @@ function lastWeekBestMark(dia, ejercicio){
 
 function updateCardHighlights(){
   renderPriorityBanner();
+  renderMuscleLoad();
   const day = DAYS[currentDay];
   if (!day) return;
   document.querySelectorAll('#main .card[data-exercise]').forEach(cardEl => {
