@@ -124,6 +124,18 @@
   }
   .qrtip b{color:#fff;}
 
+  .priority-banner{
+    margin:14px 16px 0;
+    background:rgba(242,169,59,0.12);
+    border:1px solid var(--amber);
+    border-radius:12px;
+    padding:10px 12px;
+    font-size:12.5px;
+    color:#ffe3b8;
+    line-height:1.45;
+  }
+  .priority-banner b{color:#fff;}
+
   .group{margin-top:22px;}
   .group-label{
     display:flex;
@@ -793,6 +805,8 @@
   <span>🔗 Poleas</span>
   <span>🧘 Suelo</span>
 </div>
+
+<div class="priority-banner" id="priorityBanner" style="display:none;"></div>
 
 <main id="main"></main>
 </div>
@@ -1627,6 +1641,64 @@ function weeklyVolumeForProfile(profile, weekStart){
     .reduce((sum, r) => sum + rowVolume(r), 0);
 }
 
+// ---- Variedad de grupos musculares semana a semana ----
+// "Brazos" (Día 5) agrupa Bíceps + Tríceps bajo una sola etiqueta en el Excel;
+// aquí se traduce a los grupos "reales" para que el conteo por grupo sea correcto.
+const GROUP_ALIASES = { 'Brazos': ['Bíceps', 'Tríceps'] };
+
+function canonicalGroups(rawGrupo){
+  return GROUP_ALIASES[rawGrupo] || [rawGrupo];
+}
+
+function allCanonicalGroups(){
+  const set = new Set();
+  DAYS.forEach(day => day.groups.forEach(g => canonicalGroups(g.label).forEach(cg => set.add(cg))));
+  return [...set];
+}
+
+function daysCoveringGroup(canonicalGroup){
+  return DAYS
+    .filter(day => day.groups.some(g => canonicalGroups(g.label).includes(canonicalGroup)))
+    .map(day => day.name.split('·')[0].trim());
+}
+
+function groupsTrainedInWeek(profile, weekStart){
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const cache = window._progressCache || [];
+  const set = new Set();
+  cache
+    .filter(r => (r['Perfil'] || '') === profile)
+    .filter(r => { const f = parseLocalDate(r['Fecha']); return f >= weekStart && f < weekEnd; })
+    .forEach(r => canonicalGroups(r['Grupo']).forEach(cg => set.add(cg)));
+  return set;
+}
+
+// Grupos que faltaron la semana pasada Y que esta semana todavía no se han cubierto.
+function stillMissingPriorityGroups(profile){
+  const trainedLastWeek = groupsTrainedInWeek(profile, getWeekStartOffset(-1));
+  if (trainedLastWeek.size === 0) return []; // sin datos de la semana pasada, no avisar
+  const missingLastWeek = allCanonicalGroups().filter(g => !trainedLastWeek.has(g));
+  if (missingLastWeek.length === 0) return [];
+  const trainedThisWeek = groupsTrainedInWeek(profile, getWeekStart());
+  return missingLastWeek.filter(g => !trainedThisWeek.has(g));
+}
+
+function renderPriorityBanner(){
+  const el = document.getElementById('priorityBanner');
+  if (!el) return;
+  const profile = getProfile();
+  if (!profile) { el.style.display = 'none'; return; }
+  const missing = stillMissingPriorityGroups(profile);
+  if (missing.length === 0) { el.style.display = 'none'; return; }
+  const parts = missing.map(g => {
+    const days = daysCoveringGroup(g);
+    return '<b>' + g + '</b>' + (days.length ? ' (' + days.join(' o ') + ')' : '');
+  });
+  el.innerHTML = '⚠️ La semana pasada no entrenaste: ' + parts.join(', ') + '. Priorízalo esta semana.';
+  el.style.display = 'block';
+}
+
 function daysTrainedThisWeek(profile){
   const weekStart = getWeekStart();
   const cache = window._progressCache || [];
@@ -1973,6 +2045,7 @@ function lastWeekBestMark(dia, ejercicio){
 }
 
 function updateCardHighlights(){
+  renderPriorityBanner();
   const day = DAYS[currentDay];
   if (!day) return;
   document.querySelectorAll('#main .card[data-exercise]').forEach(cardEl => {
