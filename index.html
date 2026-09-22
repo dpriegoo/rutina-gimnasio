@@ -77,6 +77,19 @@
     -webkit-overflow-scrolling:touch;
   }
   .daytabs::-webkit-scrollbar{display:none;}
+  .day-compare-btn{
+    display:block;
+    width:100%;
+    margin:10px 0 4px;
+    padding:9px 0;
+    border-radius:10px;
+    border:1px solid var(--blue-dim);
+    background:rgba(63,124,240,0.10);
+    color:#cfe0ff;
+    font-size:12.5px;
+    font-weight:600;
+  }
+
   .week-summary-btn{
     flex:0 0 auto;
     padding:8px 12px;
@@ -994,6 +1007,14 @@
     <button class="summary-close" onclick="hideWeekSummary()">✕</button>
   </div>
   <div class="summary-body" id="summaryBody"></div>
+</div>
+
+<div class="summary-screen" id="dayCompareScreen">
+  <div class="summary-header">
+    <h2 id="dayCompareTitle">Comparativa</h2>
+    <button class="summary-close" onclick="hideDayComparison()">✕</button>
+  </div>
+  <div class="summary-body" id="dayCompareBody"></div>
 </div>
 
 <div class="toast" id="toast">Guardado ✓</div>
@@ -1955,6 +1976,16 @@ function renderPriorityBanner(){
   el.style.display = 'block';
 }
 
+function dayVolumeForWeek(profile, dia, weekStart){
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const cache = window._progressCache || [];
+  return cache
+    .filter(r => (r['Perfil'] || '') === profile && r['Día'] === dia)
+    .filter(r => { const f = parseLocalDate(r['Fecha']); return f >= weekStart && f < weekEnd; })
+    .reduce((sum, r) => sum + rowVolume(r), 0);
+}
+
 function daysTrainedThisWeek(profile){
   const weekStart = getWeekStart();
   const cache = window._progressCache || [];
@@ -2001,6 +2032,82 @@ function showWeekSummary(){
 
 function hideWeekSummary(){
   document.getElementById('summaryScreen').style.display = 'none';
+}
+
+function showDayComparison(dayIdx){
+  renderDayComparison(dayIdx);
+  document.getElementById('dayCompareScreen').style.display = 'block';
+}
+
+function hideDayComparison(){
+  document.getElementById('dayCompareScreen').style.display = 'none';
+}
+
+function renderDayComparison(dayIdx){
+  const day = DAYS[dayIdx];
+  const profile = getProfile();
+  const thisWeekStart = getWeekStart();
+  const lastWeekStart = getWeekStartOffset(-1);
+
+  document.getElementById('dayCompareTitle').textContent = day.name.split('·')[0].trim() + ': esta semana vs. la pasada';
+
+  const volThis = Math.round(dayVolumeForWeek(profile, day.name, thisWeekStart));
+  const volLast = Math.round(dayVolumeForWeek(profile, day.name, lastWeekStart));
+  let volDeltaHtml;
+  if (volLast > 0) {
+    const pct = Math.round(((volThis - volLast) / volLast) * 100);
+    const cls = pct > 0 ? 'up' : (pct < 0 ? 'down' : 'flat');
+    const arrow = pct > 0 ? '▲' : (pct < 0 ? '▼' : '·');
+    volDeltaHtml = `<div class="sum-delta ${cls}">${arrow} ${pct > 0 ? '+' : ''}${pct}% vs. semana pasada (${volLast.toLocaleString('es-ES')} kg)</div>`;
+  } else {
+    volDeltaHtml = `<div class="sum-delta flat">Sin datos de la semana pasada para comparar</div>`;
+  }
+
+  const exerciseEntries = day.groups.flatMap(g => g.exercises.map(ex => ({ name: ex.name, timed: isTimedExercise(ex.name) })));
+  const rowsHtml = exerciseEntries.map(e => {
+    const thisMark = bestMarkInWeek(day.name, e.name, thisWeekStart);
+    const lastMark = bestMarkInWeek(day.name, e.name, lastWeekStart);
+    const thisTxt = !thisMark ? 'Sin registrar' : (e.timed ? thisMark.reps + 's' : thisMark.peso + 'kg × ' + thisMark.reps);
+    const lastTxt = !lastMark ? 'Sin datos' : (e.timed ? lastMark.reps + 's' : lastMark.peso + 'kg × ' + lastMark.reps);
+
+    let deltaHtml = '';
+    if (thisMark && lastMark) {
+      if (e.timed) {
+        const d = thisMark.reps - lastMark.reps;
+        deltaHtml = d > 0 ? `<span class="sum-improve-delta">+${d}s</span>`
+          : (d < 0 ? `<span class="sum-improve-delta" style="color:#e0656a;">${d}s</span>`
+          : `<span class="metric-sub">Igual</span>`);
+      } else {
+        const d = Math.round((thisMark.rm - lastMark.rm) * 10) / 10;
+        deltaHtml = d > 0 ? `<span class="sum-improve-delta">+${d}kg (1RM est.)</span>`
+          : (d < 0 ? `<span class="sum-improve-delta" style="color:#e0656a;">${d}kg (1RM est.)</span>`
+          : `<span class="metric-sub">Igual</span>`);
+      }
+    }
+
+    return `
+      <div class="sum-improve-row" style="flex-direction:column; align-items:stretch; gap:4px;">
+        <div><b>${e.name}</b></div>
+        <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted);">
+          <span>Pasada: ${lastTxt}</span>
+          <span>Esta semana: ${thisTxt}</span>
+        </div>
+        ${deltaHtml ? `<div style="text-align:right;">${deltaHtml}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('dayCompareBody').innerHTML = `
+    <div class="sum-card">
+      <div class="sum-title">Volumen total del día</div>
+      <div class="sum-big">${volThis.toLocaleString('es-ES')} kg</div>
+      ${volDeltaHtml}
+    </div>
+    <div class="sum-card">
+      <div class="sum-title">Por ejercicio</div>
+      ${rowsHtml}
+    </div>
+  `;
 }
 
 function findExerciseGroup(exerciseName){
@@ -2272,16 +2379,16 @@ function lastSessionValue(ejercicio){
   return fromSheet[fromSheet.length - 1];
 }
 
-function lastWeekBestMark(dia, ejercicio){
+function bestMarkInWeek(dia, ejercicio, weekStart){
   const profile = getProfile();
-  const weekStart = getWeekStart();
-  const lastWeekStart = getWeekStartOffset(-1);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
   const cache = window._progressCache || [];
   const rows = cache.filter(r => {
     if ((r['Perfil'] || '') !== profile) return false;
     if (r['Día'] !== dia || r['Ejercicio'] !== ejercicio) return false;
     const f = parseLocalDate(r['Fecha']);
-    return f >= lastWeekStart && f < weekStart;
+    return f >= weekStart && f < weekEnd;
   });
   if (rows.length === 0) return null;
 
@@ -2299,7 +2406,11 @@ function lastWeekBestMark(dia, ejercicio){
     const rm = rp ? p * (1 + rp / 30) : 0;
     if (rm > bestRM) { bestRM = rm; best = r; }
   });
-  return { timed: false, peso: Number(best['Peso (kg)']) || 0, reps: Number(best['Reps']) || 0 };
+  return { timed: false, peso: Number(best['Peso (kg)']) || 0, reps: Number(best['Reps']) || 0, rm: Math.round(bestRM * 10) / 10 };
+}
+
+function lastWeekBestMark(dia, ejercicio){
+  return bestMarkInWeek(dia, ejercicio, getWeekStartOffset(-1));
 }
 
 function updateCardHighlights(){
@@ -2753,6 +2864,12 @@ function renderDay(){
   title.style.margin = '4px 0 0';
   title.textContent = day.name;
   main.appendChild(title);
+
+  const compareBtn = document.createElement('button');
+  compareBtn.className = 'day-compare-btn';
+  compareBtn.textContent = '📊 Comparar con la semana pasada';
+  compareBtn.onclick = () => showDayComparison(currentDay);
+  main.appendChild(compareBtn);
 
   day.groups.forEach(g => {
     const groupEl = document.createElement('div');
