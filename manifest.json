@@ -1,0 +1,25 @@
+{
+  "name": "IronLog · Rutina de fuerza",
+  "short_name": "IronLog",
+  "description": "Seguimiento de rutina de gimnasio, progreso y peso corporal",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#111316",
+  "theme_color": "#111316",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
