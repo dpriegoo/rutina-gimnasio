@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="IronLog">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
 <title>IronLog · Rutina de fuerza</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -153,6 +154,17 @@
     line-height:1.45;
   }
   .priority-banner b{color:#fff;}
+  .rest-week-toggle{
+    display:block;
+    margin-top:6px;
+    background:none;
+    border:1px solid var(--amber);
+    color:var(--amber);
+    border-radius:8px;
+    padding:4px 8px;
+    font-size:11px;
+    font-weight:600;
+  }
 
   .group{margin-top:22px;}
   .group-label{
@@ -325,10 +337,15 @@
   .log-form{
     display:none;
     margin-top:10px;
+    flex-direction:column;
     gap:8px;
   }
   .log-form.open{display:flex;}
-  .log-form input{
+  .log-form-main{
+    display:flex;
+    gap:8px;
+  }
+  .log-form-main input{
     flex:1;
     min-width:0;
     background:var(--icon-bg);
@@ -339,7 +356,7 @@
     font-size:13.5px;
     text-align:center;
   }
-  .log-form input::placeholder{color:var(--muted); font-size:11px;}
+  .log-form-main input::placeholder{color:var(--muted); font-size:11px;}
   .log-add{
     flex:0 0 auto;
     background:var(--blue);
@@ -350,6 +367,40 @@
     font-size:13px;
     font-weight:600;
   }
+  .log-adv-toggle{
+    background:none;
+    border:none;
+    color:var(--muted);
+    font-size:11.5px;
+    text-align:left;
+    padding:2px 0;
+  }
+  .log-advanced{
+    display:none;
+    flex-direction:column;
+    gap:8px;
+    padding-top:8px;
+    border-top:1px dashed var(--card-border);
+  }
+  .log-advanced.open{display:flex;}
+  .log-advanced select,
+  .log-advanced .inp-nota{
+    width:100%;
+    background:var(--icon-bg);
+    border:1px solid var(--card-border);
+    border-radius:8px;
+    color:var(--text);
+    padding:8px 8px;
+    font-size:12.5px;
+  }
+  .inp-warmup-label{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:12px;
+    color:var(--muted);
+  }
+  .inp-warmup-label input{width:auto;}
 
   .pending-wrap{margin-top:8px;}
   .pending-list{margin-bottom:8px;}
@@ -379,6 +430,20 @@
     padding:10px;
     font-weight:700;
     font-size:13.5px;
+  }
+  .pending-row-badges{
+    color:var(--amber);
+    font-size:10.5px;
+    margin-top:2px;
+  }
+  .undo-btn{
+    width:100%;
+    background:none;
+    border:1px dashed var(--card-border);
+    color:var(--muted);
+    border-radius:8px;
+    padding:8px;
+    font-size:12px;
   }
 
   .toast{
@@ -972,7 +1037,8 @@
 
   <div class="metric-card">
     <div class="metric-title">Historial reciente</div>
-    <div class="metric-sub">Elige un ejercicio para ver y corregir sus últimos registros</div>
+    <div class="metric-sub">Elige primero el día y luego el ejercicio para ver y corregir sus últimos registros</div>
+    <select class="metric-select" id="historialDaySelect" onchange="onHistorialDayChange()"></select>
     <select class="metric-select" id="historialExerciseSelect" onchange="renderHistorial()"></select>
     <div id="historialList"></div>
   </div>
@@ -988,6 +1054,12 @@
     <div class="metric-title">Volumen semanal total</div>
     <div class="metric-sub" id="volumeSub">Peso × reps × series sumado por semana — el mejor indicador de progreso para ganar músculo</div>
     <div class="chart-wrap"><canvas id="volumeChart"></canvas></div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-title">Índice de fuerza</div>
+    <div class="metric-sub" id="strengthIndexSub">Tendencia de fondo: promedio de tu 1RM estimado en todos los ejercicios, respecto a tu primera marca de cada uno</div>
+    <div class="chart-wrap"><canvas id="strengthIndexChart"></canvas></div>
   </div>
 </div>
 
@@ -1048,6 +1120,27 @@ function decodeJwt(token){
   } catch(e) { return null; }
 }
 
+// Los ID tokens de Google Identity Services caducan tras ~1h. En vez de esperar a que
+// una petición falle a mitad de sesión, programamos una renovación silenciosa poco antes.
+function scheduleTokenRefresh(){
+  clearTimeout(window._tokenRefreshTimer);
+  const token = getIdToken();
+  if (!token) return;
+  const payload = decodeJwt(token);
+  if (!payload || !payload.exp) return;
+  const refreshAt = payload.exp * 1000 - 5 * 60 * 1000; // 5 min antes de caducar
+  const delay = Math.max(refreshAt - Date.now(), 5000);
+  window._tokenRefreshTimer = setTimeout(attemptSilentTokenRefresh, delay);
+}
+
+function attemptSilentTokenRefresh(){
+  if (getProfile() && getIdToken() && window.google && google.accounts && google.accounts.id) {
+    // Si el usuario sigue con sesión activa en Google, esto renueva el credential
+    // sin pedirle nada (dispara handleCredentialResponse con un token nuevo).
+    google.accounts.id.prompt();
+  }
+}
+
 function handleCredentialResponse(response){
   const errEl = document.getElementById('loginError');
   const payload = decodeJwt(response.credential);
@@ -1067,6 +1160,7 @@ function handleCredentialResponse(response){
   localStorage.setItem('profile', profile);
   document.getElementById('profileScreen').style.display = 'none';
   updateProfileIndicator();
+  scheduleTokenRefresh();
   renderTabs();
   updateCardHighlights();
   fetchProgressSilently();
@@ -1079,7 +1173,8 @@ function initGoogleSignIn(){
   }
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
-    callback: handleCredentialResponse
+    callback: handleCredentialResponse,
+    auto_select: true // maximiza que la renovación silenciosa no pida confirmación
   });
   const btn = document.getElementById('googleSignInBtn');
   if (btn) {
@@ -1141,6 +1236,7 @@ async function loadMetrics(force){
     renderHistorial();
     renderProgressChart();
     renderVolumeChart();
+    renderStrengthIndexChart();
     renderTabs();
     updateCardHighlights();
     loadBodyStats();
@@ -1212,7 +1308,7 @@ function dailyVolumeMap(){
   const cache = window._progressCache || [];
   const map = {};
   cache
-    .filter(r => (r['Perfil'] || '') === profile)
+    .filter(r => (r['Perfil'] || '') === profile && !isWarmupRow(r))
     .forEach(r => {
       const f = String(r['Fecha']).slice(0, 10);
       map[f] = (map[f] || 0) + rowVolume(r);
@@ -1324,20 +1420,20 @@ function renderWeightTrend(){
 async function saveHeightValue(){
   const val = document.getElementById('heightInput').value.replace(',', '.').trim();
   if (!val || isNaN(parseFloat(val))) { showToast('Pon una altura válida'); return; }
-  try {
-    await postToSheet({ action: 'saveHeight', altura: val });
+  const data = await postToSheetChecked({ action: 'saveHeight', altura: val });
+  if (data && data.ok) {
     window._height = val;
     showToast('Altura guardada ✓');
-  } catch(e) {
-    showToast('No se pudo guardar la altura');
+  } else if (!data.unauthorized) {
+    showToast('No se pudo guardar la altura, revisa tu conexión');
   }
 }
 
 async function saveWeightValue(){
   const val = document.getElementById('weightInput').value.replace(',', '.').trim();
   if (!val || isNaN(parseFloat(val))) { showToast('Pon un peso válido'); return; }
-  try {
-    await postToSheet({ action: 'saveWeight', peso: val, fecha: localDateStr() });
+  const data = await postToSheetChecked({ action: 'saveWeight', peso: val, fecha: localDateStr() });
+  if (data && data.ok) {
     const today = localDateStr();
     window._weightHistory = (window._weightHistory || []).filter(w => w.fecha !== today);
     window._weightHistory.push({ fecha: today, peso: parseFloat(val) });
@@ -1345,8 +1441,8 @@ async function saveWeightValue(){
     renderWeightTrend();
     renderWeightChart();
     showToast('Peso registrado ✓');
-  } catch(e) {
-    showToast('No se pudo registrar el peso');
+  } else if (!data.unauthorized) {
+    showToast('No se pudo registrar el peso, revisa tu conexión');
   }
 }
 
@@ -1377,9 +1473,11 @@ async function saveEditHist(id){
     reps = row.querySelector('.edit-reps').value;
     series = row.querySelector('.edit-series').value;
   }
-  try {
-    await postToSheet({ action: 'update', id, peso, reps, series });
-  } catch(e) {}
+  const data = await postToSheetChecked({ action: 'update', id, peso, reps, series });
+  if (!data || !data.ok) {
+    if (!data.unauthorized) showToast('⚠️ No se pudo actualizar, revisa tu conexión');
+    return;
+  }
   const row2 = window._progressCache.find(r => String(r['ID']) === String(id));
   if (row2) { row2['Peso (kg)'] = peso; row2['Reps'] = reps; row2['Series'] = series; }
   editingHistId = null;
@@ -1390,9 +1488,11 @@ async function saveEditHist(id){
 }
 
 async function deleteHist(id){
-  try {
-    await postToSheet({ action: 'delete', id });
-  } catch(e) {}
+  const data = await postToSheetChecked({ action: 'delete', id });
+  if (!data || !data.ok) {
+    if (!data.unauthorized) showToast('⚠️ No se pudo borrar, revisa tu conexión');
+    return;
+  }
   window._progressCache = window._progressCache.filter(r => String(r['ID']) !== String(id));
   showToast('Registro borrado ✓');
   renderHeatmap();
@@ -1404,18 +1504,55 @@ async function deleteHist(id){
   updateCardHighlights();
 }
 
+function populateHistorialDaySelect(){
+  const daySel = document.getElementById('historialDaySelect');
+  if (!daySel) return;
+  const prevValue = daySel.value;
+  daySel.innerHTML = '<option value="">Elige un día…</option>' +
+    DAYS.map(d => `<option value="${d.name}">${d.name.split('·')[0].trim()}</option>`).join('');
+  if (DAYS.some(d => d.name === prevValue)) daySel.value = prevValue;
+}
+
+function onHistorialDayChange(){
+  populateHistorialExerciseSelect();
+  renderHistorial();
+}
+
+function populateHistorialExerciseSelect(){
+  const daySel = document.getElementById('historialDaySelect');
+  const exSel = document.getElementById('historialExerciseSelect');
+  if (!exSel) return;
+  const dia = daySel ? daySel.value : '';
+  if (!dia) {
+    exSel.innerHTML = '<option value="">Elige un día primero…</option>';
+    return;
+  }
+  const day = DAYS.find(d => d.name === dia);
+  const names = day ? day.groups.flatMap(g => g.exercises.map(ex => ex.name)) : [];
+  const prevValue = exSel.value;
+  exSel.innerHTML = '<option value="">Elige un ejercicio…</option>' +
+    names.map(n => `<option value="${n}">${n}</option>`).join('');
+  if (names.includes(prevValue)) exSel.value = prevValue;
+}
+
 function renderHistorial(){
   const listEl = document.getElementById('historialList');
-  const sel = document.getElementById('historialExerciseSelect');
-  const exercise = sel ? sel.value : '';
+  const daySel = document.getElementById('historialDaySelect');
+  const exSel = document.getElementById('historialExerciseSelect');
+  const dia = daySel ? daySel.value : '';
+  const exercise = exSel ? exSel.value : '';
 
+  if (!dia) {
+    listEl.innerHTML = '<div class="draft-empty">Elige un día arriba para ver su historial.</div>';
+    return;
+  }
   if (!exercise) {
     listEl.innerHTML = '<div class="draft-empty">Elige un ejercicio arriba para ver su historial.</div>';
     return;
   }
 
   const rows = myRows()
-    .filter(r => r['ID'] && r['Ejercicio'] === exercise)
+    .filter(r => r['ID'] && r['Día'] === dia && r['Ejercicio'] === exercise)
     .sort((a,b) => String(b['Fecha']).localeCompare(String(a['Fecha'])))
     .slice(0, 20);
 
@@ -1451,9 +1588,14 @@ function renderHistorial(){
         </div>
       `;
     }
+    const badges = [
+      isWarmupRow(r) ? '🔥 calentamiento' : '',
+      r['Variante'] ? '🔀 ' + r['Variante'] : '',
+      r['Nota'] ? '📝 ' + r['Nota'] : '',
+    ].filter(Boolean).join(' · ');
     return `
       <div class="draft-item" data-hist-id="${id}">
-        <div class="di-text">${r['Ejercicio']}<div class="di-sub">${String(r['Fecha']).slice(0,10)} · ${timed ? r['Reps'] + ' seg' : r['Peso (kg)'] + ' kg · ' + r['Reps'] + ' reps'} · ${r['Series']} series</div></div>
+        <div class="di-text">${r['Ejercicio']}<div class="di-sub">${String(r['Fecha']).slice(0,10)} · ${timed ? r['Reps'] + ' seg' : r['Peso (kg)'] + ' kg · ' + r['Reps'] + ' reps'} · ${r['Series']} series</div>${badges ? `<div class="di-sub" style="color:var(--amber);">${badges}</div>` : ''}</div>
         <button class="draft-edit" onclick="startEditHist('${id}')">✏️</button>
         <button class="draft-del" onclick="deleteHist('${id}')">✕</button>
       </div>
@@ -1527,7 +1669,7 @@ function mondayOf(d){
 function computeMuscleLoad(profile){
   const cache = window._progressCache || [];
   const weekStart = getWeekStart();
-  const rows = cache.filter(r => (r['Perfil'] || '') === profile);
+  const rows = cache.filter(r => (r['Perfil'] || '') === profile && !isWarmupRow(r));
   const zoneKeys = Object.keys(MUSCLE_ZONES);
 
   const thisWeekVol = {}; zoneKeys.forEach(z => thisWeekVol[z] = 0);
@@ -1670,17 +1812,12 @@ function populateExerciseSelect(){
   sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
   if (names.includes(prevValue)) sel.value = prevValue;
 
-  const histSel = document.getElementById('historialExerciseSelect');
-  if (histSel) {
-    const histPrev = histSel.value;
-    histSel.innerHTML = '<option value="">Elige un ejercicio…</option>' +
-      names.map(n => `<option value="${n}">${n}</option>`).join('');
-    if (names.includes(histPrev)) histSel.value = histPrev;
-  }
+  populateHistorialDaySelect();
+  populateHistorialExerciseSelect();
 }
 
 function renderProgressChart(){
-  const rows = myRows();
+  const rows = myRows().filter(r => !isWarmupRow(r));
   const exercise = document.getElementById('exerciseSelect').value;
   const timed = isTimedExercise(exercise);
   const filtered = rows
@@ -1794,7 +1931,7 @@ function isoWeekLabel(dateStr){
 }
 
 function renderVolumeChart(){
-  const rows = myRows();
+  const rows = myRows().filter(r => !isWarmupRow(r));
   const volumeByWeek = {};
   rows.forEach(r => {
     const week = isoWeekLabel(String(r['Fecha']));
@@ -1842,6 +1979,93 @@ function renderVolumeChart(){
   });
 }
 
+// ---- Índice de fuerza (tendencia de fondo, no solo esta semana vs. la pasada) ----
+function computeStrengthIndexByWeek(profile){
+  const cache = window._progressCache || [];
+  const rows = cache.filter(r => (r['Perfil'] || '') === profile && !isWarmupRow(r) && !isTimedExercise(r['Ejercicio']));
+  if (rows.length === 0) return { labels: [], values: [] };
+
+  function rm(r){
+    const p = Number(r['Peso (kg)']) || 0, rp = Number(r['Reps']) || 0;
+    return rp ? p * (1 + rp / 30) : 0;
+  }
+
+  // Línea base: primer 1RM>0 registrado de cada ejercicio (por orden de fecha)
+  const baseline = {};
+  const sorted = rows.slice().sort((a, b) => String(a['Fecha']).localeCompare(String(b['Fecha'])));
+  sorted.forEach(r => {
+    const ex = r['Ejercicio'];
+    const v = rm(r);
+    if (v > 0 && !(ex in baseline)) baseline[ex] = v;
+  });
+
+  // Mejor 1RM por semana y ejercicio
+  const byWeekEx = {};
+  rows.forEach(r => {
+    const v = rm(r);
+    if (v <= 0) return;
+    const ex = r['Ejercicio'];
+    if (!(ex in baseline) || baseline[ex] <= 0) return;
+    const wk = isoWeekLabel(String(r['Fecha']));
+    if (!byWeekEx[wk]) byWeekEx[wk] = {};
+    if (!byWeekEx[wk][ex] || v > byWeekEx[wk][ex]) byWeekEx[wk][ex] = v;
+  });
+
+  const weekKeys = Object.keys(byWeekEx).sort().slice(-12);
+  const values = weekKeys.map(wk => {
+    const exMap = byWeekEx[wk];
+    const ratios = Object.keys(exMap).map(ex => (exMap[ex] / baseline[ex]) * 100);
+    const avg = ratios.reduce((s, v) => s + v, 0) / ratios.length;
+    return Math.round(avg * 10) / 10;
+  });
+
+  return { labels: weekKeys, values };
+}
+
+let strengthIndexChartInstance = null;
+
+function renderStrengthIndexChart(){
+  const profile = getProfile();
+  const subEl = document.getElementById('strengthIndexSub');
+  const ctx = document.getElementById('strengthIndexChart');
+  if (strengthIndexChartInstance) { strengthIndexChartInstance.destroy(); strengthIndexChartInstance = null; }
+  if (!subEl || !ctx) return;
+  if (!window.Chart) { subEl.textContent = '⚠️ No se pudo cargar la librería de gráficos.'; return; }
+  if (!profile) return;
+
+  const { labels, values } = computeStrengthIndexByWeek(profile);
+  if (labels.length < 2) {
+    subEl.textContent = 'Necesitas un par de semanas con registros para ver la tendencia de fondo.';
+    return;
+  }
+  subEl.textContent = '100% = tu primera marca registrada de cada ejercicio (1RM estimado, sin calentamientos). Por encima de 100%, vas a más de media.';
+
+  strengthIndexChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Índice de fuerza',
+        data: values,
+        borderColor: '#3f7cf0',
+        backgroundColor: 'rgba(63,124,240,0.15)',
+        tension: 0.3,
+        fill: true,
+        pointRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } },
+        y: { ticks: { color: '#9aa1ab', font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#2a2e35' } }
+      }
+    }
+  });
+}
+
 // ---- Google Sheet config ----
 const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwgIxhB_Pym24bLJETzkQ5wEiE7lgeN_jb-yTj4FntarGEwns7gy3JxhFLbOPk31D_V/exec';
 
@@ -1856,6 +2080,23 @@ function postToSheet(payload){
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify(body)
   });
+}
+
+// Envuelve postToSheet: si el servidor responde "unauthorized" (sesión caducada),
+// lo trata de forma centralizada (mensaje claro + pantalla de login) en vez de que
+// cada función lo confunda con un fallo genérico de red.
+async function postToSheetChecked(payload){
+  try {
+    const res = await postToSheet(payload);
+    const data = await res.json();
+    if (data && data.error === 'unauthorized') {
+      handleUnauthorized();
+      return { ok: false, unauthorized: true };
+    }
+    return data;
+  } catch (e) {
+    return { ok: false };
+  }
 }
 
 async function fetchSheetData(){
@@ -1875,6 +2116,11 @@ function showToast(msg){
 function toggleLog(id){
   const form = document.getElementById(id);
   form.classList.toggle('open');
+}
+
+function toggleAdvanced(logId){
+  const adv = document.getElementById('adv-' + logId);
+  if (adv) adv.classList.toggle('open');
 }
 
 function localDateStr(d){
@@ -1913,7 +2159,7 @@ function weeklyVolumeForProfile(profile, weekStart){
   weekEnd.setDate(weekEnd.getDate() + 7);
   const cache = window._progressCache || [];
   return cache
-    .filter(r => (r['Perfil'] || '') === profile)
+    .filter(r => (r['Perfil'] || '') === profile && !isWarmupRow(r))
     .filter(r => { const f = parseLocalDate(r['Fecha']); return f >= weekStart && f < weekEnd; })
     .reduce((sum, r) => sum + rowVolume(r), 0);
 }
@@ -1961,18 +2207,43 @@ function stillMissingPriorityGroups(profile){
   return missingLastWeek.filter(g => !trainedThisWeek.has(g));
 }
 
+function restWeekKey(profile){
+  return 'restWeek_' + profile + '_' + localDateStr(getWeekStart());
+}
+
+function isRestWeek(profile){
+  return localStorage.getItem(restWeekKey(profile)) === '1';
+}
+
+function toggleRestWeek(){
+  const profile = getProfile();
+  if (!profile) return;
+  const key = restWeekKey(profile);
+  if (localStorage.getItem(key) === '1') localStorage.removeItem(key);
+  else localStorage.setItem(key, '1');
+  renderPriorityBanner();
+}
+
 function renderPriorityBanner(){
   const el = document.getElementById('priorityBanner');
   if (!el) return;
   const profile = getProfile();
   if (!profile) { el.style.display = 'none'; return; }
+
+  if (isRestWeek(profile)) {
+    el.innerHTML = '🛌 Semana marcada como descanso — sin avisos de prioridad muscular. <button class="rest-week-toggle" onclick="toggleRestWeek()">Desactivar</button>';
+    el.style.display = 'block';
+    return;
+  }
+
   const missing = stillMissingPriorityGroups(profile);
   if (missing.length === 0) { el.style.display = 'none'; return; }
   const parts = missing.map(g => {
     const days = daysCoveringGroup(g);
     return '<b>' + g + '</b>' + (days.length ? ' (' + days.join(' o ') + ')' : '');
   });
-  el.innerHTML = '⚠️ La semana pasada no entrenaste: ' + parts.join(', ') + '. Priorízalo esta semana.';
+  el.innerHTML = '⚠️ La semana pasada no entrenaste: ' + parts.join(', ') + '. Priorízalo esta semana.'
+    + ' <button class="rest-week-toggle" onclick="toggleRestWeek()">¿Semana de descanso?</button>';
   el.style.display = 'block';
 }
 
@@ -1981,7 +2252,7 @@ function dayVolumeForWeek(profile, dia, weekStart){
   weekEnd.setDate(weekEnd.getDate() + 7);
   const cache = window._progressCache || [];
   return cache
-    .filter(r => (r['Perfil'] || '') === profile && r['Día'] === dia)
+    .filter(r => (r['Perfil'] || '') === profile && r['Día'] === dia && !isWarmupRow(r))
     .filter(r => { const f = parseLocalDate(r['Fecha']); return f >= weekStart && f < weekEnd; })
     .reduce((sum, r) => sum + rowVolume(r), 0);
 }
@@ -2001,7 +2272,7 @@ function weeklyImprovements(profile){
   const thisWeekStart = getWeekStart();
   const lastWeekStart = getWeekStartOffset(-1);
   const cache = window._progressCache || [];
-  const rows = cache.filter(r => (r['Perfil'] || '') === profile && !isTimedExercise(r['Ejercicio']));
+  const rows = cache.filter(r => (r['Perfil'] || '') === profile && !isTimedExercise(r['Ejercicio']) && !isWarmupRow(r));
   const byExercise = {};
   rows.forEach(r => {
     const f = parseLocalDate(r['Fecha']);
@@ -2085,6 +2356,11 @@ function renderDayComparison(dayIdx){
       }
     }
 
+    const variantMismatch = thisMark && lastMark && (thisMark.variante || '') !== (lastMark.variante || '');
+    const mismatchHtml = variantMismatch
+      ? `<div style="font-size:11px; color:var(--amber); text-align:right;">⚠️ variante distinta (${lastMark.variante || 'la habitual'} → ${thisMark.variante || 'la habitual'}), la comparación no es del todo justa</div>`
+      : '';
+
     return `
       <div class="sum-improve-row" style="flex-direction:column; align-items:stretch; gap:4px;">
         <div><b>${e.name}</b></div>
@@ -2093,6 +2369,7 @@ function renderDayComparison(dayIdx){
           <span>Esta semana: ${thisTxt}</span>
         </div>
         ${deltaHtml ? `<div style="text-align:right;">${deltaHtml}</div>` : ''}
+        ${mismatchHtml}
       </div>
     `;
   }).join('');
@@ -2362,6 +2639,7 @@ function weeklySeriesCount(dia, ejercicio){
     .filter(r => {
       if ((r['Perfil'] || '') !== profile) return false;
       if (r['Día'] !== dia || r['Ejercicio'] !== ejercicio) return false;
+      if (isWarmupRow(r)) return false; // el calentamiento no cuenta para el objetivo de 3 series
       const f = parseLocalDate(r['Fecha']);
       return f >= weekStart;
     })
@@ -2372,7 +2650,7 @@ function lastSessionValue(ejercicio){
   const profile = getProfile();
   const cache = window._progressCache || [];
   const fromSheet = cache
-    .filter(r => (r['Perfil'] || '') === profile && r['Ejercicio'] === ejercicio)
+    .filter(r => (r['Perfil'] || '') === profile && r['Ejercicio'] === ejercicio && !isWarmupRow(r))
     .map(r => ({ fecha: String(r['Fecha']).slice(0,10), peso: r['Peso (kg)'], reps: r['Reps'] }));
   if (fromSheet.length === 0) return null;
   fromSheet.sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -2387,6 +2665,7 @@ function bestMarkInWeek(dia, ejercicio, weekStart){
   const rows = cache.filter(r => {
     if ((r['Perfil'] || '') !== profile) return false;
     if (r['Día'] !== dia || r['Ejercicio'] !== ejercicio) return false;
+    if (isWarmupRow(r)) return false; // el calentamiento no cuenta como marca
     const f = parseLocalDate(r['Fecha']);
     return f >= weekStart && f < weekEnd;
   });
@@ -2395,7 +2674,7 @@ function bestMarkInWeek(dia, ejercicio, weekStart){
   if (isTimedExercise(ejercicio)) {
     let best = rows[0];
     rows.forEach(r => { if ((Number(r['Reps']) || 0) > (Number(best['Reps']) || 0)) best = r; });
-    return { timed: true, reps: Number(best['Reps']) || 0 };
+    return { timed: true, reps: Number(best['Reps']) || 0, variante: best['Variante'] || '' };
   }
 
   let best = rows[0];
@@ -2406,7 +2685,7 @@ function bestMarkInWeek(dia, ejercicio, weekStart){
     const rm = rp ? p * (1 + rp / 30) : 0;
     if (rm > bestRM) { bestRM = rm; best = r; }
   });
-  return { timed: false, peso: Number(best['Peso (kg)']) || 0, reps: Number(best['Reps']) || 0, rm: Math.round(bestRM * 10) / 10 };
+  return { timed: false, peso: Number(best['Peso (kg)']) || 0, reps: Number(best['Reps']) || 0, rm: Math.round(bestRM * 10) / 10, variante: best['Variante'] || '' };
 }
 
 function lastWeekBestMark(dia, ejercicio){
@@ -2429,12 +2708,13 @@ function updateCardHighlights(){
     const beatEl = cardEl.querySelector('.beat-last-week');
     if (beatEl) {
       const lastWeek = lastWeekBestMark(diaForCount, exName);
+      const variantNote = (lastWeek && lastWeek.variante) ? ' (con ' + lastWeek.variante + ')' : '';
       if (!lastWeek) {
         beatEl.textContent = '';
       } else if (lastWeek.timed) {
-        beatEl.textContent = '🎯 Supera: ' + lastWeek.reps + 's (semana pasada)';
+        beatEl.textContent = '🎯 Supera: ' + lastWeek.reps + 's (semana pasada' + variantNote + ')';
       } else {
-        beatEl.textContent = '🎯 Supera: ' + lastWeek.peso + 'kg × ' + lastWeek.reps + ' (semana pasada)';
+        beatEl.textContent = '🎯 Supera: ' + lastWeek.peso + 'kg × ' + lastWeek.reps + ' (semana pasada' + variantNote + ')';
       }
     }
 
@@ -2477,12 +2757,24 @@ function addPendingRow(logId){
       return;
     }
   }
+  const variante = (box.querySelector('.inp-variante') && box.querySelector('.inp-variante').value) || '';
+  const calentamiento = !!(box.querySelector('.inp-calentamiento') && box.querySelector('.inp-calentamiento').checked);
+  const nota = (box.querySelector('.inp-nota') && box.querySelector('.inp-nota').value.trim()) || '';
+
   if (!pendingRows[logId]) pendingRows[logId] = [];
-  pendingRows[logId].push({ peso, reps, id: Date.now() + '-' + Math.random().toString(36).slice(2, 7) });
+  pendingRows[logId].push({
+    peso, reps, variante, calentamiento, nota,
+    id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+  });
   persistPending();
   const pesoEl = box.querySelector('.inp-peso');
   if (pesoEl) pesoEl.value = '';
   box.querySelector('.inp-reps').value = '';
+  // La variante seleccionada se mantiene (si sigues usando la alternativa, no hay que reelegirla en cada serie).
+  const calentamientoEl = box.querySelector('.inp-calentamiento');
+  if (calentamientoEl) calentamientoEl.checked = false;
+  const notaEl = box.querySelector('.inp-nota');
+  if (notaEl) notaEl.value = '';
   renderPendingWrap(logId);
 }
 
@@ -2493,6 +2785,26 @@ function removePendingRow(logId, idx){
 }
 
 const savingPending = new Set(); // logId de las tarjetas con un guardado en curso, para evitar dobles envíos
+let lastAcceptedByLogId = {}; // logId -> {ids, count}, para poder deshacer el último guardado
+
+function allTimeBestBeforeNow(dia, ejercicio){
+  const profile = getProfile();
+  const cache = window._progressCache || [];
+  const rows = cache.filter(r => (r['Perfil'] || '') === profile && r['Día'] === dia && r['Ejercicio'] === ejercicio && !isWarmupRow(r));
+  if (rows.length === 0) return null;
+  if (isTimedExercise(ejercicio)) {
+    let best = 0;
+    rows.forEach(r => { const s = Number(r['Reps']) || 0; if (s > best) best = s; });
+    return { timed: true, value: best };
+  }
+  let bestRM = 0;
+  rows.forEach(r => {
+    const p = Number(r['Peso (kg)']) || 0, rp = Number(r['Reps']) || 0;
+    const rm = rp ? p * (1 + rp / 30) : 0;
+    if (rm > bestRM) bestRM = rm;
+  });
+  return { timed: false, value: Math.round(bestRM * 10) / 10 };
+}
 
 async function acceptPending(logId){
   if (savingPending.has(logId)) return; // ya hay un guardado en curso para esta tarjeta
@@ -2502,31 +2814,29 @@ async function acceptPending(logId){
   const rows = pendingRows[logId] || [];
   if (rows.length === 0) return;
 
+  const priorBest = allTimeBestBeforeNow(dia, ejercicio);
+
   const entries = rows.map(r => ({
     fecha: localDateStr(),
     perfil: getProfile(),
     dia: dia, grupo: grupo, ejercicio: ejercicio,
     peso: r.peso, reps: r.reps, series: 1,
+    variante: r.variante || '',
+    calentamiento: !!r.calentamiento,
+    nota: r.nota || '',
     id: r.id || (Date.now() + '-' + Math.random().toString(36).slice(2, 7)), // fallback por si venía de un pendiente guardado antes de este cambio
-    nota: '',
   }));
 
   savingPending.add(logId);
   renderPendingWrap(logId);
 
-  let confirmed = false;
-  try {
-    const res = await postToSheet({ entries: entries });
-    const data = await res.json();
-    confirmed = !!(data && data.ok);
-  } catch (e) {
-    confirmed = false;
-  }
+  const data = await postToSheetChecked({ entries: entries });
+  const confirmed = !!(data && data.ok);
 
   savingPending.delete(logId);
 
   if (!confirmed) {
-    showToast('⚠️ No se pudo guardar, revisa tu conexión y vuelve a pulsar Aceptar');
+    if (!data.unauthorized) showToast('⚠️ No se pudo guardar, revisa tu conexión y vuelve a pulsar Aceptar');
     renderPendingWrap(logId);
     return;
   }
@@ -2536,16 +2846,49 @@ async function acceptPending(logId){
     window._progressCache.push({
       'Fecha': entry.fecha, 'Perfil': entry.perfil, 'Día': entry.dia, 'Grupo': entry.grupo,
       'Ejercicio': entry.ejercicio, 'Peso (kg)': entry.peso, 'Reps': entry.reps, 'Series': entry.series,
-      'Nota': '', 'ID': entry.id,
+      'Nota': entry.nota, 'ID': entry.id, 'Variante': entry.variante, 'Calentamiento': entry.calentamiento,
     });
   });
 
-  showToast('Guardado ✓ (' + rows.length + (rows.length > 1 ? ' series)' : ' serie)'));
+  // ¿Alguna de las series NO-calentamiento de esta tanda bate tu mejor marca de siempre en este ejercicio?
+  let newBest = null;
+  const timed = isTimedExercise(ejercicio);
+  entries.forEach((e, i) => {
+    if (rows[i].calentamiento) return;
+    const value = timed ? (Number(e.reps) || 0) : (Number(e.reps) ? Number(e.peso) * (1 + Number(e.reps) / 30) : 0);
+    if (newBest === null || value > newBest) newBest = value;
+  });
+  const isPR = newBest !== null && newBest > 0 && (!priorBest || newBest > priorBest.value);
+
+  showToast(isPR
+    ? '🏆 ¡Marca personal en ' + ejercicio + '!'
+    : 'Guardado ✓ (' + rows.length + (rows.length > 1 ? ' series)' : ' serie)'));
+
+  lastAcceptedByLogId[logId] = { ids: entries.map(e => e.id), count: entries.length };
   pendingRows[logId] = [];
   persistPending();
   renderPendingWrap(logId);
   renderTabs();
   updateCardHighlights();
+}
+
+async function undoLastAccept(logId){
+  const info = lastAcceptedByLogId[logId];
+  if (!info) return;
+  delete lastAcceptedByLogId[logId];
+  renderPendingWrap(logId);
+  for (const id of info.ids) {
+    const data = await postToSheetChecked({ action: 'delete', id });
+    if (data && data.ok) {
+      window._progressCache = window._progressCache.filter(r => String(r['ID']) !== String(id));
+    }
+  }
+  showToast('Deshecho ✓');
+  renderHeatmap();
+  populateExerciseSelect();
+  renderTabs();
+  updateCardHighlights();
+  renderPendingWrap(logId);
 }
 
 function renderPendingWrap(logId){
@@ -2554,18 +2897,31 @@ function renderPendingWrap(logId){
   const rows = pendingRows[logId] || [];
   const timed = isTimedExercise(wrap.dataset.ejercicio);
   if (rows.length === 0) {
-    wrap.innerHTML = '';
+    const undo = lastAcceptedByLogId[logId];
+    wrap.innerHTML = undo
+      ? `<button class="undo-btn" onclick="undoLastAccept('${logId}')">↩️ Deshacer último guardado (${undo.count} ${undo.count > 1 ? 'series' : 'serie'})</button>`
+      : '';
     return;
   }
   const saving = savingPending.has(logId);
   wrap.innerHTML = `
     <div class="pending-list">
-      ${rows.map((r, i) => `
+      ${rows.map((r, i) => {
+        const badges = [
+          r.calentamiento ? '🔥 calentamiento' : '',
+          r.variante ? '🔀 ' + r.variante : '',
+          r.nota ? '📝 ' + r.nota : '',
+        ].filter(Boolean).join(' · ');
+        return `
         <div class="pending-row">
-          <span>Serie ${i + 1}: ${timed ? r.reps + ' seg' : r.peso + ' kg × ' + r.reps + ' reps'}</span>
+          <div>
+            <span>Serie ${i + 1}: ${timed ? r.reps + ' seg' : r.peso + ' kg × ' + r.reps + ' reps'}</span>
+            ${badges ? `<div class="pending-row-badges">${badges}</div>` : ''}
+          </div>
           <button class="pending-del" onclick="removePendingRow('${logId}', ${i})" ${saving ? 'disabled' : ''}>✕</button>
         </div>
-      `).join('')}
+      `;
+      }).join('')}
     </div>
     <button class="accept-btn" onclick="acceptPending('${logId}')" ${saving ? 'disabled' : ''}>${saving ? '⏳ Guardando…' : '✅ Aceptar (' + rows.length + (rows.length > 1 ? ' series)' : ' serie)')}</button>
   `;
@@ -2702,6 +3058,11 @@ const DAYS = [
 let currentDay = 0;
 
 const TIMED_EXERCISES = ['Planchas abdominales'];
+function isWarmupRow(r){
+  const v = r['Calentamiento'];
+  return v === true || v === 'true' || v === 'TRUE' || v === 1 || v === '1';
+}
+
 function isTimedExercise(name){
   return TIMED_EXERCISES.includes(name);
 }
@@ -2764,7 +3125,10 @@ function refreshProgressIfLoggedIn(){
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') refreshProgressIfLoggedIn();
+  if (document.visibilityState === 'visible') {
+    refreshProgressIfLoggedIn();
+    attemptSilentTokenRefresh();
+  }
 });
 window.addEventListener('pageshow', (evt) => {
   if (evt.persisted) refreshProgressIfLoggedIn(); // vuelta desde el caché de "atrás/adelante" del navegador (típico en iOS al reabrir la app)
@@ -2842,11 +3206,22 @@ function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
       <div class="howto"><b>Cómo hacerlo:</b> ${ex.howTo}</div>
       <button class="log-toggle" onclick="toggleLog('${logId}')">📈 Registrar serie</button>
       <div class="log-form" id="${logId}">
-        ${isTimedExercise(ex.name)
-          ? `<input class="inp-reps" type="number" inputmode="numeric" placeholder="Segundos">`
-          : `<input class="inp-peso" type="text" inputmode="decimal" placeholder="Peso kg">
-             <input class="inp-reps" type="number" inputmode="numeric" placeholder="Reps">`}
-        <button class="log-add" onclick="addPendingRow('${logId}')">+ Añadir</button>
+        <div class="log-form-main">
+          ${isTimedExercise(ex.name)
+            ? `<input class="inp-reps" type="number" inputmode="numeric" placeholder="Segundos">`
+            : `<input class="inp-peso" type="text" inputmode="decimal" placeholder="Peso kg">
+               <input class="inp-reps" type="number" inputmode="numeric" placeholder="Reps">`}
+          <button class="log-add" onclick="addPendingRow('${logId}')">+ Añadir</button>
+        </div>
+        <button class="log-adv-toggle" type="button" onclick="toggleAdvanced('${logId}')">⚙️ Variante / calentamiento / nota</button>
+        <div class="log-advanced" id="adv-${logId}">
+          <select class="inp-variante">
+            <option value="">Variante: ${ex.primary} (la habitual)</option>
+            ${ex.alts.map(a => `<option value="${a.replace(/"/g,'&quot;')}">Variante: ${a}</option>`).join('')}
+          </select>
+          <label class="inp-warmup-label"><input type="checkbox" class="inp-calentamiento"> 🔥 Es calentamiento (no cuenta para el objetivo semanal ni el progreso)</label>
+          <input class="inp-nota" type="text" placeholder="Nota opcional">
+        </div>
       </div>
       <div class="pending-wrap" id="pendingWrap-${logId}" data-dia="${dia.replace(/"/g,'&quot;')}" data-grupo="${grupo.replace(/"/g,'&quot;')}" data-ejercicio="${ex.name.replace(/"/g,'&quot;')}"></div>
     </div>
@@ -2929,6 +3304,7 @@ initGoogleSignIn();
 if (getProfile() && getIdToken()) {
   document.getElementById('profileScreen').style.display = 'none';
   updateProfileIndicator();
+  scheduleTokenRefresh();
   fetchProgressSilently();
 } else {
   updateProfileIndicator();
