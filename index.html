@@ -609,6 +609,59 @@
     font-size:15px;
   }
   .summary-body{padding:0 16px 30px;}
+
+  .modal-backdrop{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.6);
+    z-index:95;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .modal-card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:16px;
+    padding:22px 18px;
+    max-width:320px;
+    width:100%;
+    text-align:center;
+  }
+  .modal-title{
+    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+    font-size:16px;
+    font-weight:700;
+    margin-bottom:10px;
+  }
+  .modal-text{
+    color:var(--muted);
+    font-size:13.5px;
+    line-height:1.5;
+    margin-bottom:18px;
+  }
+  .modal-btn-row{
+    display:flex;
+    gap:10px;
+  }
+  .modal-btn{
+    flex:1;
+    padding:11px 0;
+    border-radius:10px;
+    font-size:13.5px;
+    font-weight:600;
+    border:1px solid var(--card-border);
+  }
+  .modal-btn.secondary{
+    background:none;
+    color:var(--muted);
+  }
+  .modal-btn.primary{
+    background:var(--blue);
+    border-color:var(--blue);
+    color:#fff;
+  }
   .sum-card{
     background:var(--card);
     border:1px solid var(--card-border);
@@ -1090,6 +1143,17 @@
   <div class="summary-body" id="dayCompareBody"></div>
 </div>
 
+<div class="modal-backdrop" id="rebalanceModal">
+  <div class="modal-card">
+    <div class="modal-title">⚖️ Reequilibrar la semana</div>
+    <div class="modal-text" id="rebalanceText"></div>
+    <div class="modal-btn-row">
+      <button class="modal-btn secondary" onclick="declineRebalance()">No, gracias</button>
+      <button class="modal-btn primary" onclick="acceptRebalance()">Sí, reestructurar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast">Guardado ✓</div>
 
 <script>
@@ -1241,6 +1305,7 @@ async function loadMetrics(force){
     renderTabs();
     updateCardHighlights();
     loadBodyStats();
+    maybeShowRebalanceModal();
     btn.textContent = '🔄 Actualizar datos';
   } catch (err) {
     btn.textContent = '⚠️ No se pudo cargar — reintentar';
@@ -1756,6 +1821,238 @@ function renderMuscleLoad(){
       <span class="muscle-zone-status">${load[z].label}</span>
     </div>
   `).join('');
+}
+
+// ---- Reequilibrio semanal: si un grupo quedó muy por debajo de la media de esa
+// semana (desequilibrio relativo, no solo "a cero"), se propone reforzarlo esta
+// semana prestando un ejercicio ya existente de ese grupo a un día que no lo entrena.
+function lastWeekZoneVolumes(profile){
+  const cache = window._progressCache || [];
+  const lastWeekStart = getWeekStartOffset(-1);
+  const thisWeekStart = getWeekStart();
+  const zoneKeys = Object.keys(MUSCLE_ZONES);
+  const vol = {}; zoneKeys.forEach(z => vol[z] = 0);
+  cache
+    .filter(r => (r['Perfil'] || '') === profile && !isWarmupRow(r))
+    .forEach(r => {
+      const f = parseLocalDate(r['Fecha']);
+      if (!(f >= lastWeekStart && f < thisWeekStart)) return;
+      const g = preciseGroupForRow(r);
+      if (!g) return;
+      const zoneKey = zoneKeys.find(z => MUSCLE_ZONES[z].groups.includes(g));
+      if (!zoneKey) return;
+      vol[zoneKey] += rowVolume(r);
+    });
+  return vol;
+}
+
+// Grupo con mayor desequilibrio relativo respecto a la media de esa semana
+// (no necesariamente el más bajo en absoluto, sino el más rezagado frente al resto).
+function findMostNeglectedZone(profile){
+  const vol = lastWeekZoneVolumes(profile);
+  const zoneKeys = Object.keys(vol);
+  const total = zoneKeys.reduce((s, z) => s + vol[z], 0);
+  if (total <= 0) return null; // sin datos la semana pasada, no hay nada que comparar
+  const avg = total / zoneKeys.length;
+  let worst = null;
+  zoneKeys.forEach(z => {
+    const ratio = avg > 0 ? vol[z] / avg : 0;
+    if (worst === null || ratio < worst.ratio) worst = { zone: z, ratio: ratio };
+  });
+  if (!worst || worst.ratio >= 0.5) return null; // sin desequilibrio relevante
+  return worst.zone;
+}
+
+// Grupo con mayor SOBRECARGA relativa respecto a la media de esa semana — el
+// candidato a "ceder" una sesión al grupo rezagado.
+function findMostOverloadedZone(profile){
+  const vol = lastWeekZoneVolumes(profile);
+  const zoneKeys = Object.keys(vol);
+  const total = zoneKeys.reduce((s, z) => s + vol[z], 0);
+  if (total <= 0) return null;
+  const avg = total / zoneKeys.length;
+  let worst = null;
+  zoneKeys.forEach(z => {
+    const ratio = avg > 0 ? vol[z] / avg : 0;
+    if (worst === null || ratio > worst.ratio) worst = { zone: z, ratio: ratio };
+  });
+  if (!worst || worst.ratio <= 1.5) return null; // sin sobrecarga clara
+  return worst.zone;
+}
+
+// Busca, dentro del catálogo de otro día, el grupo "dueño" de una etiqueta concreta
+// (para tomar prestados sus ejercicios sin inventar nada nuevo).
+function findHomeGroupForLabel(label, excludeDayName){
+  for (const day of DAYS) {
+    if (day.name === excludeDayName) continue;
+    const g = day.groups.find(gr => gr.label === label);
+    if (g) return { label: g.label, exercises: g.exercises, homeDayName: day.name };
+  }
+  return null;
+}
+
+// Grupo sustituto para la zona rezagada: prueba cada etiqueta canónica de esa zona,
+// tomando la primera cuyo "dueño" no sea el propio día que se va a sustituir.
+function pickSubstituteGroupForZone(zoneKey, excludeDayName){
+  const groups = MUSCLE_ZONES[zoneKey].groups;
+  for (const label of groups) {
+    const found = findHomeGroupForLabel(label, excludeDayName);
+    if (found) return found;
+  }
+  return null;
+}
+
+// Día candidato para ALIVIAR la zona sobrecargada: debe entrenarla, tener otro
+// grupo además (para no vaciarlo), y no estar ya empezado esta semana (para no
+// desordenar series que ya hayas registrado ahí).
+function findSwapTargetDay(overloadedZoneKey){
+  const overloadedGroups = MUSCLE_ZONES[overloadedZoneKey].groups;
+  const candidates = DAYS.filter(day => {
+    const matching = day.groups.filter(g => overloadedGroups.includes(g.label));
+    return matching.length > 0 && day.groups.length > matching.length && !isDayStarted(day);
+  });
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => {
+    const count = d => d.groups.filter(g => overloadedGroups.includes(g.label)).reduce((s, g) => s + g.exercises.length, 0);
+    return count(b) - count(a);
+  });
+  const targetDay = candidates[0];
+  const fromGroup = targetDay.groups.find(g => overloadedGroups.includes(g.label));
+  return { targetDay: targetDay, fromGroup: fromGroup };
+}
+
+// Respaldo: si no hay un día válido para sustituir, se limita a prestar un ejercicio
+// (como antes) a un día que no entrene ya esa zona y no esté empezado esta semana.
+function findReinforcementPick(zoneKey){
+  const groups = MUSCLE_ZONES[zoneKey].groups;
+  const pool = [];
+  DAYS.forEach(day => {
+    day.groups.forEach(g => {
+      if (groups.includes(g.label)) {
+        g.exercises.forEach(ex => pool.push({ ex: ex, homeDay: day.name, homeGroup: g.label }));
+      }
+    });
+  });
+  if (pool.length === 0) return null;
+
+  const candidateDays = DAYS.filter(day => !day.groups.some(g => groups.includes(g.label)) && !isDayStarted(day));
+  if (candidateDays.length === 0) return null;
+
+  const targetDay = candidateDays.slice().sort((a, b) => a.groups.length - b.groups.length)[0];
+  const pick = pool[0];
+  return { targetDayName: targetDay.name, targetDayLabel: targetDay.name.split('·')[0].trim(), exerciseName: pick.ex.name, grupo: pick.homeGroup, originalDayName: pick.homeDay };
+}
+
+function buildRebalancePlan(profile){
+  const neglected = findMostNeglectedZone(profile);
+  if (!neglected) return null;
+
+  const overloaded = findMostOverloadedZone(profile);
+  if (overloaded) {
+    const swap = findSwapTargetDay(overloaded);
+    if (swap) {
+      const substitute = pickSubstituteGroupForZone(neglected, swap.targetDay.name);
+      if (substitute) {
+        return {
+          type: 'swap',
+          neglectedLabel: MUSCLE_ZONES[neglected].label,
+          overloadedLabel: MUSCLE_ZONES[overloaded].label,
+          dayName: swap.targetDay.name,
+          dayLabel: swap.targetDay.name.split('·')[0].trim(),
+          fromGroupLabel: swap.fromGroup.label,
+          toGroupLabel: substitute.label,
+          toExercises: substitute.exercises,
+        };
+      }
+    }
+  }
+
+  const pick = findReinforcementPick(neglected);
+  if (!pick) return null;
+  return { type: 'add', neglectedLabel: MUSCLE_ZONES[neglected].label, pick: pick };
+}
+
+// ---- Override semanal: sustituye un grupo de un día concreto, solo para la
+// semana en curso (la clave incluye la fecha del lunes, así que la semana
+// siguiente deja de aplicarse sola, sin necesidad de limpiarla).
+function getWeekOverrideKey(profile){
+  return 'weekOverride_' + profile + '_' + localDateStr(getWeekStart());
+}
+
+function getWeekOverride(profile){
+  try { return JSON.parse(localStorage.getItem(getWeekOverrideKey(profile)) || 'null'); } catch(e) { return null; }
+}
+
+function setWeekOverride(profile, override){
+  localStorage.setItem(getWeekOverrideKey(profile), JSON.stringify(override));
+}
+
+// Grupos "efectivos" de un día para esta semana — es lo que deben usar renderDay()
+// y todo lo que decide qué cuenta como completado, en vez de day.groups a secas.
+function effectiveDayGroups(day){
+  const profile = getProfile();
+  const override = profile && getWeekOverride(profile);
+  if (!override || override.dayName !== day.name) return day.groups;
+  return day.groups.map(g => g.label === override.fromGroupLabel
+    ? { label: override.toGroupLabel, exercises: override.toExercises }
+    : g
+  );
+}
+
+function maybeShowRebalanceModal(){
+  const profile = getProfile();
+  if (!profile) return;
+  const weekKey = localDateStr(getWeekStart());
+  const seenKey = 'rebalanceSeen_' + profile + '_' + weekKey;
+  if (localStorage.getItem(seenKey)) return; // ya se decidió (sí o no) esta semana
+
+  const plan = buildRebalancePlan(profile);
+  if (!plan) { localStorage.setItem(seenKey, '1'); return; }
+
+  window._rebalancePlan = plan;
+  const textEl = document.getElementById('rebalanceText');
+  if (plan.type === 'swap') {
+    textEl.textContent =
+      'La semana pasada ' + plan.overloadedLabel + ' llevó bastante más carga que el resto, mientras que ' + plan.neglectedLabel + ' se quedó corto. ¿Quieres que esta semana el ' + plan.dayLabel + ' sea de ' + plan.toGroupLabel + ' en vez de ' + plan.fromGroupLabel + '?';
+  } else {
+    textEl.textContent =
+      'La semana pasada no entrenaste ' + plan.neglectedLabel + ' con la misma intensidad que el resto de grupos musculares. ¿Quieres añadir ' + plan.pick.exerciseName + ' al ' + plan.pick.targetDayLabel + ' para compensarlo?';
+  }
+  document.getElementById('rebalanceModal').style.display = 'flex';
+  localStorage.setItem(seenKey, '1');
+}
+
+function acceptRebalance(){
+  const plan = window._rebalancePlan;
+  document.getElementById('rebalanceModal').style.display = 'none';
+  if (!plan) return;
+  const profile = getProfile();
+
+  if (plan.type === 'swap') {
+    setWeekOverride(profile, {
+      dayName: plan.dayName,
+      fromGroupLabel: plan.fromGroupLabel,
+      toGroupLabel: plan.toGroupLabel,
+      toExercises: plan.toExercises,
+    });
+    showToast(plan.dayLabel + ' actualizado para esta semana ✓');
+    renderTabs();
+    if (DAYS[currentDay] && DAYS[currentDay].name === plan.dayName) renderDay();
+  } else {
+    addBorrowedExercise(plan.pick.targetDayName, plan.pick.exerciseName, plan.pick.grupo, plan.pick.originalDayName);
+  }
+}
+
+function declineRebalance(){
+  document.getElementById('rebalanceModal').style.display = 'none';
+}
+
+function revertWeekOverride(){
+  const profile = getProfile();
+  if (!profile) return;
+  localStorage.removeItem(getWeekOverrideKey(profile));
+  renderTabs();
+  renderDay();
 }
 
 function renderHeatmap(){
@@ -2335,7 +2632,7 @@ function renderDayComparison(dayIdx){
     volDeltaHtml = `<div class="sum-delta flat">Sin datos de la semana pasada para comparar</div>`;
   }
 
-  const exerciseEntries = day.groups.flatMap(g => g.exercises.map(ex => ({ name: ex.name, timed: isTimedExercise(ex.name) })));
+  const exerciseEntries = effectiveDayGroups(day).flatMap(g => g.exercises.map(ex => ({ name: ex.name, timed: isTimedExercise(ex.name) })));
   const rowsHtml = exerciseEntries.map(e => {
     const thisMark = bestMarkInWeek(day.name, e.name, thisWeekStart);
     const lastMark = bestMarkInWeek(day.name, e.name, lastWeekStart);
@@ -2440,7 +2737,7 @@ function recommendDayForExercise(exerciseName, sourceDayIdx){
 function pendingFromPartialDays(){
   const pending = [];
   DAYS.forEach((day, dayIdx) => {
-    const exerciseEntries = day.groups.flatMap(g => g.exercises.map(ex => ({ name: ex.name, grupo: g.label })));
+    const exerciseEntries = effectiveDayGroups(day).flatMap(g => g.exercises.map(ex => ({ name: ex.name, grupo: g.label })));
     const counts = exerciseEntries.map(e => weeklySeriesCount(day.name, e.name));
     const anyStarted = counts.some(c => c > 0);
     const allDone = counts.every(c => c >= 3);
@@ -3069,14 +3366,14 @@ function isTimedExercise(name){
 }
 
 function isDayComplete(day){
-  const exerciseNames = day.groups.flatMap(g => g.exercises.map(ex => ex.name));
+  const exerciseNames = effectiveDayGroups(day).flatMap(g => g.exercises.map(ex => ex.name));
   return exerciseNames.length > 0 && exerciseNames.every(
     name => weeklySeriesCount(day.name, name) >= 3
   );
 }
 
 function isDayStarted(day){
-  const exerciseNames = day.groups.flatMap(g => g.exercises.map(ex => ex.name));
+  const exerciseNames = effectiveDayGroups(day).flatMap(g => g.exercises.map(ex => ex.name));
   return exerciseNames.some(name => weeklySeriesCount(day.name, name) > 0);
 }
 
@@ -3104,6 +3401,7 @@ async function fetchProgressSilently(retriesLeft){
     try { localStorage.setItem('progressCache', JSON.stringify(data)); } catch(e) {}
     renderTabs();
     updateCardHighlights();
+    maybeShowRebalanceModal();
     const [heightRes, weightsRes] = await Promise.all([
       postToSheet({ action: 'getHeight' }).then(r => r.json()).catch(() => null),
       postToSheet({ action: 'listWeights' }).then(r => r.json()).catch(() => [])
@@ -3246,7 +3544,18 @@ function renderDay(){
   compareBtn.onclick = () => showDayComparison(currentDay);
   main.appendChild(compareBtn);
 
-  day.groups.forEach(g => {
+  const profileForOverride = getProfile();
+  const activeOverride = profileForOverride && getWeekOverride(profileForOverride);
+  if (activeOverride && activeOverride.dayName === day.name) {
+    const notice = document.createElement('div');
+    notice.className = 'priority-banner';
+    notice.style.marginLeft = '0';
+    notice.style.marginRight = '0';
+    notice.innerHTML = '🔄 Esta semana este día es de <b>' + activeOverride.toGroupLabel + '</b> en vez de ' + activeOverride.fromGroupLabel + '. <button class="rest-week-toggle" onclick="revertWeekOverride()">Deshacer</button>';
+    main.appendChild(notice);
+  }
+
+  effectiveDayGroups(day).forEach(g => {
     const groupEl = document.createElement('div');
     groupEl.className = 'group';
 
