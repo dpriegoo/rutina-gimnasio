@@ -262,8 +262,27 @@
     display:flex;
     align-items:center;
     justify-content:center;
+    border:none;
+    padding:0;
+    position:relative;
+    cursor:pointer;
   }
   .icon-box svg{width:34px;height:34px;stroke:#cfd6e0;fill:none;}
+  .icon-box .play-badge{
+    position:absolute;
+    bottom:-4px;
+    right:-4px;
+    width:18px;
+    height:18px;
+    border-radius:50%;
+    background:var(--blue);
+    color:#fff;
+    font-size:9px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:2px solid var(--card);
+  }
 
   .card-body{flex:1; min-width:0;}
   .card-top{
@@ -3029,10 +3048,17 @@ function updateCardHighlights(){
 }
 
 // ---- Pending rows per card (acumular antes de aceptar) ----
-let pendingRows = JSON.parse(localStorage.getItem('pendingRows') || '{}');
+// Se lee de localStorage justo antes de cada cambio, en vez de guardar una única
+// copia en memoria durante toda la sesión — si la app se queda abierta en más de
+// una pestaña/instancia a la vez (típico en Android: una pestaña normal + la app
+// instalada, o "apps recientes" reteniendo una copia antigua), esto evita que la
+// última en escribir borre sin querer lo que había puesto la otra.
+function getPendingRows(){
+  try { return JSON.parse(localStorage.getItem('pendingRows') || '{}'); } catch(e) { return {}; }
+}
 
-function persistPending(){
-  localStorage.setItem('pendingRows', JSON.stringify(pendingRows));
+function savePendingRows(rows){
+  try { localStorage.setItem('pendingRows', JSON.stringify(rows)); } catch(e) {}
 }
 
 function addPendingRow(logId){
@@ -3059,12 +3085,13 @@ function addPendingRow(logId){
   const calentamiento = !!(box.querySelector('.inp-calentamiento') && box.querySelector('.inp-calentamiento').checked);
   const nota = (box.querySelector('.inp-nota') && box.querySelector('.inp-nota').value.trim()) || '';
 
-  if (!pendingRows[logId]) pendingRows[logId] = [];
-  pendingRows[logId].push({
+  const rows = getPendingRows();
+  if (!rows[logId]) rows[logId] = [];
+  rows[logId].push({
     peso, reps, variante, calentamiento, nota,
     id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
   });
-  persistPending();
+  savePendingRows(rows);
   const pesoEl = box.querySelector('.inp-peso');
   if (pesoEl) pesoEl.value = '';
   box.querySelector('.inp-reps').value = '';
@@ -3077,8 +3104,9 @@ function addPendingRow(logId){
 }
 
 function removePendingRow(logId, idx){
-  pendingRows[logId].splice(idx, 1);
-  persistPending();
+  const rows = getPendingRows();
+  if (rows[logId]) rows[logId].splice(idx, 1);
+  savePendingRows(rows);
   renderPendingWrap(logId);
 }
 
@@ -3109,7 +3137,7 @@ async function acceptPending(logId){
   const wrap = document.getElementById('pendingWrap-' + logId);
   if (!wrap) return;
   const dia = wrap.dataset.dia, grupo = wrap.dataset.grupo, ejercicio = wrap.dataset.ejercicio;
-  const rows = pendingRows[logId] || [];
+  const rows = getPendingRows()[logId] || [];
   if (rows.length === 0) return;
 
   const priorBest = allTimeBestBeforeNow(dia, ejercicio);
@@ -3163,8 +3191,12 @@ async function acceptPending(logId){
     : 'Guardado ✓ (' + rows.length + (rows.length > 1 ? ' series)' : ' serie)'));
 
   lastAcceptedByLogId[logId] = { ids: entries.map(e => e.id), count: entries.length };
-  pendingRows[logId] = [];
-  persistPending();
+  // Solo se quitan las filas de ESTA tanda (por id) — si otra pestaña añadió algo
+  // más mientras se guardaba, no se pierde.
+  const acceptedIds = new Set(entries.map(e => e.id));
+  const freshRows = getPendingRows();
+  freshRows[logId] = (freshRows[logId] || []).filter(r => !acceptedIds.has(r.id));
+  savePendingRows(freshRows);
   renderPendingWrap(logId);
   renderTabs();
   updateCardHighlights();
@@ -3192,7 +3224,7 @@ async function undoLastAccept(logId){
 function renderPendingWrap(logId){
   const wrap = document.getElementById('pendingWrap-' + logId);
   if (!wrap) return;
-  const rows = pendingRows[logId] || [];
+  const rows = getPendingRows()[logId] || [];
   const timed = isTimedExercise(wrap.dataset.ejercicio);
   if (rows.length === 0) {
     const undo = lastAcceptedByLogId[logId];
@@ -3356,6 +3388,14 @@ const DAYS = [
 let currentDay = 0;
 
 const TIMED_EXERCISES = ['Planchas abdominales'];
+// El QR/NFC de las máquinas Technogym solo abre el vídeo dentro de su propio
+// escáner (no hay un enlace público reutilizable por ejercicio), así que en su
+// lugar se abre una búsqueda de YouTube con el nombre exacto del ejercicio.
+function openExerciseVideo(exerciseName){
+  const url = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(exerciseName + ' ejercicio técnica correcta');
+  window.open(url, '_blank');
+}
+
 function isWarmupRow(r){
   const v = r['Calentamiento'];
   return v === true || v === 'true' || v === 'TRUE' || v === 1 || v === '1';
@@ -3431,6 +3471,19 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pageshow', (evt) => {
   if (evt.persisted) refreshProgressIfLoggedIn(); // vuelta desde el caché de "atrás/adelante" del navegador (típico en iOS al reabrir la app)
 });
+
+// Si hay más de una pestaña/instancia abierta a la vez (frecuente en Android:
+// una pestaña normal + la app instalada), este evento avisa a las demás en
+// cuanto una de ellas cambia las series pendientes, para que no se queden con
+// una vista desactualizada que luego pueda sobrescribir lo nuevo.
+window.addEventListener('storage', (evt) => {
+  if (evt.key === 'pendingRows') {
+    document.querySelectorAll('.pending-wrap[id]').forEach(el => {
+      const logId = el.id.replace(/^pendingWrap-/, '');
+      renderPendingWrap(logId);
+    });
+  }
+});
 setInterval(() => {
   if (document.visibilityState === 'visible') refreshProgressIfLoggedIn();
 }, 120000); // cada 2 minutos mientras la app esté visible en primer plano
@@ -3488,7 +3541,7 @@ function removeBorrowedExercise(targetDayName, idx){
 
 function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
   return `
-    <div class="icon-box">${ICONS[ex.icon] || ''}</div>
+    <button class="icon-box" type="button" onclick="openExerciseVideo('${ex.name.replace(/'/g,"\\'")}')" title="Ver vídeo de cómo hacerlo">${ICONS[ex.icon] || ''}<span class="play-badge">▶</span></button>
     <div class="card-body">
       <div class="card-top">
         <div class="exname">${ex.name}<span class="zone-badge" style="background:${ZONE_META[ICON_TO_ZONE[ex.icon]].color}" title="${ZONE_META[ICON_TO_ZONE[ex.icon]].label}">${ZONE_META[ICON_TO_ZONE[ex.icon]].icon}</span>${extraBadgeHtml || ''}<span class="done-badge">✓ hecho</span></div>
