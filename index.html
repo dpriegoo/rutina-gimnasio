@@ -154,6 +154,15 @@
     line-height:1.45;
   }
   .priority-banner b{color:#fff;}
+  .sync-badge{
+    margin-left:8px;
+    display:inline-block;
+    color:var(--amber);
+    font-size:12px;
+    border:1px solid var(--amber);
+    border-radius:14px;
+    padding:4px 10px;
+  }
   .rest-week-toggle{
     display:block;
     margin-top:6px;
@@ -1000,6 +1009,7 @@
   <h1>Rutina de fuerza</h1>
   <p>5 días · máquinas Technogym — Fitness Park</p>
   <div class="profile-indicator" id="profileIndicator" onclick="showProfileScreen()"></div>
+  <span class="sync-badge" id="syncBadge" onclick="flushAttempt = 0; flushOutbox();" style="display:none;"></span>
 </header>
 
 <div class="viewtoggle">
@@ -1027,6 +1037,7 @@
 
 <div id="metricasView" style="display:none;">
   <button class="refresh-btn" onclick="loadMetrics(true)" id="refreshBtn">🔄 Actualizar datos</button>
+  <div class="metric-sub" id="syncTimingText" style="margin:6px 16px 0;"></div>
 
   <div class="metric-card">
     <div class="metric-title">Carga muscular esta semana</div>
@@ -1247,6 +1258,7 @@ async function handleCredentialResponse(response){
   renderTabs();
   updateCardHighlights();
   fetchProgressSilently();
+  flushOutbox();
 }
 
 function initGoogleSignIn(){
@@ -1287,6 +1299,7 @@ function updateProfileIndicator(){
   const p = getProfile();
   const el = document.getElementById('profileIndicator');
   el.textContent = p ? ('👤 ' + p + ' · cerrar sesión') : '';
+  updateSyncBadge();
 }
 
 // ---- View switching ----
@@ -1297,6 +1310,7 @@ function setView(v){
   document.getElementById('metricasView').style.display = v === 'metricas' ? '' : 'none';
   document.getElementById('viewBtnRutina').classList.toggle('active', v === 'rutina');
   document.getElementById('viewBtnMetricas').classList.toggle('active', v === 'metricas');
+  if (v === 'metricas') renderSyncTiming();
   if (v === 'metricas' && !metricsLoadedOnce) {
     metricsLoadedOnce = true;
     loadMetrics(false);
@@ -1315,6 +1329,7 @@ async function loadMetrics(force){
     if (data && data.error === 'unauthorized') { handleUnauthorized(); return; }
     window._progressCache = data;
     try { localStorage.setItem('progressCache', JSON.stringify(data)); } catch(e) {}
+    applyOutboxToCache();
     renderHeatmap();
     populateExerciseSelect();
     renderHistorial();
@@ -1558,10 +1573,17 @@ async function saveEditHist(id){
     reps = row.querySelector('.edit-reps').value;
     series = row.querySelector('.edit-series').value;
   }
-  const data = await postToSheetChecked({ action: 'update', id, peso, reps, series });
-  if (!data || !data.ok) {
-    if (!data.unauthorized) showToast('⚠️ No se pudo actualizar, revisa tu conexión');
-    return;
+  const queuedEntry = getOutbox().find(e => String(e.id) === String(id));
+  if (queuedEntry) {
+    // Aún no ha llegado al servidor: se corrige directamente en la cola
+    queuedEntry.peso = peso; queuedEntry.reps = reps; queuedEntry.series = series;
+    saveOutbox(getOutbox().map(e => String(e.id) === String(id) ? queuedEntry : e));
+  } else {
+    const data = await postToSheetChecked({ action: 'update', id, peso, reps, series });
+    if (!data || !data.ok) {
+      if (!data.unauthorized) showToast('⚠️ No se pudo actualizar, revisa tu conexión');
+      return;
+    }
   }
   const row2 = window._progressCache.find(r => String(r['ID']) === String(id));
   if (row2) { row2['Peso (kg)'] = peso; row2['Reps'] = reps; row2['Series'] = series; }
@@ -1573,10 +1595,16 @@ async function saveEditHist(id){
 }
 
 async function deleteHist(id){
-  const data = await postToSheetChecked({ action: 'delete', id });
-  if (!data || !data.ok) {
-    if (!data.unauthorized) showToast('⚠️ No se pudo borrar, revisa tu conexión');
-    return;
+  const isQueued = getOutbox().some(e => String(e.id) === String(id));
+  if (isQueued) {
+    // Aún no ha llegado al servidor: basta con quitarla de la cola
+    saveOutbox(getOutbox().filter(e => String(e.id) !== String(id)));
+  } else {
+    const data = await postToSheetChecked({ action: 'delete', id });
+    if (!data || !data.ok) {
+      if (!data.unauthorized) showToast('⚠️ No se pudo borrar, revisa tu conexión');
+      return;
+    }
   }
   window._progressCache = window._progressCache.filter(r => String(r['ID']) !== String(id));
   showToast('Registro borrado ✓');
@@ -3170,8 +3198,121 @@ function allTimeBestBeforeNow(dia, ejercicio){
   return { timed: false, value: Math.round(bestRM * 10) / 10 };
 }
 
+// ---- Cola de sincronización (guardado instantáneo) ----
+// Al aceptar, las series se dan por guardadas al momento en la app y se envían al
+// servidor en segundo plano. Si falla la red, se reintenta sola. Cada serie lleva un
+// id estable y el servidor ignora los ids que ya tiene, así que reintentar es seguro.
+function getOutbox(){
+  try { return JSON.parse(localStorage.getItem('syncOutbox') || '[]'); } catch(e) { return []; }
+}
+
+function saveOutbox(list){
+  try { localStorage.setItem('syncOutbox', JSON.stringify(list)); } catch(e) {}
+  updateSyncBadge();
+}
+
+function outboxEntryToRow(e){
+  return {
+    'Fecha': e.fecha, 'Perfil': e.perfil, 'Día': e.dia, 'Grupo': e.grupo,
+    'Ejercicio': e.ejercicio, 'Peso (kg)': e.peso, 'Reps': e.reps, 'Series': e.series,
+    'Nota': e.nota, 'ID': e.id, 'Variante': e.variante, 'Calentamiento': e.calentamiento,
+    '_unsynced': true,
+  };
+}
+
+// Añade a la caché local lo que aún está en la cola (sin duplicar), para que un
+// refresco del servidor no "borre" series que todavía no se han sincronizado.
+function applyOutboxToCache(){
+  const outbox = getOutbox();
+  if (outbox.length === 0) return;
+  if (!Array.isArray(window._progressCache)) window._progressCache = [];
+  const have = new Set(window._progressCache.map(r => String(r['ID'])));
+  outbox.forEach(e => { if (!have.has(String(e.id))) window._progressCache.push(outboxEntryToRow(e)); });
+}
+
+let flushing = false;
+let flushAttempt = 0;
+let flushRetryTimer = null;
+
+function updateSyncBadge(){
+  const el = document.getElementById('syncBadge');
+  if (!el) return;
+  const profile = getProfile();
+  const n = getOutbox().filter(e => !profile || e.perfil === profile).length;
+  if (n === 0) { el.style.display = 'none'; return; }
+  el.textContent = (flushing ? '🔄 Sincronizando ' : '⏳ Sin sincronizar: ') + n;
+  el.style.display = 'inline-block';
+}
+
+function recordSyncTiming(totalMs, serverMs){
+  try {
+    localStorage.setItem('lastSyncTiming', JSON.stringify({
+      total: Math.round(totalMs), server: (typeof serverMs === 'number' ? serverMs : null), at: Date.now(),
+    }));
+  } catch(e) {}
+  renderSyncTiming();
+}
+
+function renderSyncTiming(){
+  const el = document.getElementById('syncTimingText');
+  if (!el) return;
+  try {
+    const t = JSON.parse(localStorage.getItem('lastSyncTiming') || 'null');
+    if (!t) { el.textContent = ''; return; }
+    el.textContent = 'Última sincronización: ' + (t.total / 1000).toFixed(1) + ' s en total'
+      + (t.server !== null ? ' (' + (t.server / 1000).toFixed(1) + ' s dentro del script)' : '');
+  } catch(e) {}
+}
+
+function scheduleFlushRetry(){
+  clearTimeout(flushRetryTimer);
+  const delays = [3000, 8000, 20000, 60000];
+  const delay = delays[Math.min(flushAttempt, delays.length - 1)];
+  if (flushAttempt === 0) showToast('Sin conexión con el servidor: se reintentará solo');
+  flushAttempt++;
+  flushRetryTimer = setTimeout(flushOutbox, delay);
+  updateSyncBadge();
+}
+
+async function flushOutbox(){
+  if (flushing) return;
+  const profile = getProfile();
+  if (!profile || !getSessionToken()) return;
+  const batch = getOutbox().filter(e => e.perfil === profile);
+  if (batch.length === 0) { updateSyncBadge(); return; }
+
+  flushing = true;
+  clearTimeout(flushRetryTimer);
+  updateSyncBadge();
+  const t0 = Date.now();
+  const data = await postToSheetChecked({ entries: batch });
+  flushing = false;
+
+  if (data && data.ok) {
+    const sent = new Set(batch.map(e => String(e.id)));
+    // Solo se quitan las enviadas: lo que se haya añadido mientras tanto se queda en cola
+    saveOutbox(getOutbox().filter(e => !sent.has(String(e.id))));
+    (window._progressCache || []).forEach(r => { if (sent.has(String(r['ID']))) delete r._unsynced; });
+    flushAttempt = 0;
+    recordSyncTiming(Date.now() - t0, data.ms);
+    if (getOutbox().some(e => e.perfil === profile)) flushOutbox();
+    return;
+  }
+  if (data && data.unauthorized) { updateSyncBadge(); return; } // tras iniciar sesión de nuevo se retoma solo
+  scheduleFlushRetry();
+}
+
+function waitForFlushIdle(maxMs){
+  return new Promise(resolve => {
+    const t0 = Date.now();
+    (function check(){
+      if (!flushing || Date.now() - t0 > maxMs) return resolve();
+      setTimeout(check, 100);
+    })();
+  });
+}
+
 async function acceptPending(logId){
-  if (savingPending.has(logId)) return; // ya hay un guardado en curso para esta tarjeta
   const wrap = document.getElementById('pendingWrap-' + logId);
   if (!wrap) return;
   const dia = wrap.dataset.dia, grupo = wrap.dataset.grupo, ejercicio = wrap.dataset.ejercicio;
@@ -3191,28 +3332,16 @@ async function acceptPending(logId){
     id: r.id || (Date.now() + '-' + Math.random().toString(36).slice(2, 7)), // fallback por si venía de un pendiente guardado antes de este cambio
   }));
 
-  savingPending.add(logId);
-  renderPendingWrap(logId);
+  // 1) Salen de "pendientes" (solo las de esta tanda, por id) y pasan a la cola de envío.
+  //    Esto es instantáneo, así que un doble toque en "Aceptar" ya no puede duplicar nada.
+  const acceptedIds = new Set(entries.map(e => e.id));
+  const freshRows = getPendingRows();
+  freshRows[logId] = (freshRows[logId] || []).filter(r => !acceptedIds.has(r.id));
+  savePendingRows(freshRows);
+  saveOutbox(getOutbox().concat(entries));
 
-  const data = await postToSheetChecked({ entries: entries });
-  const confirmed = !!(data && data.ok);
-
-  savingPending.delete(logId);
-
-  if (!confirmed) {
-    if (!data.unauthorized) showToast('⚠️ No se pudo guardar, revisa tu conexión y vuelve a pulsar Aceptar');
-    renderPendingWrap(logId);
-    return;
-  }
-
-  if (!window._progressCache) window._progressCache = [];
-  entries.forEach(entry => {
-    window._progressCache.push({
-      'Fecha': entry.fecha, 'Perfil': entry.perfil, 'Día': entry.dia, 'Grupo': entry.grupo,
-      'Ejercicio': entry.ejercicio, 'Peso (kg)': entry.peso, 'Reps': entry.reps, 'Series': entry.series,
-      'Nota': entry.nota, 'ID': entry.id, 'Variante': entry.variante, 'Calentamiento': entry.calentamiento,
-    });
-  });
+  // 2) Se refleja ya en la app (tarjetas en verde, volumen, etc.)
+  applyOutboxToCache();
 
   // ¿Alguna de las series NO-calentamiento de esta tanda bate tu mejor marca de siempre en este ejercicio?
   let newBest = null;
@@ -3229,15 +3358,12 @@ async function acceptPending(logId){
     : 'Guardado ✓ (' + rows.length + (rows.length > 1 ? ' series)' : ' serie)'));
 
   lastAcceptedByLogId[logId] = { ids: entries.map(e => e.id), count: entries.length };
-  // Solo se quitan las filas de ESTA tanda (por id) — si otra pestaña añadió algo
-  // más mientras se guardaba, no se pierde.
-  const acceptedIds = new Set(entries.map(e => e.id));
-  const freshRows = getPendingRows();
-  freshRows[logId] = (freshRows[logId] || []).filter(r => !acceptedIds.has(r.id));
-  savePendingRows(freshRows);
   renderPendingWrap(logId);
   renderTabs();
   updateCardHighlights();
+
+  // 3) Se envía al servidor en segundo plano
+  flushOutbox();
 }
 
 async function undoLastAccept(logId){
@@ -3245,7 +3371,21 @@ async function undoLastAccept(logId){
   if (!info) return;
   delete lastAcceptedByLogId[logId];
   renderPendingWrap(logId);
+
+  // Si justo se están enviando, se espera a que termine para no dejar una serie "fantasma" en el servidor
+  await waitForFlushIdle(15000);
+
+  const idSet = new Set(info.ids.map(String));
+  const outbox = getOutbox();
+  const queued = new Set(outbox.filter(e => idSet.has(String(e.id))).map(e => String(e.id)));
+
+  // Las que aún están en la cola no han llegado al servidor: basta con quitarlas de aquí
+  saveOutbox(outbox.filter(e => !queued.has(String(e.id))));
+  window._progressCache = (window._progressCache || []).filter(r => !queued.has(String(r['ID'])));
+
+  // Las que ya se sincronizaron sí hay que borrarlas en el servidor
   for (const id of info.ids) {
+    if (queued.has(String(id))) continue;
     const data = await postToSheetChecked({ action: 'delete', id });
     if (data && data.ok) {
       window._progressCache = window._progressCache.filter(r => String(r['ID']) !== String(id));
@@ -3477,6 +3617,7 @@ async function fetchProgressSilently(retriesLeft){
     if (data && data.error === 'unauthorized') { handleUnauthorized(); return; }
     window._progressCache = data;
     try { localStorage.setItem('progressCache', JSON.stringify(data)); } catch(e) {}
+    applyOutboxToCache();
     renderTabs();
     updateCardHighlights();
     maybeShowRebalanceModal();
@@ -3498,8 +3639,13 @@ async function fetchProgressSilently(retriesLeft){
 // Refresco automático: al entrar/volver a la app y cada cierto tiempo mientras
 // esté abierta, para no depender de darle manualmente a "Actualizar datos".
 function refreshProgressIfLoggedIn(){
-  if (getProfile() && getSessionToken()) fetchProgressSilently();
+  if (getProfile() && getSessionToken()) {
+    flushOutbox();
+    fetchProgressSilently();
+  }
 }
+
+window.addEventListener('online', () => { flushAttempt = 0; flushOutbox(); });
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
@@ -3515,6 +3661,13 @@ window.addEventListener('pageshow', (evt) => {
 // cuanto una de ellas cambia las series pendientes, para que no se queden con
 // una vista desactualizada que luego pueda sobrescribir lo nuevo.
 window.addEventListener('storage', (evt) => {
+  if (evt.key === 'syncOutbox') {
+    // Otra pestaña ha guardado/sincronizado series: se refleja aquí sin esperar al siguiente refresco
+    applyOutboxToCache();
+    updateSyncBadge();
+    renderTabs();
+    updateCardHighlights();
+  }
   if (evt.key === 'pendingRows') {
     document.querySelectorAll('.pending-wrap[id]').forEach(el => {
       const logId = el.id.replace(/^pendingWrap-/, '');
@@ -3531,6 +3684,7 @@ function loadCachedProgress(){
     const cached = localStorage.getItem('progressCache');
     if (cached) window._progressCache = JSON.parse(cached);
   } catch (e) {}
+  applyOutboxToCache();
 }
 
 let borrowedExercises = JSON.parse(localStorage.getItem('borrowedExercises') || '{}');
@@ -3704,6 +3858,7 @@ initGoogleSignIn();
 if (getProfile() && getSessionToken()) {
   document.getElementById('profileScreen').style.display = 'none';
   updateProfileIndicator();
+  flushOutbox();
   fetchProgressSilently();
 } else {
   // Sin sesión propia válida (p. ej. quedó un idToken del sistema anterior): login directo
