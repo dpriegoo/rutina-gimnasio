@@ -685,6 +685,124 @@
     background:none;
     color:var(--muted);
   }
+  .modal-card.wide{
+    max-width:420px;
+    max-height:90vh;
+    overflow-y:auto;
+    text-align:left;
+  }
+  .modal-card.wide .modal-title{text-align:center;}
+  .ed-field{margin-bottom:12px;}
+  .ed-field label{
+    display:block;
+    color:var(--muted);
+    font-size:12px;
+    margin-bottom:4px;
+  }
+  .ed-field input, .ed-field select, .ed-field textarea{
+    width:100%;
+    background:var(--icon-bg);
+    border:1px solid var(--card-border);
+    border-radius:8px;
+    color:var(--text);
+    padding:9px 10px;
+    font-size:14px;
+    font-family:inherit;
+  }
+  .ed-field textarea{resize:vertical;}
+  .ed-icon-row{display:flex; gap:10px; align-items:center;}
+  .ed-icon-row select{flex:1;}
+  .ed-error{color:#e0656a; font-size:12.5px; min-height:16px; margin-bottom:8px;}
+  .ed-archive-btn{
+    width:100%;
+    margin-top:12px;
+    background:none;
+    border:1px solid var(--card-border);
+    color:var(--muted);
+    border-radius:10px;
+    padding:10px;
+    font-size:13px;
+  }
+  .card-actions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px dashed var(--card-border);
+  }
+  .card-actions .log-toggle{margin-top:0; padding-top:0; border-top:none; flex:1;}
+  .edit-intro{
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.45;
+    margin:14px 16px 0;
+  }
+  .edit-day{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:14px;
+    padding:14px;
+    margin:14px 16px 0;
+  }
+  .edit-day-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    margin-bottom:4px;
+  }
+  .edit-day-name{
+    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+    font-size:15px;
+    font-weight:600;
+    min-width:0;
+  }
+  .edit-group-label{
+    color:var(--muted);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    margin:14px 0 2px;
+  }
+  .edit-ex-row{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:8px 0;
+    border-bottom:1px solid var(--card-border);
+  }
+  .edit-ex-main{flex:1; min-width:0; cursor:pointer;}
+  .edit-ex-name{
+    font-size:14px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .edit-ex-sub{color:var(--muted); font-size:11.5px; margin-top:1px;}
+  .edit-arrow, .edit-mini-btn{
+    flex:0 0 auto;
+    background:none;
+    border:1px solid var(--card-border);
+    color:var(--muted);
+    border-radius:8px;
+    padding:5px 8px;
+    font-size:12px;
+  }
+  .edit-arrow:disabled{opacity:0.25;}
+  .edit-hint{color:var(--muted); font-size:12px; line-height:1.4; margin-bottom:10px;}
+  .day-edit-btn{
+    display:block;
+    width:100%;
+    margin-top:12px;
+    background:none;
+    border:1px dashed var(--card-border);
+    color:var(--muted);
+    border-radius:10px;
+    padding:11px 8px;
+    font-size:13px;
+    font-weight:600;
+  }
   .modal-btn.primary{
     background:var(--blue);
     border-color:var(--blue);
@@ -1015,6 +1133,7 @@
 <div class="viewtoggle">
   <button id="viewBtnRutina" class="active" onclick="setView('rutina')">🏋️ Rutina</button>
   <button id="viewBtnMetricas" onclick="setView('metricas')">📈 Métricas</button>
+  <button id="viewBtnEditar" onclick="setView('editar')">✏️ Editar</button>
 </div>
 
 <div id="rutinaView">
@@ -1147,6 +1266,10 @@
   </div>
 </div>
 
+<div id="editView" style="display:none;">
+  <div id="editViewBody"></div>
+</div>
+
 <div style="padding:0 16px;">
 <details class="info">
   <summary>RIR, descanso y 1RM — recordatorio rápido</summary>
@@ -1180,6 +1303,44 @@
     <div class="modal-btn-row">
       <button class="modal-btn secondary" onclick="declineRebalance()">No, gracias</button>
       <button class="modal-btn primary" onclick="acceptRebalance()">Sí, reestructurar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="exerciseEditorModal">
+  <div class="modal-card wide">
+    <div class="modal-title" id="exEditTitle">Editar ejercicio</div>
+    <div class="ed-field"><label for="exEditDay">Día</label><select id="exEditDay" onchange="onEditorDayChange()"></select></div>
+    <div class="ed-field"><label for="exEditName">Nombre</label><input id="exEditName" type="text" maxlength="60" placeholder="Ej. Press militar con mancuernas"></div>
+    <div class="ed-field"><label for="exEditGroup">Grupo muscular</label><select id="exEditGroup" onchange="onEditorGroupChange()"></select></div>
+    <div class="ed-field" id="exEditCanonicalWrap" style="display:none;"><label for="exEditCanonical">Este grupo mezcla bíceps y tríceps: ¿cuál trabaja?</label>
+      <select id="exEditCanonical"><option value="Bíceps">Bíceps</option><option value="Tríceps">Tríceps</option></select></div>
+    <div class="ed-field"><label for="exEditTimed">Tipo</label>
+      <select id="exEditTimed"><option value="0">Peso y repeticiones</option><option value="1">Por tiempo (segundos)</option></select></div>
+    <div class="ed-field"><label for="exEditReps">Repeticiones o tiempo objetivo (siempre 3 series)</label><input id="exEditReps" type="text" maxlength="30" placeholder="8-10  ·  30 seg"></div>
+    <div class="ed-field"><label for="exEditIcon">Icono</label>
+      <div class="ed-icon-row"><div class="icon-box" id="exEditIconPreview"></div><select id="exEditIcon" onchange="updateEditorIconPreview()"></select></div></div>
+    <div class="ed-field"><label for="exEditPrimary">Máquina o material habitual</label><input id="exEditPrimary" type="text" maxlength="100"></div>
+    <div class="ed-field"><label for="exEditAlts">Alternativas si está ocupada (una por línea)</label><textarea id="exEditAlts" rows="3"></textarea></div>
+    <div class="ed-field"><label for="exEditHowTo">Cómo hacerlo</label><textarea id="exEditHowTo" rows="3"></textarea></div>
+    <div class="ed-error" id="exEditError"></div>
+    <div class="modal-btn-row">
+      <button class="modal-btn secondary" onclick="closeExerciseEditor()">Cancelar</button>
+      <button class="modal-btn primary" onclick="saveExerciseEditor()">Guardar</button>
+    </div>
+    <button class="ed-archive-btn" id="exEditArchiveBtn" onclick="archiveExerciseFromEditor()">🗄️ Archivar este ejercicio</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="dayRenameModal">
+  <div class="modal-card wide">
+    <div class="modal-title">Renombrar día</div>
+    <div class="ed-field"><label for="dayRenameInput">Nombre del día</label><input id="dayRenameInput" type="text" maxlength="60"></div>
+    <div class="edit-hint">En la pestaña se muestra lo que va antes del punto medio (·): por ejemplo, "Día 1 · Pectoral y tríceps" aparece como "Día 1". Tu historial se mantiene.</div>
+    <div class="ed-error" id="dayRenameError"></div>
+    <div class="modal-btn-row">
+      <button class="modal-btn secondary" onclick="closeDayRename()">Cancelar</button>
+      <button class="modal-btn primary" onclick="saveDayRename()">Guardar</button>
     </div>
   </div>
 </div>
@@ -1255,7 +1416,9 @@ async function handleCredentialResponse(response){
   localStorage.setItem('profile', data.profile);
   document.getElementById('profileScreen').style.display = 'none';
   updateProfileIndicator();
+  const routineChanged = loadRoutineForProfile(data.profile);
   renderTabs();
+  if (routineChanged) renderDay(); // si la rutina es la misma no se redibuja, para no borrar lo que se estuviera tecleando
   updateCardHighlights();
   fetchProgressSilently();
   flushOutbox();
@@ -1308,8 +1471,11 @@ let metricsLoadedOnce = false;
 function setView(v){
   document.getElementById('rutinaView').style.display = v === 'rutina' ? '' : 'none';
   document.getElementById('metricasView').style.display = v === 'metricas' ? '' : 'none';
+  document.getElementById('editView').style.display = v === 'editar' ? '' : 'none';
   document.getElementById('viewBtnRutina').classList.toggle('active', v === 'rutina');
   document.getElementById('viewBtnMetricas').classList.toggle('active', v === 'metricas');
+  document.getElementById('viewBtnEditar').classList.toggle('active', v === 'editar');
+  if (v === 'editar') renderEditView();
   if (v === 'metricas') renderSyncTiming();
   if (v === 'metricas' && !metricsLoadedOnce) {
     metricsLoadedOnce = true;
@@ -1358,6 +1524,7 @@ async function loadBodyStats(){
     ]);
     window._height = heightRes && heightRes.altura ? heightRes.altura : null;
     window._weightHistory = Array.isArray(weightsRes) ? weightsRes : [];
+    onServerInfo(heightRes);
     if (window._height) document.getElementById('heightInput').value = window._height;
     renderWeightTrend();
     renderWeightChart();
@@ -1640,7 +1807,7 @@ function populateHistorialExerciseSelect(){
     exSel.innerHTML = '<option value="">Elige un día primero…</option>';
     return;
   }
-  const day = DAYS.find(d => d.name === dia);
+  const day = (ROUTINE ? ROUTINE.days : DAYS).find(d => d.name === dia);
   const names = day ? day.groups.flatMap(g => g.exercises.map(ex => ex.name)) : [];
   const prevValue = exSel.value;
   exSel.innerHTML = '<option value="">Elige un ejercicio…</option>' +
@@ -1750,12 +1917,16 @@ const EXERCISE_GROUP_OVERRIDES = {
 };
 
 function buildExerciseGroupMap(){
+  // Se recorre la rutina completa (incluye ejercicios archivados) para que su historial siga resolviéndose.
   const map = {};
-  DAYS.forEach(day => day.groups.forEach(g => g.exercises.forEach(ex => {
-    if (map[ex.name]) return;
-    if (EXERCISE_GROUP_OVERRIDES[ex.name]) { map[ex.name] = EXERCISE_GROUP_OVERRIDES[ex.name]; return; }
-    if (g.label === 'Brazos') return; // ambiguo sin override, se ignora para este cálculo
-    map[ex.name] = g.label;
+  const days = ROUTINE ? ROUTINE.days : DEFAULT_DAYS;
+  days.forEach(day => day.groups.forEach(g => g.exercises.forEach(ex => {
+    const label = ex.canonical || EXERCISE_GROUP_OVERRIDES[ex.name] || (g.label === 'Brazos' ? null : g.label);
+    if (!label) return; // ambiguo sin zona explícita, se ignora para este cálculo
+    [ex.name].concat(ex.aliases || []).forEach(n => {
+      if (!map[day.name + '|' + n]) map[day.name + '|' + n] = label;
+      if (!map[n]) map[n] = label;
+    });
   })));
   return map;
 }
@@ -1766,7 +1937,8 @@ function getExerciseGroupMap(){
 }
 
 function preciseGroupForRow(r){
-  const fromExercise = getExerciseGroupMap()[r['Ejercicio']];
+  const gm = getExerciseGroupMap();
+  const fromExercise = gm[r['Día'] + '|' + r['Ejercicio']] || gm[r['Ejercicio']];
   if (fromExercise) return fromExercise;
   return r['Grupo'] !== 'Brazos' ? r['Grupo'] : null;
 }
@@ -2045,7 +2217,7 @@ function effectiveDayGroups(day){
   const override = profile && getWeekOverride(profile);
   if (!override || override.dayName !== day.name) return day.groups;
   return day.groups.map(g => g.label === override.fromGroupLabel
-    ? { label: override.toGroupLabel, exercises: override.toExercises }
+    ? { label: override.toGroupLabel, exercises: override.toExercises.map(ex => ex.id ? ex : Object.assign({ id: 'o-' + String(ex.name).replace(/[^a-zA-Z0-9]/g, '') }, ex)) }
     : g
   );
 }
@@ -3223,6 +3395,7 @@ function outboxEntryToRow(e){
 // Añade a la caché local lo que aún está en la cola (sin duplicar), para que un
 // refresco del servidor no "borre" series que todavía no se han sincronizado.
 function applyOutboxToCache(){
+  normalizeCacheNames();
   const outbox = getOutbox();
   if (outbox.length === 0) return;
   if (!Array.isArray(window._progressCache)) window._progressCache = [];
@@ -3475,7 +3648,7 @@ const ZONE_META = {
   suelo:   { label: 'Zona de suelo',      icon: '🧘', color: 'rgba(167,139,250,0.28)' },
 };
 
-const DAYS = [
+const DEFAULT_DAYS = [
   {
     name: "Día 1 · Pectoral, deltoides y tríceps",
     groups: [
@@ -3508,7 +3681,7 @@ const DAYS = [
       ]},
       { label: "Core", exercises: [
         { name:"Elevación de piernas tumbado", sets:"3 · 10-12", icon:"floorMat", primary:"Tumbado en banco o suelo (zona de esterillas)", alts:["Barra de dominadas con soporte lumbar (elevación colgado)","Rueda abdominal"], howTo:"Tumbado boca arriba, lumbares pegadas al suelo. Eleva las piernas rectas o semi-flexionadas hasta 90° y baja controlando sin arquear la espalda." },
-        { name:"Planchas abdominales", sets:"3 · 30 seg", icon:"floorMat", primary:"Suelo, zona de esterillas", alts:["Plancha con disco sobre la espalda","Mountain climbers"], howTo:"Apoyo en antebrazos y puntas de los pies, cuerpo en línea recta de cabeza a talones, abdomen contraído sin hundir la cadera." },
+        { name:"Planchas abdominales", timed:true, sets:"3 · 30 seg", icon:"floorMat", primary:"Suelo, zona de esterillas", alts:["Plancha con disco sobre la espalda","Mountain climbers"], howTo:"Apoyo en antebrazos y puntas de los pies, cuerpo en línea recta de cabeza a talones, abdomen contraído sin hundir la cadera." },
       ]},
     ]
   },
@@ -3557,7 +3730,7 @@ const DAYS = [
       ]},
       { label: "Core", exercises: [
         { name:"Crunch abdominal", sets:"3 · 14-16", icon:"abBench", primary:"Abdominal Crunch (Technogym)", alts:["Total Abdominal (Technogym)","Rueda abdominal"], howTo:"Espalda apoyada, agarra las asas. Contrae el abdomen llevando el pecho hacia la pelvis, sin tirar del cuello con los brazos." },
-        { name:"Planchas abdominales", sets:"3 · 30 seg", icon:"floorMat", primary:"Suelo, zona de esterillas", alts:["Plancha con disco sobre la espalda","Mountain climbers"], howTo:"Apoyo en antebrazos y puntas de los pies, cuerpo en línea recta, abdomen contraído sin hundir la cadera." },
+        { name:"Planchas abdominales", timed:true, sets:"3 · 30 seg", icon:"floorMat", primary:"Suelo, zona de esterillas", alts:["Plancha con disco sobre la espalda","Mountain climbers"], howTo:"Apoyo en antebrazos y puntas de los pies, cuerpo en línea recta, abdomen contraído sin hundir la cadera." },
       ]},
     ]
   },
@@ -3565,7 +3738,554 @@ const DAYS = [
 
 let currentDay = 0;
 
-const TIMED_EXERCISES = ['Planchas abdominales'];
+// ================= Rutina editable por perfil =================
+// ROUTINE = rutina completa del perfil (incluye ejercicios archivados).
+// DAYS    = vista activa que usa el resto de la app (sin archivados ni grupos vacíos).
+let ROUTINE = null;
+let DAYS = [];
+let TIMED_NAMES = null;
+
+const ALLOWED_GROUP_LABELS = ['Pectoral', 'Deltoides', 'Hombros', 'Tríceps', 'Dorsales', 'Bíceps', 'Core', 'Piernas'];
+
+const ICON_LABELS = {
+  barbellBench: 'Press banca (barra)', inclineDumbbell: 'Press inclinado', pecDeck: 'Aperturas en máquina',
+  reversePecDeck: 'Posterior en máquina', cableHigh: 'Polea alta', cableLow: 'Polea baja',
+  latPulldown: 'Jalón al pecho', seatedRow: 'Remo sentado', barbellRow: 'Remo / peso muerto (barra)',
+  preacherCurl: 'Curl predicador', squatRack: 'Sentadilla', legPress: 'Prensa',
+  legExtension: 'Extensión de cuádriceps', legCurl: 'Curl femoral', shoulderPress: 'Press de hombros',
+  abBench: 'Abdominal en máquina', dumbbells: 'Mancuernas', floorMat: 'Suelo / esterilla',
+  lunge: 'Zancadas', pullover: 'Pullover',
+};
+
+function escHtml(s){
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+// Para meter un texto dentro de onclick="fn('...')"
+function jsArg(s){
+  return escHtml(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+}
+function cleanText(s, max){
+  return String(s == null ? '' : s).replace(/[<>"\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, max || 200);
+}
+
+function cloneJson(o){ return JSON.parse(JSON.stringify(o)); }
+function defaultExerciseId(di, gi, ei){ return 'd' + di + 'g' + gi + 'e' + ei; }
+function newExerciseId(){ return 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6); }
+
+function defaultRoutine(){
+  const days = cloneJson(DEFAULT_DAYS);
+  days.forEach((d, di) => d.groups.forEach((g, gi) => g.exercises.forEach((ex, ei) => { ex.id = defaultExerciseId(di, gi, ei); })));
+  return { days: days };
+}
+
+function ensureRoutineIds(routine){
+  const seen = new Set();
+  routine.days.forEach(d => d.groups.forEach(g => g.exercises.forEach(ex => {
+    if (!ex.id || seen.has(ex.id)) ex.id = newExerciseId();
+    seen.add(ex.id);
+  })));
+}
+
+function isValidRoutine(r){
+  return !!(r && Array.isArray(r.days) && r.days.length === DEFAULT_DAYS.length &&
+    r.days.every(d => d && typeof d.name === 'string' && Array.isArray(d.groups) &&
+      d.groups.every(g => g && typeof g.label === 'string' && Array.isArray(g.exercises) &&
+        g.exercises.every(ex => ex && typeof ex.name === 'string' && ICONS[ex.icon]))));
+}
+
+function rebuildDays(){
+  DAYS = ROUTINE.days.map(day => ({
+    name: day.name,
+    groups: day.groups
+      .map(g => ({ label: g.label, exercises: g.exercises.filter(ex => !ex.archived) }))
+      .filter(g => g.exercises.length > 0),
+  }));
+  EXERCISE_GROUP_MAP = null;
+  TIMED_NAMES = null;
+}
+
+function routineKey(profile){ return 'routine_' + profile; }
+function routineMetaKey(profile){ return 'routineMeta_' + profile; }
+function getRoutineMeta(profile){
+  try { return Object.assign({ version: 0, dirty: false }, JSON.parse(localStorage.getItem(routineMetaKey(profile)) || '{}')); }
+  catch(e) { return { version: 0, dirty: false }; }
+}
+function setRoutineMeta(profile, meta){
+  try { localStorage.setItem(routineMetaKey(profile), JSON.stringify(meta)); } catch(e) {}
+}
+
+// Carga la rutina del perfil (o la de serie). Devuelve true si ha cambiado respecto a la anterior.
+function loadRoutineForProfile(profile){
+  const before = ROUTINE ? JSON.stringify(ROUTINE) : null;
+  let r = null;
+  if (profile) { try { r = JSON.parse(localStorage.getItem(routineKey(profile)) || 'null'); } catch(e) {} }
+  if (!isValidRoutine(r)) r = defaultRoutine();
+  ensureRoutineIds(r);
+  ROUTINE = r;
+  rebuildDays();
+  normalizeCacheNames();
+  return before !== JSON.stringify(ROUTINE);
+}
+
+// Si se renombra un día o un ejercicio, o un ejercicio cambia de día, sus registros
+// antiguos siguen contando como suyos: en la caché local se les pone el nombre/día actual
+// (en el Excel no se toca nada). Siempre se parte del valor original de cada fila, así
+// que deshacer un cambio también restaura el historial.
+function normalizeCacheNames(){
+  if (!ROUTINE || !Array.isArray(window._progressCache)) return;
+  const dayAlias = {};
+  ROUTINE.days.forEach(d => (d.aliases || []).forEach(a => { if (a !== d.name) dayAlias[a] = d.name; }));
+  const curDay = n => dayAlias[n] || n;
+  const exAlias = {};   // día actual -> { nombre antiguo: nombre actual }
+  const moves = [];     // ejercicios que han cambiado de día
+  ROUTINE.days.forEach(day => day.groups.forEach(g => g.exercises.forEach(ex => {
+    (ex.aliases || []).forEach(a => { if (a !== ex.name) (exAlias[day.name] = exAlias[day.name] || {})[a] = ex.name; });
+    (ex.moves || []).forEach(mv => moves.push({
+      toDay: day.name, fromDay: curDay(mv.day), until: mv.until, name: ex.name, names: [ex.name].concat(ex.aliases || []),
+    }));
+  })));
+  window._progressCache.forEach(r => {
+    if (r._rawDia === undefined) { r._rawDia = r['Día']; r._rawEj = r['Ejercicio']; }
+    let dia = curDay(r._rawDia), ej = r._rawEj;
+    const fecha = String(r['Fecha']).slice(0, 10);
+    for (let i = 0; i < moves.length; i++) {
+      const mv = moves[i];
+      // solo lo registrado hasta el día del cambio pertenece al ejercicio que se movió
+      if (dia === mv.fromDay && fecha <= mv.until && mv.names.indexOf(ej) >= 0) { dia = mv.toDay; ej = mv.name; break; }
+    }
+    const m = exAlias[dia];
+    if (m && m[ej]) ej = m[ej];
+    r['Día'] = dia;
+    r['Ejercicio'] = ej;
+  });
+}
+
+function isTimedExercise(name){
+  if (!TIMED_NAMES) {
+    TIMED_NAMES = new Set();
+    const days = ROUTINE ? ROUTINE.days : DEFAULT_DAYS;
+    days.forEach(d => d.groups.forEach(g => g.exercises.forEach(ex => {
+      if (ex.timed) { TIMED_NAMES.add(ex.name); (ex.aliases || []).forEach(a => TIMED_NAMES.add(a)); }
+    })));
+  }
+  return TIMED_NAMES.has(name);
+}
+
+function findInRoutine(routine, dayIdx, exId){
+  const day = routine.days[dayIdx];
+  if (!day) return null;
+  for (let gi = 0; gi < day.groups.length; gi++) {
+    const ei = day.groups[gi].exercises.findIndex(ex => ex.id === exId);
+    if (ei >= 0) return { day: day, group: day.groups[gi], gi: gi, ei: ei, ex: day.groups[gi].exercises[ei] };
+  }
+  return null;
+}
+
+// Las series pendientes se guardaban con una clave basada en la posición de la tarjeta;
+// ahora es por id de ejercicio. Se migran una sola vez.
+function migratePendingKeys(){
+  if (localStorage.getItem('pendingKeysMigrated') === '1') return;
+  const rows = getPendingRows();
+  let changed = false;
+  Object.keys(rows).forEach(key => {
+    const m = /^log-(\d+)-(.+)-(\d+)$/.exec(key);
+    if (!m) return;
+    const di = Number(m[1]);
+    const d = DEFAULT_DAYS[di];
+    if (!d) return;
+    const gi = d.groups.findIndex(gr => gr.label.replace(/\s/g, '') === m[2]);
+    if (gi < 0 || !d.groups[gi].exercises[Number(m[3])]) return;
+    const newKey = 'log-' + di + '-' + defaultExerciseId(di, gi, Number(m[3]));
+    rows[newKey] = (rows[newKey] || []).concat(rows[key]);
+    delete rows[key];
+    changed = true;
+  });
+  if (changed) savePendingRows(rows);
+  try { localStorage.setItem('pendingKeysMigrated', '1'); } catch(e) {}
+}
+
+function refreshRoutineViews(){
+  renderTabs();
+  renderDay();
+  populateExerciseSelect();
+  renderEditView();
+}
+
+// Aplica un cambio de rutina: se ve al instante y se sincroniza en segundo plano
+function commitRoutine(newRoutine){
+  const profile = getProfile();
+  ensureRoutineIds(newRoutine);
+  ROUTINE = newRoutine;
+  rebuildDays();
+  if (profile) {
+    try { localStorage.setItem(routineKey(profile), JSON.stringify(ROUTINE)); } catch(e) {}
+    const meta = getRoutineMeta(profile);
+    meta.dirty = true;
+    setRoutineMeta(profile, meta);
+  }
+  normalizeCacheNames();
+  refreshRoutineViews();
+  syncRoutine();
+}
+
+// ---- Sincronización de la rutina con el servidor (solo si el servidor la soporta) ----
+let routineSyncing = false;
+
+function serverSupportsRoutine(){ return localStorage.getItem('serverRoutineSupport') === '1'; }
+
+// El servidor nuevo añade v (versión del script) y rv (versión de la rutina) a la respuesta de getHeight
+function onServerInfo(heightRes){
+  if (heightRes && typeof heightRes.v === 'number' && heightRes.v >= 3) {
+    try { localStorage.setItem('serverRoutineSupport', '1'); } catch(e) {}
+    window._serverRoutineVersion = heightRes.rv;
+    syncRoutine();
+  }
+}
+
+async function pullRoutine(profile, announce){
+  const res = await postToSheetChecked({ action: 'getRoutine' });
+  if (res && res.ok && res.routine && isValidRoutine(res.routine)) {
+    ensureRoutineIds(res.routine);
+    ROUTINE = res.routine;
+    rebuildDays();
+    try { localStorage.setItem(routineKey(profile), JSON.stringify(ROUTINE)); } catch(e) {}
+    setRoutineMeta(profile, { version: res.version, dirty: false });
+    window._serverRoutineVersion = res.version;
+    normalizeCacheNames();
+    refreshRoutineViews();
+    if (announce) showToast('La rutina se cambió en otro dispositivo: se ha cargado esa versión');
+  }
+}
+
+async function syncRoutine(){
+  if (routineSyncing || !serverSupportsRoutine()) return;
+  const profile = getProfile();
+  if (!profile || !getSessionToken()) return;
+  routineSyncing = true;
+  try {
+    let meta = getRoutineMeta(profile);
+    if (meta.dirty) {
+      const res = await postToSheetChecked({ action: 'saveRoutine', baseVersion: meta.version, routine: ROUTINE });
+      if (res && res.ok) {
+        setRoutineMeta(profile, { version: res.version, dirty: false });
+        window._serverRoutineVersion = res.version;
+      } else if (res && res.error === 'conflict') {
+        await pullRoutine(profile, true);
+      }
+      // cualquier otro fallo: queda pendiente y se reintenta en el siguiente refresco
+    } else if (typeof window._serverRoutineVersion === 'number' && window._serverRoutineVersion > meta.version) {
+      await pullRoutine(profile, false);
+    }
+  } finally {
+    routineSyncing = false;
+  }
+}
+
+// ---- Pestaña "Editar": días, ejercicios y grupos musculares ----
+let editorState = { dayIdx: 0, exId: null };
+
+function $id(id){ return document.getElementById(id); }
+function dayShortLabel(name){ return String(name).split('·')[0].trim(); }
+
+function groupOptionsForDay(dayIdx){
+  const present = ROUTINE.days[dayIdx].groups.map(g => g.label);
+  return present.concat(ALLOWED_GROUP_LABELS.filter(l => present.indexOf(l) === -1));
+}
+
+// ¿Hay ya en ese día un ejercicio (o un nombre antiguo suyo) con este nombre?
+function nameTakenInDay(routine, dayIdx, name, exceptId){
+  const lower = name.toLowerCase();
+  let hit = null;
+  routine.days[dayIdx].groups.forEach(g => g.exercises.forEach(ex => {
+    if (ex.id === exceptId) return;
+    if ([ex.name].concat(ex.aliases || []).some(n => n.toLowerCase() === lower)) hit = ex;
+  }));
+  return hit;
+}
+
+function updateEditorIconPreview(){
+  $id('exEditIconPreview').innerHTML = ICONS[$id('exEditIcon').value] || '';
+}
+
+function onEditorGroupChange(){
+  $id('exEditCanonicalWrap').style.display = $id('exEditGroup').value === 'Brazos' ? 'block' : 'none';
+}
+
+function fillGroupOptions(dayIdx, selected, fallback){
+  const options = groupOptionsForDay(dayIdx);
+  const groupSel = $id('exEditGroup');
+  groupSel.innerHTML = options.map(l => `<option value="${escHtml(l)}">${escHtml(l)}</option>`).join('');
+  groupSel.value = options.indexOf(selected) >= 0 ? selected : (options.indexOf(fallback) >= 0 ? fallback : options[0]);
+}
+
+// Al cambiar el día en el editor se recalculan los grupos disponibles en ese día
+function onEditorDayChange(){
+  const idx = Number($id('exEditDay').value);
+  const prevLabel = $id('exEditGroup').value;
+  const fallback = $id('exEditCanonical').value;
+  fillGroupOptions(idx, prevLabel, prevLabel === 'Brazos' ? fallback : null);
+  onEditorGroupChange();
+}
+
+function fillEditor(dayIdx, ex, groupLabel){
+  $id('exEditDay').innerHTML = ROUTINE.days.map((d, i) => `<option value="${i}">${escHtml(d.name)}</option>`).join('');
+  $id('exEditDay').value = String(dayIdx);
+  fillGroupOptions(dayIdx, groupLabel, null);
+  $id('exEditIcon').innerHTML = Object.keys(ICONS).map(k => `<option value="${k}">${escHtml(ICON_LABELS[k] || k)}</option>`).join('');
+  $id('exEditName').value = ex ? ex.name : '';
+  $id('exEditTimed').value = ex && ex.timed ? '1' : '0';
+  const parts = ex && ex.sets ? String(ex.sets).split('·') : [];
+  $id('exEditReps').value = parts.length > 1 ? parts[1].trim() : '';
+  $id('exEditIcon').value = ex && ICONS[ex.icon] ? ex.icon : 'dumbbells';
+  $id('exEditPrimary').value = ex ? (ex.primary || '') : '';
+  $id('exEditAlts').value = ex ? (ex.alts || []).join('\n') : '';
+  $id('exEditHowTo').value = ex ? (ex.howTo || '') : '';
+  $id('exEditCanonical').value = ex && ex.canonical ? ex.canonical : 'Bíceps';
+  $id('exEditError').textContent = '';
+  updateEditorIconPreview();
+  onEditorGroupChange();
+}
+
+function openNewExercise(dayIdx){
+  editorState = { dayIdx: dayIdx, exId: null };
+  $id('exEditTitle').textContent = 'Añadir ejercicio';
+  $id('exEditArchiveBtn').style.display = 'none';
+  const first = ROUTINE.days[dayIdx].groups.length ? ROUTINE.days[dayIdx].groups[0].label : 'Pectoral';
+  fillEditor(dayIdx, null, first);
+  $id('exerciseEditorModal').style.display = 'flex';
+}
+
+function openExerciseEditor(dayIdx, exId){
+  const loc = findInRoutine(ROUTINE, dayIdx, exId);
+  if (!loc) { showToast('No se encontró ese ejercicio'); return; }
+  editorState = { dayIdx: dayIdx, exId: exId };
+  $id('exEditTitle').textContent = 'Editar ejercicio';
+  $id('exEditArchiveBtn').style.display = 'block';
+  fillEditor(dayIdx, loc.ex, loc.group.label);
+  $id('exerciseEditorModal').style.display = 'flex';
+}
+
+function closeExerciseEditor(){
+  $id('exerciseEditorModal').style.display = 'none';
+}
+
+// Las series pendientes de una tarjeta se guardan con una clave que incluye el día
+function movePendingKey(oldIdx, newIdx, exId){
+  const rows = getPendingRows();
+  const oldKey = 'log-' + oldIdx + '-' + exId, newKey = 'log-' + newIdx + '-' + exId;
+  if (!rows[oldKey]) return;
+  rows[newKey] = (rows[newKey] || []).concat(rows[oldKey]);
+  delete rows[oldKey];
+  savePendingRows(rows);
+}
+
+function saveExerciseEditor(){
+  const srcIdx = editorState.dayIdx;
+  const tgtIdx = Number($id('exEditDay').value);
+  const editing = !!editorState.exId;
+  const name = cleanText($id('exEditName').value, 60);
+  const err = msg => { $id('exEditError').textContent = msg; };
+  if (!name) return err('Ponle un nombre al ejercicio.');
+
+  const clash = nameTakenInDay(ROUTINE, tgtIdx, name, editorState.exId);
+  if (clash) return err(clash.archived
+    ? 'Ya hay un ejercicio archivado con ese nombre en ese día: restáuralo desde "Archivados".'
+    : 'Ya existe un ejercicio con ese nombre en ese día.');
+
+  const timed = $id('exEditTimed').value === '1';
+  const reps = cleanText($id('exEditReps').value, 30) || (timed ? '30 seg' : '8-10');
+  const groupLabel = $id('exEditGroup').value;
+  const alts = $id('exEditAlts').value.split('\n').map(a => cleanText(a, 80)).filter(Boolean).slice(0, 8);
+  const fields = {
+    name: name,
+    sets: '3 · ' + reps,
+    icon: $id('exEditIcon').value,
+    primary: cleanText($id('exEditPrimary').value, 100),
+    alts: alts,
+    howTo: cleanText($id('exEditHowTo').value, 400),
+  };
+  if (!ICONS[fields.icon]) return err('Elige un icono.');
+
+  const newR = cloneJson(ROUTINE);
+  const srcDay = newR.days[srcIdx], tgtDay = newR.days[tgtIdx];
+  const loc = editing ? findInRoutine(newR, srcIdx, editorState.exId) : null;
+  if (editing && !loc) return err('No se encontró el ejercicio.');
+
+  let target = tgtDay.groups.find(g => g.label === groupLabel);
+  if (!target) { target = { label: groupLabel, exercises: [] }; tgtDay.groups.push(target); }
+
+  let ex;
+  if (editing) {
+    ex = loc.ex;
+    if (ex.name !== name) {
+      ex.aliases = (ex.aliases || []).filter(a => a !== name);
+      if (ex.aliases.indexOf(ex.name) === -1) ex.aliases.push(ex.name);
+    }
+    Object.assign(ex, fields);
+  } else {
+    ex = Object.assign({ id: newExerciseId() }, fields);
+    target.exercises.push(ex);
+  }
+  if (timed) ex.timed = true; else delete ex.timed;
+  if (groupLabel === 'Brazos') ex.canonical = $id('exEditCanonical').value; else delete ex.canonical;
+
+  let moved = false;
+  if (editing && loc.group !== target) {
+    loc.group.exercises.splice(loc.ei, 1);
+    target.exercises.push(ex);
+    if (loc.group.exercises.length === 0) srcDay.groups.splice(srcDay.groups.indexOf(loc.group), 1);
+    moved = true;
+  }
+  if (editing && srcIdx !== tgtIdx) {
+    // El historial se queda con el ejercicio: se apunta de qué día venía y hasta cuándo
+    const tgtNames = [tgtDay.name].concat(tgtDay.aliases || []);
+    ex.moves = (ex.moves || []).filter(mv => tgtNames.indexOf(mv.day) === -1);
+    ex.moves.push({ day: srcDay.name, until: localDateStr() });
+    movePendingKey(srcIdx, tgtIdx, ex.id);
+  }
+
+  closeExerciseEditor();
+  commitRoutine(newR);
+  showToast(editing ? (srcIdx !== tgtIdx ? 'Ejercicio movido a ' + dayShortLabel(tgtDay.name) + ' ✓' : 'Ejercicio actualizado ✓') : 'Ejercicio añadido ✓');
+}
+
+function setArchived(dayIdx, exId, archived){
+  const newR = cloneJson(ROUTINE);
+  const loc = findInRoutine(newR, dayIdx, exId);
+  if (!loc) return;
+  if (archived) loc.ex.archived = true; else delete loc.ex.archived;
+  commitRoutine(newR);
+}
+
+function archiveExerciseFromEditor(){
+  const dayIdx = editorState.dayIdx, exId = editorState.exId;
+  closeExerciseEditor();
+  setArchived(dayIdx, exId, true);
+  showToast('Archivado. Puedes restaurarlo desde "Archivados".');
+}
+
+function restoreExercise(dayIdx, exId){
+  setArchived(dayIdx, exId, false);
+  showToast('Ejercicio restaurado ✓');
+}
+
+// Sube o baja un ejercicio dentro de su grupo (saltándose los archivados)
+function moveExerciseInGroup(dayIdx, exId, dir){
+  const newR = cloneJson(ROUTINE);
+  const loc = findInRoutine(newR, dayIdx, exId);
+  if (!loc) return;
+  const list = loc.group.exercises;
+  let j = loc.ei + dir;
+  while (j >= 0 && j < list.length && list[j].archived) j += dir;
+  if (j < 0 || j >= list.length) return;
+  const tmp = list[loc.ei]; list[loc.ei] = list[j]; list[j] = tmp;
+  commitRoutine(newR);
+}
+
+// ---- Renombrar un día ----
+let dayRenameIdx = 0;
+
+function openDayRename(dayIdx){
+  dayRenameIdx = dayIdx;
+  $id('dayRenameInput').value = ROUTINE.days[dayIdx].name;
+  $id('dayRenameError').textContent = '';
+  $id('dayRenameModal').style.display = 'flex';
+}
+
+function closeDayRename(){ $id('dayRenameModal').style.display = 'none'; }
+
+// Lo que estuviera guardado con el nombre antiguo del día (ejercicios prestados, ajuste semanal)
+function migrateDayReferences(oldName, newName){
+  let changed = false;
+  if (borrowedExercises[oldName]) {
+    borrowedExercises[newName] = (borrowedExercises[newName] || []).concat(borrowedExercises[oldName]);
+    delete borrowedExercises[oldName];
+    changed = true;
+  }
+  Object.keys(borrowedExercises).forEach(k => borrowedExercises[k].forEach(b => {
+    if (b.originalDayName === oldName) { b.originalDayName = newName; b.originalDayLabel = dayShortLabel(newName); changed = true; }
+  }));
+  if (changed) { try { localStorage.setItem('borrowedExercises', JSON.stringify(borrowedExercises)); } catch(e) {} }
+  const profile = getProfile();
+  const ov = profile && getWeekOverride(profile);
+  if (ov && ov.dayName === oldName) { ov.dayName = newName; setWeekOverride(profile, ov); }
+}
+
+function saveDayRename(){
+  const di = dayRenameIdx;
+  const name = cleanText($id('dayRenameInput').value, 60);
+  const err = msg => { $id('dayRenameError').textContent = msg; };
+  if (!name) return err('Ponle un nombre al día.');
+  const old = ROUTINE.days[di].name;
+  if (name === old) { closeDayRename(); return; }
+  const lower = name.toLowerCase();
+  const clash = ROUTINE.days.some((d, i) => i !== di && [d.name].concat(d.aliases || []).some(n => n.toLowerCase() === lower));
+  if (clash) return err('Ya hay otro día con ese nombre.');
+
+  const newR = cloneJson(ROUTINE);
+  const day = newR.days[di];
+  day.aliases = (day.aliases || []).filter(a => a !== name);
+  if (day.aliases.indexOf(old) === -1) day.aliases.push(old);
+  day.name = name;
+  migrateDayReferences(old, name);
+  closeDayRename();
+  commitRoutine(newR);
+  showToast('Día renombrado ✓');
+}
+
+// ---- Pantalla "Editar" ----
+function renderEditView(){
+  const el = document.getElementById('editViewBody');
+  if (!el || !ROUTINE) return;
+  const archived = [];
+  let html = '<div class="edit-intro">Aquí gestionas tus días y ejercicios: toca un ejercicio para editarlo, cambiarlo de grupo o de día, o archivarlo. Los cambios se ven al momento en la pestaña Rutina.</div>';
+  ROUTINE.days.forEach((day, di) => {
+    html += `<div class="edit-day">
+      <div class="edit-day-head">
+        <div class="edit-day-name">${escHtml(day.name)}</div>
+        <button class="edit-mini-btn" onclick="openDayRename(${di})">Renombrar</button>
+      </div>`;
+    let any = false;
+    day.groups.forEach(g => {
+      g.exercises.forEach(e => { if (e.archived) archived.push({ di: di, day: day, group: g, ex: e }); });
+      const active = g.exercises.filter(e => !e.archived);
+      if (active.length === 0) return;
+      any = true;
+      html += `<div class="edit-group-label">${escHtml(g.label)}</div>`;
+      active.forEach((e, i) => {
+        html += `<div class="edit-ex-row">
+          <div class="edit-ex-main" onclick="openExerciseEditor(${di}, '${jsArg(e.id)}')">
+            <div class="edit-ex-name">${escHtml(e.name)}</div>
+            <div class="edit-ex-sub">${escHtml(e.sets)}${e.timed ? ' · por tiempo' : ''}</div>
+          </div>
+          <button class="edit-arrow" ${i === 0 ? 'disabled' : ''} onclick="moveExerciseInGroup(${di}, '${jsArg(e.id)}', -1)" aria-label="Subir">▲</button>
+          <button class="edit-arrow" ${i === active.length - 1 ? 'disabled' : ''} onclick="moveExerciseInGroup(${di}, '${jsArg(e.id)}', 1)" aria-label="Bajar">▼</button>
+          <button class="edit-mini-btn" onclick="openExerciseEditor(${di}, '${jsArg(e.id)}')" aria-label="Editar">✏️</button>
+        </div>`;
+      });
+    });
+    if (!any) html += '<div class="draft-empty">Este día no tiene ejercicios activos.</div>';
+    html += `<button class="day-edit-btn" onclick="openNewExercise(${di})">＋ Añadir ejercicio a este día</button></div>`;
+  });
+
+  html += `<div class="edit-day"><div class="edit-day-head"><div class="edit-day-name">🗄️ Archivados</div></div>`;
+  if (archived.length === 0) {
+    html += '<div class="draft-empty">No hay ejercicios archivados. Si archivas uno, seguirá contando en tus métricas y podrás restaurarlo aquí.</div>';
+  } else {
+    archived.forEach(it => {
+      html += `<div class="edit-ex-row">
+        <div class="edit-ex-main">
+          <div class="edit-ex-name">${escHtml(it.ex.name)}</div>
+          <div class="edit-ex-sub">${escHtml(dayShortLabel(it.day.name))} · ${escHtml(it.group.label)}</div>
+        </div>
+        <button class="edit-mini-btn" onclick="restoreExercise(${it.di}, '${jsArg(it.ex.id)}')">Restaurar</button>
+      </div>`;
+    });
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
 // El QR/NFC de las máquinas Technogym solo abre el vídeo dentro de su propio
 // escáner (no hay un enlace público reutilizable por ejercicio), así que en su
 // lugar se abre una búsqueda de YouTube con el nombre exacto del ejercicio.
@@ -3577,10 +4297,6 @@ function openExerciseVideo(exerciseName){
 function isWarmupRow(r){
   const v = r['Calentamiento'];
   return v === true || v === 'true' || v === 'TRUE' || v === 1 || v === '1';
-}
-
-function isTimedExercise(name){
-  return TIMED_EXERCISES.includes(name);
 }
 
 function isDayComplete(day){
@@ -3627,6 +4343,7 @@ async function fetchProgressSilently(retriesLeft){
     ]);
     window._height = heightRes && heightRes.altura ? heightRes.altura : null;
     window._weightHistory = Array.isArray(weightsRes) ? weightsRes : [];
+    onServerInfo(heightRes);
   } catch (e) {
     if (retriesLeft > 0) {
       await new Promise(r => setTimeout(r, 1500));
@@ -3732,22 +4449,26 @@ function removeBorrowedExercise(targetDayName, idx){
 }
 
 function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
+  const zone = ZONE_META[ICON_TO_ZONE[ex.icon]] || ZONE_META.libre;
+  const alts = ex.alts || [];
   return `
-    <button class="icon-box" type="button" onclick="openExerciseVideo('${ex.name.replace(/'/g,"\\'")}')" title="Ver vídeo de cómo hacerlo">${ICONS[ex.icon] || ''}<span class="play-badge">▶</span></button>
+    <button class="icon-box" type="button" onclick="openExerciseVideo('${jsArg(ex.name)}')" title="Ver vídeo de cómo hacerlo">${ICONS[ex.icon] || ''}<span class="play-badge">▶</span></button>
     <div class="card-body">
       <div class="card-top">
-        <div class="exname">${ex.name}<span class="zone-badge" style="background:${ZONE_META[ICON_TO_ZONE[ex.icon]].color}" title="${ZONE_META[ICON_TO_ZONE[ex.icon]].label}">${ZONE_META[ICON_TO_ZONE[ex.icon]].icon}</span>${extraBadgeHtml || ''}<span class="done-badge">✓ hecho</span></div>
-        <div class="sets">${ex.sets}</div>
+        <div class="exname">${escHtml(ex.name)}<span class="zone-badge" style="background:${zone.color}" title="${zone.label}">${zone.icon}</span>${extraBadgeHtml || ''}<span class="done-badge">✓ hecho</span></div>
+        <div class="sets">${escHtml(ex.sets)}</div>
       </div>
       <div class="series-progress"></div>
       <div class="beat-last-week"></div>
-      <div class="machine">
-        <div class="machine-row"><span class="tag primary">USA</span><span class="txt">${ex.primary}</span></div>
-        <div class="machine-row"><span class="tag alt">SI OCUPADA</span></div>
-        <div class="alt-list">${ex.alts.join(' &nbsp;·&nbsp; ')}</div>
+      ${(ex.primary || alts.length) ? `<div class="machine">
+        ${ex.primary ? `<div class="machine-row"><span class="tag primary">USA</span><span class="txt">${escHtml(ex.primary)}</span></div>` : ''}
+        ${alts.length ? `<div class="machine-row"><span class="tag alt">SI OCUPADA</span></div>
+        <div class="alt-list">${alts.map(escHtml).join(' &nbsp;·&nbsp; ')}</div>` : ''}
+      </div>` : ''}
+      ${ex.howTo ? `<div class="howto"><b>Cómo hacerlo:</b> ${escHtml(ex.howTo)}</div>` : ''}
+      <div class="card-actions">
+        <button class="log-toggle" onclick="toggleLog('${logId}')">📈 Registrar serie</button>
       </div>
-      <div class="howto"><b>Cómo hacerlo:</b> ${ex.howTo}</div>
-      <button class="log-toggle" onclick="toggleLog('${logId}')">📈 Registrar serie</button>
       <div class="log-form" id="${logId}">
         <div class="log-form-main">
           ${isTimedExercise(ex.name)
@@ -3759,14 +4480,14 @@ function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
         <button class="log-adv-toggle" type="button" onclick="toggleAdvanced('${logId}')">⚙️ Variante / calentamiento / nota</button>
         <div class="log-advanced" id="adv-${logId}">
           <select class="inp-variante">
-            <option value="">Variante: ${ex.primary} (la habitual)</option>
-            ${ex.alts.map(a => `<option value="${a.replace(/"/g,'&quot;')}">Variante: ${a}</option>`).join('')}
+            <option value="">Variante: ${escHtml(ex.primary || 'la habitual')} (la habitual)</option>
+            ${alts.map(a => `<option value="${escHtml(a)}">Variante: ${escHtml(a)}</option>`).join('')}
           </select>
           <label class="inp-warmup-label"><input type="checkbox" class="inp-calentamiento"> 🔥 Es calentamiento (no cuenta para el objetivo semanal ni el progreso)</label>
           <input class="inp-nota" type="text" placeholder="Nota opcional">
         </div>
       </div>
-      <div class="pending-wrap" id="pendingWrap-${logId}" data-dia="${dia.replace(/"/g,'&quot;')}" data-grupo="${grupo.replace(/"/g,'&quot;')}" data-ejercicio="${ex.name.replace(/"/g,'&quot;')}"></div>
+      <div class="pending-wrap" id="pendingWrap-${logId}" data-dia="${escHtml(dia)}" data-grupo="${escHtml(grupo)}" data-ejercicio="${escHtml(ex.name)}"></div>
     </div>
   `;
 }
@@ -3809,8 +4530,8 @@ function renderDay(){
     label.innerHTML = '<span class="dot"></span>' + g.label;
     groupEl.appendChild(label);
 
-    g.exercises.forEach((ex, exIdx) => {
-      const logId = 'log-' + currentDay + '-' + g.label.replace(/\s/g,'') + '-' + exIdx;
+    g.exercises.forEach(ex => {
+      const logId = 'log-' + currentDay + '-' + ex.id;
       const card = document.createElement('div');
       card.className = 'card';
       card.setAttribute('data-exercise', ex.name);
@@ -3850,6 +4571,8 @@ function renderDay(){
   updateCardHighlights();
 }
 
+migratePendingKeys();
+loadRoutineForProfile(getProfile());
 loadCachedProgress();
 renderTabs();
 renderDay();
