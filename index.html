@@ -1899,45 +1899,47 @@ function findMostOverloadedZone(profile){
   return worst.zone;
 }
 
-// Busca, dentro del catálogo de otro día, el grupo "dueño" de una etiqueta concreta
-// (para tomar prestados sus ejercicios sin inventar nada nuevo).
-function findHomeGroupForLabel(label, excludeDayName){
-  for (const day of DAYS) {
-    if (day.name === excludeDayName) continue;
-    const g = day.groups.find(gr => gr.label === label);
-    if (g) return { label: g.label, exercises: g.exercises, homeDayName: day.name };
-  }
-  return null;
+// Todos los grupos "dueños" de una zona (uno por cada etiqueta de la zona y cada día
+// donde aparece), para tomar prestados sus ejercicios sin inventar nada nuevo.
+function listHomeGroupsForZone(zoneKey, excludeDayName){
+  const labels = MUSCLE_ZONES[zoneKey].groups;
+  const out = [];
+  labels.forEach(label => {
+    DAYS.forEach(day => {
+      if (day.name === excludeDayName) return;
+      const g = day.groups.find(gr => gr.label === label);
+      if (g) out.push({ label: g.label, exercises: g.exercises, homeDayName: day.name });
+    });
+  });
+  return out;
 }
 
-// Grupo sustituto para la zona rezagada: prueba cada etiqueta canónica de esa zona,
-// tomando la primera cuyo "dueño" no sea el propio día que se va a sustituir.
-function pickSubstituteGroupForZone(zoneKey, excludeDayName){
-  const groups = MUSCLE_ZONES[zoneKey].groups;
-  for (const label of groups) {
-    const found = findHomeGroupForLabel(label, excludeDayName);
-    if (found) return found;
-  }
-  return null;
+// Ejercicios del grupo sustituto que NO repitan nombre con los que el día ya tiene
+// en el resto de sus grupos (el grupo que se va a reemplazar no cuenta).
+function uniqueSubstituteExercises(substituteExercises, targetDay, fromGroupLabel){
+  const namesInDay = new Set();
+  targetDay.groups.forEach(g => {
+    if (g.label === fromGroupLabel) return;
+    g.exercises.forEach(ex => namesInDay.add(ex.name));
+  });
+  return substituteExercises.filter(ex => !namesInDay.has(ex.name));
 }
 
-// Día candidato para ALIVIAR la zona sobrecargada: debe entrenarla, tener otro
-// grupo además (para no vaciarlo), y no estar ya empezado esta semana (para no
-// desordenar series que ya hayas registrado ahí).
-function findSwapTargetDay(overloadedZoneKey){
+// Días candidatos para ALIVIAR la zona sobrecargada, de mejor a peor: deben entrenarla,
+// tener otro grupo además (para no vaciarlos), no estar empezados esta semana, y NO
+// entrenar ya de forma nativa la zona que se quiere reforzar (si no, acabarían con ese
+// grupo duplicado y ejercicios repetidos).
+function findSwapCandidateDays(overloadedZoneKey, neglectedZoneKey){
   const overloadedGroups = MUSCLE_ZONES[overloadedZoneKey].groups;
+  const neglectedGroups = MUSCLE_ZONES[neglectedZoneKey].groups;
   const candidates = DAYS.filter(day => {
     const matching = day.groups.filter(g => overloadedGroups.includes(g.label));
-    return matching.length > 0 && day.groups.length > matching.length && !isDayStarted(day);
+    const alreadyTrainsNeglected = day.groups.some(g => neglectedGroups.includes(g.label));
+    return matching.length > 0 && day.groups.length > matching.length && !alreadyTrainsNeglected && !isDayStarted(day);
   });
-  if (candidates.length === 0) return null;
-  candidates.sort((a, b) => {
-    const count = d => d.groups.filter(g => overloadedGroups.includes(g.label)).reduce((s, g) => s + g.exercises.length, 0);
-    return count(b) - count(a);
-  });
-  const targetDay = candidates[0];
-  const fromGroup = targetDay.groups.find(g => overloadedGroups.includes(g.label));
-  return { targetDay: targetDay, fromGroup: fromGroup };
+  const count = d => d.groups.filter(g => overloadedGroups.includes(g.label)).reduce((s, g) => s + g.exercises.length, 0);
+  candidates.sort((a, b) => count(b) - count(a));
+  return candidates.map(day => ({ targetDay: day, fromGroup: day.groups.find(g => overloadedGroups.includes(g.label)) }));
 }
 
 // Respaldo: si no hay un día válido para sustituir, se limita a prestar un ejercicio
@@ -1968,10 +1970,12 @@ function buildRebalancePlan(profile){
 
   const overloaded = findMostOverloadedZone(profile);
   if (overloaded) {
-    const swap = findSwapTargetDay(overloaded);
-    if (swap) {
-      const substitute = pickSubstituteGroupForZone(neglected, swap.targetDay.name);
-      if (substitute) {
+    const candidates = findSwapCandidateDays(overloaded, neglected);
+    for (const swap of candidates) {
+      const homeGroups = listHomeGroupsForZone(neglected, swap.targetDay.name);
+      for (const home of homeGroups) {
+        const exercises = uniqueSubstituteExercises(home.exercises, swap.targetDay, swap.fromGroup.label);
+        if (exercises.length === 0) continue;
         return {
           type: 'swap',
           neglectedLabel: MUSCLE_ZONES[neglected].label,
@@ -1979,8 +1983,8 @@ function buildRebalancePlan(profile){
           dayName: swap.targetDay.name,
           dayLabel: swap.targetDay.name.split('·')[0].trim(),
           fromGroupLabel: swap.fromGroup.label,
-          toGroupLabel: substitute.label,
-          toExercises: substitute.exercises,
+          toGroupLabel: home.label,
+          toExercises: exercises,
         };
       }
     }
@@ -2018,11 +2022,45 @@ function effectiveDayGroups(day){
   );
 }
 
+function zoneKeyForLabel(label){
+  return Object.keys(MUSCLE_ZONES).find(z => MUSCLE_ZONES[z].groups.includes(label)) || null;
+}
+
+// Un ajuste semanal es inválido si deja ejercicios repetidos en el día, o si el día ya
+// tenía de forma nativa un grupo de la misma zona que se ha metido (p. ej. Core dos veces).
+function isWeekOverrideInvalid(override){
+  const day = DAYS.find(d => d.name === override.dayName);
+  if (!day) return true;
+  const names = [];
+  const newZone = zoneKeyForLabel(override.toGroupLabel);
+  let zoneClash = false;
+  day.groups.forEach(g => {
+    if (g.label === override.fromGroupLabel) {
+      override.toExercises.forEach(ex => names.push(ex.name));
+    } else {
+      g.exercises.forEach(ex => names.push(ex.name));
+      if (newZone && zoneKeyForLabel(g.label) === newZone) zoneClash = true;
+    }
+  });
+  return zoneClash || new Set(names).size !== names.length;
+}
+
 function maybeShowRebalanceModal(){
   const profile = getProfile();
   if (!profile) return;
   const weekKey = localDateStr(getWeekStart());
   const seenKey = 'rebalanceSeen_' + profile + '_' + weekKey;
+
+  // Autocorrección: si hay un ajuste de esta semana que deja el día con ejercicios
+  // repetidos (generado por una versión anterior), se descarta y se vuelve a proponer.
+  const existing = getWeekOverride(profile);
+  if (existing && isWeekOverrideInvalid(existing)) {
+    localStorage.removeItem(getWeekOverrideKey(profile));
+    localStorage.removeItem(seenKey);
+    renderTabs();
+    renderDay();
+  }
+
   if (localStorage.getItem(seenKey)) return; // ya se decidió (sí o no) esta semana
 
   const plan = buildRebalancePlan(profile);
