@@ -2803,7 +2803,7 @@ async function sbRequest(p){
         sbUnwrap(await sb.from('sets').delete().eq('id', String(p.id)));
         return { ok: true };
       case 'advice': {
-        const r = await sb.functions.invoke('gemini-advice', { body: { stats: p.stats || {} } });
+        const r = await sb.functions.invoke('hyper-handler', { body: { stats: p.stats || {} } });
         if (r.error) {
           const st = r.error.context && r.error.context.status;
           if (st === 401) return { error: 'unauthorized' };
