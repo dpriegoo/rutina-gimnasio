@@ -1352,6 +1352,13 @@
 // ---- Selección de backend: ?backend=supabase o ?backend=sheets (se recuerda) ----
 (function(){
   try {
+    // Si la sesión guardada es de otro backend (p. ej. la antigua de Sheets), se descarta: hay que entrar de nuevo una vez
+    const tok = localStorage.getItem('sessionToken');
+    const isSb = localStorage.getItem('backend') !== 'sheets';
+    if (tok && ((isSb && tok !== 'sb') || (!isSb && tok === 'sb'))) {
+      localStorage.removeItem('profile');
+      localStorage.removeItem('sessionToken');
+    }
     const m = /[?&]backend=(supabase|sheets)/.exec(location.search);
     if (m) {
       if (localStorage.getItem('backend') !== m[1]) {
@@ -2673,7 +2680,7 @@ const SUPABASE_URL = 'https://cqulyecdgkqjlzerfeue.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_yZc9G5Pg_422VlW7tEzyjg_VUtWyBzw';
 
 function getBackend(){
-  return localStorage.getItem('backend') === 'supabase' ? 'supabase' : 'sheets';
+  return localStorage.getItem('backend') === 'sheets' ? 'sheets' : 'supabase';
 }
 
 let _sb = null;
@@ -2735,6 +2742,7 @@ async function sbRequest(p){
   const t0 = Date.now();
   const { data: sd, error: sErr } = await sb.auth.getSession();
   const session = sd && sd.session;
+  const tSess = Date.now() - t0;
   if (!session) {
     // Sin red no es lo mismo que sesión rechazada: se lanza error para que se reintente más tarde
     if (sErr && /fetch|network|retry/i.test(String(sErr.name) + ' ' + String(sErr.message))) throw sErr;
@@ -2805,7 +2813,9 @@ async function sbRequest(p){
           nota: e.nota || null, rm: sbEpley(e.peso, e.reps), variante: e.variante || null,
           calentamiento: !!e.calentamiento
         }));
+        const tDb0 = Date.now();
         if (rows.length) sbUnwrap(await sb.from('sets').upsert(rows, { onConflict: 'id', ignoreDuplicates: true }));
+        window._sbLast = { sess: tSess, db: Date.now() - tDb0 };
         return { ok: true, count: rows.length, skipped: 0, ms: Date.now() - t0 };
       }
     }
@@ -3613,7 +3623,7 @@ function updateSyncBadge(){
 function recordSyncTiming(totalMs, serverMs){
   try {
     localStorage.setItem('lastSyncTiming', JSON.stringify({
-      total: Math.round(totalMs), server: (typeof serverMs === 'number' ? serverMs : null), at: Date.now(),
+      total: Math.round(totalMs), server: (typeof serverMs === 'number' ? serverMs : null), at: Date.now(), b: getBackend(), sb: window._sbLast || null,
     }));
   } catch(e) {}
   renderSyncTiming();
@@ -3625,8 +3635,9 @@ function renderSyncTiming(){
   try {
     const t = JSON.parse(localStorage.getItem('lastSyncTiming') || 'null');
     if (!t) { el.textContent = ''; return; }
-    el.textContent = 'Última sincronización: ' + (t.total / 1000).toFixed(1) + ' s en total'
-      + (t.server !== null ? ' (' + (t.server / 1000).toFixed(1) + ' s dentro del script)' : '');
+    el.textContent = 'Última sincronización' + (t.b === 'supabase' ? ' [Supabase]' : ' [Sheets]') + ': ' + (t.total / 1000).toFixed(1) + ' s en total'
+      + (t.server !== null ? ' (' + (t.server / 1000).toFixed(1) + ' s dentro del servidor)' : '')
+      + (t.sb ? ' · sesión ' + t.sb.sess + ' ms, base de datos ' + t.sb.db + ' ms' : '');
   } catch(e) {}
 }
 
