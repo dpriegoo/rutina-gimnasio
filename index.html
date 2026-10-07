@@ -2802,8 +2802,15 @@ async function sbRequest(p){
       case 'delete':
         sbUnwrap(await sb.from('sets').delete().eq('id', String(p.id)));
         return { ok: true };
-      case 'advice':
-        return { error: 'advice_unavailable' };
+      case 'advice': {
+        const r = await sb.functions.invoke('gemini-advice', { body: { stats: p.stats || {} } });
+        if (r.error) {
+          const st = r.error.context && r.error.context.status;
+          if (st === 401) return { error: 'unauthorized' };
+          return { error: 'advice_unavailable' };
+        }
+        return { advice: r.data && r.data.advice };
+      }
       default: {
         if (p.action) return { error: 'unknown_action' };
         const entries = Array.isArray(p) ? p : (p.entries || [p]);
