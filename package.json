@@ -1,0 +1,13 @@
+{
+  "name": "ironlog",
+  "private": true,
+  "description": "Pruebas y herramientas de IronLog (la app en sí no necesita instalar nada)",
+  "scripts": {
+    "stamp": "node tools/stamp.js",
+    "test": "node tests/adapter.test.js && node tests/smoke.test.js"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "2.117.3",
+    "jsdom": "^26.0.0"
+  }
+}

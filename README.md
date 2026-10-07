@@ -1,31 +1,63 @@
-# 🏋️ IronLog
+# IronLog
 
-Aplicación web personal para seguir una rutina de fuerza en gimnasio (máquinas Technogym), registrar el progreso serie a serie y visualizarlo en gráficas — todo en un único archivo HTML, sin backend propio ni frameworks.
+App de seguimiento de entrenamiento (PWA estática en GitHub Pages) con Supabase como backend.
+No hay build ni framework: el navegador carga los archivos tal cual.
 
-**🔗 Demo:** _https://dpriegoo.github.io/rutina-gimnasio/_
+## Mapa de archivos
 
-## Funcionalidades
+| Archivo | Qué hace |
+|---|---|
+| `index.html` | Solo la estructura (HTML) y la lista de scripts. No tiene lógica. |
+| `styles.css` | Todo el CSS. |
+| `version.json` | Versión vigente de la app (lo escribe `tools/stamp.js`). |
+| `js/config.js` | Constantes, elección de backend (`?backend=supabase\|sheets`). |
+| `js/utils.js` | Fechas/semana, escape de HTML, avisos, utilidades de filas. |
+| `js/icons.js` | Pictogramas de ejercicios. |
+| `js/routine-default.js` | Rutina inicial de 5 días (datos). |
+| `js/api-supabase.js` | **Adaptador de datos**: traduce acciones de la app a consultas Supabase. |
+| `js/api.js` | `postToSheet()`: único punto de entrada de datos (Supabase o Apps Script). |
+| `js/auth.js` | Login con Google, logout, sesión rechazada. |
+| `js/routine.js` | Modelo de la rutina editable + sincronización con el servidor. |
+| `js/outbox.js` | Series pendientes y cola de envío con reintentos. |
+| `js/muscles.js` | Zonas musculares y diagrama de carga. |
+| `js/planning.js` | Reequilibrio semanal, semana de descanso, recomendaciones. |
+| `js/body.js` | Peso corporal y altura. |
+| `js/history.js` | Métricas > Historial (editar/borrar series). |
+| `js/metrics.js` | Métricas: mapa de calor, gráficas, índice de fuerza. |
+| `js/summary.js` | Resumen semanal, comparación con el compañero, consejo de Gemini. |
+| `js/day-view.js` | Pestañas de día y tarjetas de ejercicio. |
+| `js/editor.js` | Pestaña Editar. |
+| `js/progress.js` | Descarga de progreso y refrescos automáticos. |
+| `js/navigation.js` | Cambio de vista (Rutina / Métricas / Editar). |
+| `js/main.js` | Arranque + comprobación de versión. **Siempre el último.** |
+| `tools/stamp.js` | Sella las URLs con un hash para esquivar la caché. |
+| `tests/` | Pruebas (Node, sin navegador). |
 
-- **Rutina de 5 días** con ficha por ejercicio: máquina a usar (y alternativas si está ocupada), cómo ejecutarlo, y series/repeticiones objetivo.
-- **Registro de series** por ejercicio, con borrador local antes de confirmar el día y enviarlo.
-- **Selector de perfil** (estilo Netflix) para que varias personas usen la misma app y hoja de datos sin mezclarse.
-- **Cronómetro de descanso** integrado (3 min), con vibración y aviso sonoro.
-- **Panel de métricas**: mapa de calor de constancia, progresión de peso y 1RM estimado (fórmula de Epley) por ejercicio, volumen semanal total, e historial editable.
-- **Resumen semanal**: días entrenados, volumen vs. semana anterior, mejoras recientes por ejercicio, y comparativa entre perfiles.
-- Pensada para funcionar como **PWA** añadida a la pantalla de inicio (iOS/Android), 100% responsive.
+## Cómo funciona (claves para no perderse)
 
-## Cómo funciona
+- **Los scripts no son módulos ES**: son scripts normales que comparten un único ámbito global,
+  exactamente igual que cuando todo estaba en un solo `index.html`. Por eso las funciones
+  llamadas desde el HTML (`onclick="saveExerciseEditor()"`) siguen funcionando.
+- **El orden de carga importa** y está en `index.html` (de arriba abajo = de menos a más dependiente).
+  Un archivo puede usar funciones de cualquier otro dentro de sus funciones, pero lo que se ejecuta
+  *al cargar* (constantes, `addEventListener`…) solo puede usar archivos anteriores.
+- **Capa de datos**: la app solo habla con `postToSheet({action: ...})`. Hoy lo atiende
+  `api-supabase.js`. Cambiar de backend = tocar solo ese adaptador.
+- **Sesión**: la gestiona `supabase-js` (se guarda en `localStorage`, se renueva sola). La clave
+  `sessionToken` de `localStorage` es solo un marcador de "hay sesión".
 
-- **Frontend:** HTML + CSS + JavaScript vanilla (sin build, sin dependencias salvo [Chart.js](https://www.chartjs.org/) vía CDN).
-- **Backend:** una hoja de [Google Sheets](https://sheets.google.com) como base de datos, con un [Google Apps Script](https://developers.google.com/apps-script) publicado como Web App que expone `doGet`/`doPost` para leer y escribir registros.
-- **Hosting:** [GitHub Pages](https://pages.github.com/), gratis.
+## Cambiar algo y subirlo
 
-No hay servidor propio ni base de datos tradicional — todo el "backend" es la combinación Google Sheets + Apps Script, elegida para que sea gratis y no requiera mantenimiento.
+1. Edita el archivo que toque (el mapa de arriba dice cuál).
+2. `npm install` (solo la primera vez) y `npm test`.
+3. `npm run stamp` — recalcula las versiones (`?v=…`) y `version.json`.
+4. Sube **todo lo que haya cambiado** al repositorio (siempre `index.html` y `version.json`).
 
-## Motivación
+Si no ejecutas el paso 3, la caché del navegador (unos 10 min en GitHub Pages) puede servir
+archivos viejos mezclados con nuevos. Aun así, al arrancar la app compara `version.json` con la
+versión con la que se cargó y, si no coinciden, se recarga una vez sola.
 
-Proyecto personal para no depender de apps de terceros para algo tan simple como saber qué máquina tocaba usar y cuánto peso llevaba la última vez — y de paso, para practicar construyendo una herramienta real de principio a fin.
+## Pruebas
 
-## Licencia
-
-Uso personal — libre de usar como referencia o base para tu propio proyecto.
+- `tests/adapter.test.js`: el adaptador de Supabase contra una API simulada.
+- `tests/smoke.test.js`: arranca la página real en jsdom (con y sin sesión) y navega entre vistas.
