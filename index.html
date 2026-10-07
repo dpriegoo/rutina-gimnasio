@@ -2761,6 +2761,12 @@ async function sbRequest(p){
           if (rows.length < step) break;
           from += step;
         }
+        // Volumen de la semana del compañero (un único número; sus series no se descargan)
+        try {
+          const wk = localDateStr(getWeekStart());
+          const pv = await sb.rpc('partner_week_volume', { week_start: wk });
+          window._partnerVol = (!pv.error && pv.data != null) ? { week: wk, vol: Number(pv.data) } : null;
+        } catch (e) { window._partnerVol = null; }
         return all.map(sbToSheetRow);
       }
       case 'saveWeight':
@@ -2920,6 +2926,10 @@ function rowVolume(r){
 }
 
 function weeklyVolumeForProfile(profile, weekStart){
+  if (getBackend() === 'supabase' && profile !== getProfile()) {
+    const pv = window._partnerVol;
+    return (pv && pv.week === localDateStr(weekStart)) ? pv.vol : 0;
+  }
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 7);
   const cache = window._progressCache || [];
