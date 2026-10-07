@@ -1127,7 +1127,7 @@
   <h1>Rutina de fuerza</h1>
   <p>5 días · máquinas Technogym — Fitness Park</p>
   <div class="profile-indicator" id="profileIndicator" onclick="showProfileScreen()"></div>
-  <span class="sync-badge" id="syncBadge" onclick="flushAttempt = 0; flushOutbox();" style="display:none;"></span>
+  <span class="sync-badge" id="syncBadge" onclick="flushAttempt = 0; flushOutbox();" style="display:none;margin-left:14px;"></span>
 </header>
 
 <div class="viewtoggle">
@@ -1347,7 +1347,22 @@
 
 <div class="toast" id="toast">Guardado ✓</div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
 <script>
+// ---- Selección de backend: ?backend=supabase o ?backend=sheets (se recuerda) ----
+(function(){
+  try {
+    const m = /[?&]backend=(supabase|sheets)/.exec(location.search);
+    if (m) {
+      if (localStorage.getItem('backend') !== m[1]) {
+        localStorage.setItem('backend', m[1]);
+        localStorage.removeItem('profile');
+        localStorage.removeItem('sessionToken');
+      }
+      history.replaceState(null, '', location.pathname + location.hash);
+    }
+  } catch(e) {}
+})();
 // ---- Login real con Google ----
 const GOOGLE_CLIENT_ID = '681503048133-btp3sc7qud8libfnglb2tc728uir57n6.apps.googleusercontent.com';
 const EMAIL_TO_PROFILE = {
@@ -1399,16 +1414,20 @@ async function handleCredentialResponse(response){
   if (statusEl) statusEl.style.display = 'block';
   let data = null;
   try {
-    const res = await fetch(getSheetUrl(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'login', idToken: response.credential })
-    });
-    data = await res.json();
-  } catch(e) {}
+    if (getBackend() === 'supabase') {
+      data = await sbLogin(response.credential);
+    } else {
+      const res = await fetch(getSheetUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'login', idToken: response.credential })
+      });
+      data = await res.json();
+    }
+  } catch(e) { window._loginDetail = String((e && e.message) || e); }
   if (statusEl) statusEl.style.display = 'none';
   if (!data || !data.sessionToken) {
-    errEl.textContent = 'No se pudo iniciar sesión. Inténtalo de nuevo.';
+    errEl.textContent = 'No se pudo iniciar sesión. Inténtalo de nuevo.' + (window._loginDetail ? ' (' + window._loginDetail + ')' : '');
     errEl.style.display = 'block';
     return;
   }
@@ -1439,16 +1458,37 @@ function initGoogleSignIn(){
   }
 }
 
+let unauthorizedCheck = null;
+// Antes de cerrar la sesión por un "unauthorized" se confirma con una segunda
+// petición: un fallo puntual del servidor ya no te echa de la app.
 function handleUnauthorized(){
-  localStorage.removeItem('profile');
-  localStorage.removeItem('sessionToken');
-  document.getElementById('loginError').textContent = 'Tu sesión ya no es válida, inicia sesión de nuevo.';
-  document.getElementById('loginError').style.display = 'block';
-  document.getElementById('profileScreen').style.display = 'flex';
-  updateProfileIndicator();
+  if (unauthorizedCheck) return unauthorizedCheck;
+  const tokenAtStart = getSessionToken();
+  unauthorizedCheck = (async () => {
+    try {
+      await new Promise(r => setTimeout(r, 1500));
+      if (getSessionToken() !== tokenAtStart) return; // ya hay otra sesión (login nuevo)
+      let still = true;
+      try {
+        const res = await postToSheet({ action: 'getHeight' });
+        const d = await res.json();
+        still = !!(d && d.error === 'unauthorized');
+      } catch (e) { still = false; } // sin red: no es un rechazo de sesión
+      if (!still) return;
+      try { localStorage.setItem('lastLogoutReason', 'unauthorized ' + new Date().toISOString()); } catch(e) {}
+      localStorage.removeItem('profile');
+      localStorage.removeItem('sessionToken');
+      document.getElementById('loginError').textContent = 'Tu sesión ya no es válida, inicia sesión de nuevo.';
+      document.getElementById('loginError').style.display = 'block';
+      document.getElementById('profileScreen').style.display = 'flex';
+      updateProfileIndicator();
+    } finally { unauthorizedCheck = null; }
+  })();
+  return unauthorizedCheck;
 }
 
 function showProfileScreen(){
+  if (getSessionToken() && !confirm('¿Cerrar sesión?')) return;
   // Cerrar sesión: se invalida también en el servidor
   if (getSessionToken()) postToSheetChecked({ action: 'logout' }).catch(() => {});
   localStorage.removeItem('profile');
@@ -2628,7 +2668,160 @@ function getSheetUrl(){
   return localStorage.getItem('sheetUrl') || DEFAULT_SHEET_URL;
 }
 
+// ======================= Backend Supabase =======================
+const SUPABASE_URL = 'https://cqulyecdgkqjlzerfeue.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_yZc9G5Pg_422VlW7tEzyjg_VUtWyBzw';
+
+function getBackend(){
+  return localStorage.getItem('backend') === 'supabase' ? 'supabase' : 'sheets';
+}
+
+let _sb = null;
+function sbClient(){
+  if (!_sb) {
+    if (!window.supabase) throw new Error('No se pudo cargar Supabase');
+    _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'ironlog-auth' }
+    });
+  }
+  return _sb;
+}
+
+async function sbLogin(credential){
+  window._loginDetail = '';
+  const sb = sbClient();
+  const { error } = await sb.auth.signInWithIdToken({ provider: 'google', token: credential });
+  if (error) { window._loginDetail = error.message; return null; }
+  const r = await sb.from('allowed_users').select('profile').maybeSingle();
+  if (r.error) { window._loginDetail = r.error.message; return null; }
+  if (!r.data) {
+    await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+    window._loginDetail = 'cuenta sin acceso';
+    return null;
+  }
+  return { sessionToken: 'sb', profile: r.data.profile };
+}
+
+function sbEpley(peso, reps){
+  const p = Number(peso), r = Number(reps);
+  if (!p || !r) return null;
+  return Math.round(p * (1 + r / 30) * 10) / 10;
+}
+
+function sbUnwrap(res){
+  if (res.error) {
+    const e = res.error;
+    const msg = String(e.message || '');
+    if (res.status === 401 || /JWT|PGRST30/i.test(String(e.code || '') + ' ' + msg)) {
+      const u = new Error('unauthorized'); u.sbUnauthorized = true; throw u;
+    }
+    throw e;
+  }
+  return res.data;
+}
+
+function sbToSheetRow(r){
+  return {
+    'Fecha': r.fecha, 'Perfil': r.profile, 'Día': r.dia, 'Grupo': r.grupo, 'Ejercicio': r.ejercicio,
+    'Peso (kg)': r.peso, 'Reps': r.reps, 'Series': r.series, 'Nota': r.nota || '', 'ID': r.id,
+    '1RM (kg)': r.rm == null ? '' : r.rm, 'Variante': r.variante || '', 'Calentamiento': !!r.calentamiento
+  };
+}
+
+// Traduce las acciones de la app a consultas de Supabase y devuelve el mismo formato que Apps Script
+async function sbRequest(p){
+  const sb = sbClient();
+  if (p.action === 'logout') { await sb.auth.signOut({ scope: 'local' }).catch(() => {}); return { ok: true }; }
+  const t0 = Date.now();
+  const { data: sd, error: sErr } = await sb.auth.getSession();
+  const session = sd && sd.session;
+  if (!session) {
+    // Sin red no es lo mismo que sesión rechazada: se lanza error para que se reintente más tarde
+    if (sErr && /fetch|network|retry/i.test(String(sErr.name) + ' ' + String(sErr.message))) throw sErr;
+    return { error: 'unauthorized' };
+  }
+  const profile = getProfile();
+  if (!profile) return { error: 'unauthorized' };
+  try {
+    switch (p.action) {
+      case 'list': {
+        let all = [], from = 0;
+        const step = 1000;
+        for (;;) {
+          const rows = sbUnwrap(await sb.from('sets').select('*').order('fecha').order('id').range(from, from + step - 1));
+          all = all.concat(rows);
+          if (rows.length < step) break;
+          from += step;
+        }
+        return all.map(sbToSheetRow);
+      }
+      case 'saveWeight':
+        sbUnwrap(await sb.from('weights').upsert({ profile: profile, fecha: p.fecha, peso: Number(p.peso) }, { onConflict: 'profile,fecha' }));
+        return { ok: true };
+      case 'listWeights': {
+        const rows = sbUnwrap(await sb.from('weights').select('fecha,peso').eq('profile', profile).order('fecha'));
+        return rows.map(r => ({ fecha: r.fecha, peso: r.peso }));
+      }
+      case 'saveHeight':
+        sbUnwrap(await sb.from('allowed_users').update({ altura: Number(p.altura) }).eq('profile', profile));
+        return { ok: true };
+      case 'getHeight': {
+        const [u, rt] = await Promise.all([
+          sb.from('allowed_users').select('altura').eq('profile', profile).maybeSingle(),
+          sb.from('routines').select('version').eq('profile', profile).maybeSingle()
+        ]);
+        const ud = sbUnwrap(u), rd = sbUnwrap(rt);
+        return { altura: ud ? ud.altura : null, v: 3, rv: rd ? rd.version : 0 };
+      }
+      case 'getRoutine': {
+        const d = sbUnwrap(await sb.from('routines').select('version,data').eq('profile', profile).maybeSingle());
+        return { ok: true, version: d ? d.version : 0, routine: d ? d.data : null };
+      }
+      case 'saveRoutine': {
+        const v = sbUnwrap(await sb.rpc('save_routine', { base_version: Number(p.baseVersion) || 0, new_data: p.routine }));
+        if (v === -1) {
+          const d = sbUnwrap(await sb.from('routines').select('version').eq('profile', profile).maybeSingle());
+          return { ok: false, error: 'conflict', version: d ? d.version : 0 };
+        }
+        return { ok: true, version: v };
+      }
+      case 'update': {
+        sbUnwrap(await sb.from('sets').update({
+          peso: Number(p.peso), reps: Number(p.reps), series: Number(p.series), rm: sbEpley(p.peso, p.reps)
+        }).eq('id', String(p.id)));
+        return { ok: true };
+      }
+      case 'delete':
+        sbUnwrap(await sb.from('sets').delete().eq('id', String(p.id)));
+        return { ok: true };
+      case 'advice':
+        return { error: 'advice_unavailable' };
+      default: {
+        if (p.action) return { error: 'unknown_action' };
+        const entries = Array.isArray(p) ? p : (p.entries || [p]);
+        const rows = entries.map(e => ({
+          id: String(e.id), profile: profile, fecha: e.fecha, dia: e.dia || null, grupo: e.grupo || null,
+          ejercicio: e.ejercicio, peso: Number(e.peso), reps: Number(e.reps), series: Number(e.series),
+          nota: e.nota || null, rm: sbEpley(e.peso, e.reps), variante: e.variante || null,
+          calentamiento: !!e.calentamiento
+        }));
+        if (rows.length) sbUnwrap(await sb.from('sets').upsert(rows, { onConflict: 'id', ignoreDuplicates: true }));
+        return { ok: true, count: rows.length, skipped: 0, ms: Date.now() - t0 };
+      }
+    }
+  } catch (e) {
+    if (e && e.sbUnauthorized) return { error: 'unauthorized' };
+    throw e;
+  }
+}
+
+async function sbRespond(payload){
+  const out = await sbRequest(payload);
+  return { ok: true, json: async () => out };
+}
+
 function postToSheet(payload){
+  if (getBackend() === 'supabase') return sbRespond(payload);
   const body = Object.assign({}, payload, { sessionToken: getSessionToken() });
   return fetch(getSheetUrl(), {
     method: 'POST',
