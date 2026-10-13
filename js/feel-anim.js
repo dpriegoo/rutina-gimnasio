@@ -85,6 +85,31 @@ const ln=(svg,a,b,w,col)=>el(svg,'line',{x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:
 const A0=[150,176];
 const standing=(o)=>{leg(o,[150,98],[152,138],A0)};
 function setLine(l,a,b){l.setAttribute('x1',a[0]);l.setAttribute('y1',a[1]);l.setAttribute('x2',b[0]);l.setAttribute('y2',b[1])}
+
+// Codo "hacia fuera y abajo": entre las dos soluciones del brazo elige la más baja y más lejos del tronco
+function elbowOut(S,W,l1,l2){return pick(S,W,l1,l2,(a,b)=>Math.abs(a[0]-150)+a[1]*1.5>Math.abs(b[0]-150)+b[1]*1.5)}
+// Jalón visto desde detrás del muñeco: se ve cómo se agarra la barra según el tipo de agarre
+function pulldownBack(grip){
+  const G={neutro:{x:11,txt:'Agarre neutro (asa en V): palmas enfrentadas',hand:'v'},supino:{x:22,txt:'Agarre supino: palmas hacia ti, a la anchura de los hombros',hand:'h'},ancho:{x:54,txt:'Agarre ancho: palmas al frente, más ancho que los hombros',hand:'h'}}[grip];
+  return mk('up',['TIRA','APRIETA','VUELVE'],['Baja los codos hacia los costados, 1 s','Aprieta los dorsales 1 s','Sube lento, 2 s · estira los dorsales'],{
+    build(svg){const o={};label(svg,'Vista desde detrás',64,6);
+      el(svg,'rect',{x:112,y:150,width:76,height:9,rx:4,fill:'#4a505a'});el(svg,'rect',{x:146,y:159,width:8,height:17,fill:'#3a3f47'});ground(svg);
+      el(svg,'line',{x1:150,y1:62,x2:150,y2:146,stroke:TR,'stroke-width':44,'stroke-linecap':'round'});
+      o.gl=el(svg,'ellipse',{cx:131,cy:108,rx:11,ry:27,fill:'#ff6b57',opacity:.2,transform:'rotate(8 131 108)'});o.gr=el(svg,'ellipse',{cx:169,cy:108,rx:11,ry:27,fill:'#ff6b57',opacity:.2,transform:'rotate(-8 169 108)'});
+      el(svg,'circle',{cx:150,cy:40,r:13,fill:TR});
+      o.cab=ln(svg,[150,-4],[150,10],2,'#7c8490');o.cabL=ln(svg,[150,0],[150,10],2,'#7c8490');o.cabR=ln(svg,[150,0],[150,10],2,'#7c8490');
+      o.aL=limb(svg,9);o.fL=limb(svg,8);o.aR=limb(svg,9);o.fR=limb(svg,8);
+      o.bar=ln(svg,[0,0],[0,0],6,'#9aa2ad');
+      o.hL=el(svg,'rect',{rx:3,fill:'#e8ecf2'});o.hR=el(svg,'rect',{rx:3,fill:'#e8ecf2'});
+      const y=170;el(svg,'line',{x1:150-G.x-3,y1:y,x2:150+G.x+3,y2:y,stroke:'#f2a93b','stroke-width':1.5});
+      el(svg,'text',{x:150,y:182,fill:'#f2a93b','font-size':8.5,'text-anchor':'middle'}).textContent=G.txt;return o},
+    draw(o,u,tn){const SL=[128,70],y=16+u*68,WL=[150-G.x,y],E=elbowOut(SL,WL,36,26),SR=[300-SL[0],SL[1]],ER=[300-E[0],E[1]],WR=[300-WL[0],y];
+      pts(o.aL,[SL,E]);pts(o.fL,[E,WL]);pts(o.aR,[SR,ER]);pts(o.fR,[ER,WR]);
+      const half=G.hand==='v'?[6,14]:[16,8];[[o.hL,WL],[o.hR,WR]].forEach(([h,W])=>{h.setAttribute('width',half[0]);h.setAttribute('height',half[1]);h.setAttribute('x',(W[0]-half[0]/2).toFixed(1));h.setAttribute('y',(W[1]-half[1]/2).toFixed(1))});
+      const bx=G.hand==='v'?[WL[0]-4,WR[0]+4]:[WL[0]-16,WR[0]+16];setLine(o.bar,[bx[0],y-5],[bx[1],y-5]);
+      setLine(o.cabL,[150,-4],[bx[0],y-5]);setLine(o.cabR,[150,-4],[bx[1],y-5]);setLine(o.cab,[150,-8],[150,-4]);
+      o.gl.setAttribute('opacity',tn.toFixed(2));o.gr.setAttribute('opacity',tn.toFixed(2))}});
+}
 const ANIMS={
  press:{vb:'28 14 244 172',cycle:4,phases:[[0,2,'BAJA','Controlado, 2 s · estira el pecho'],[2,3,'PAUSA','1 s sin rebotar, codos ~45°'],[3,4,'EMPUJA','1 s · aprieta el pecho']],
   u:t=>t<2?ease(t/2):t<3?1:1-ease(t-3),
@@ -157,9 +182,7 @@ const ANIMS={
  overhead:mk('up',['EXTIENDE','APRIETA','VUELVE'],['Estira los brazos arriba, 1 s','Aprieta el tríceps 1 s','Baja lento, 2 s · codos fijos'],{
    build(svg){const o={};ground(svg);sideFig(svg,o);o.bar=BAR(svg);return o},
    draw(o,u,tn){const H=[150,98],S=[150,50],E=add(S,8,-26),W=pol(E,24,150+130*u);leg(o,H,[152,138],A0);body(o,H,S);arm(o,S,E,W);mv(o.bar,W);glowSeg(o,S,E,-7,6,tn)}}),
- pulldown:mk('up',['TIRA','APRIETA','VUELVE'],['Baja la barra al pecho alto, codos hacia abajo, 1 s','Aprieta los dorsales 1 s','Sube lento, 2 s · estira los dorsales'],{
-   build(svg){const o={};ground(svg);el(svg,'rect',{x:118,y:132,width:60,height:8,rx:4,fill:'#4a505a'});el(svg,'rect',{x:144,y:140,width:8,height:36,fill:'#3a3f47'});ln(svg,[198,-8],[198,-8],0);el(svg,'circle',{cx:170,cy:-6,r:5,fill:'#7c8490'});o.cable=ln(svg,[170,-6],[168,20],2,'#7c8490');sideFig(svg,o);o.bar=BAR(svg);return o},
-   draw(o,u,tn){const H=[150,128],S=[143,81],W=[166-2*u,24+u*46],E=pick(S,W,30,28,minX);leg(o,H,[192,124],[192,172]);body(o,H,S);arm(o,S,E,W);mv(o.bar,W);setLine(o.cable,[170,-6],W);glowSeg(o,H,S,-9,8,tn)}}),
+ pulldown:pulldownBack('neutro'), pulldownS:pulldownBack('supino'), pulldownW:pulldownBack('ancho'),
  bentrow:mk('up',['TIRA','APRIETA','BAJA'],['Lleva los codos atrás, barra al abdomen, 1 s','Junta omóplatos 1 s','Baja lento, 2 s · espalda recta'],{
    build(svg){const o={};ground(svg);sideFig(svg,o);o.bar=BAR(svg);return o},
    draw(o,u,tn){const H=[140,98],S=[176,64],W=[176-6*u,122-32*u],E=pick(S,W,30,28,minX);leg(o,H,[156,138],[142,176]);body(o,H,S,12);arm(o,S,E,W);mv(o.bar,W);glowSeg(o,H,S,-8,8,tn)}}),
