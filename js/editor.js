@@ -55,6 +55,8 @@ function fillEditor(dayIdx, ex, groupLabel){
   $id('exEditDay').value = String(dayIdx);
   fillGroupOptions(dayIdx, groupLabel, null);
   $id('exEditIcon').innerHTML = Object.keys(ICONS).map(k => `<option value="${k}">${escHtml(ICON_LABELS[k] || k)}</option>`).join('');
+  $id('exEditFeel').innerHTML = '<option value="">Automático (según nombre / icono)</option>' + Object.keys(FEEL_PROFILES).map(k => `<option value="${k}">${escHtml(FEEL_PROFILES[k].label)}</option>`).join('');
+  $id('exEditFeel').value = ex && ex.feel && FEEL_PROFILES[ex.feel] ? ex.feel : '';
   $id('exEditName').value = ex ? ex.name : '';
   $id('exEditTimed').value = ex && ex.timed ? '1' : '0';
   const parts = ex && ex.sets ? String(ex.sets).split('·') : [];
@@ -149,6 +151,8 @@ function saveExerciseEditor(){
     ex = Object.assign({ id: newExerciseId() }, fields);
     target.exercises.push(ex);
   }
+  const feelKey = $id('exEditFeel').value;
+  if (feelKey && FEEL_PROFILES[feelKey]) ex.feel = feelKey; else delete ex.feel;
   if (timed) ex.timed = true; else delete ex.timed;
   if (groupLabel === 'Brazos') ex.canonical = $id('exEditCanonical').value; else delete ex.canonical;
 

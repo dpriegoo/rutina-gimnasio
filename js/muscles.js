@@ -129,18 +129,11 @@ function renderMuscleLoad(){
   if (!profile) { listEl.innerHTML = ''; return; }
 
   const load = computeMuscleLoad(profile);
-  const setFill = (id, color) => { const el = document.getElementById(id); if (el) el.setAttribute('fill', color); };
-
-  setFill('zone-pectoral', load.pectoral.color);
-  setFill('zone-core', load.core.color);
-  setFill('zone-dorsales', load.dorsales.color);
-  ['L', 'R'].forEach(side => {
-    setFill('zone-hombros-front-' + side, load.hombros.color);
-    setFill('zone-hombros-back-' + side, load.hombros.color);
-    setFill('zone-biceps-' + side, load.biceps.color);
-    setFill('zone-triceps-' + side, load.triceps.color);
-    setFill('zone-piernas-front-' + side, load.piernas.color);
-    setFill('zone-piernas-back-' + side, load.piernas.color);
+  ['front', 'back'].forEach(view => {
+    const svg = document.getElementById(view === 'front' ? 'muscleSvgFront' : 'muscleSvgBack');
+    if (!svg) return;
+    const map = BODY_FINE_TO_COARSE[view];
+    svg.innerHTML = bodyMarkup(view, z => (z === '_base' ? 'var(--icon-bg)' : (map[z] && load[map[z]] ? load[map[z]].color : 'var(--icon-bg)')));
   });
 
   listEl.innerHTML = Object.keys(MUSCLE_ZONES).map(z => `

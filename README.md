@@ -19,6 +19,7 @@ No hay build ni framework: el navegador carga los archivos tal cual.
 | `js/auth.js` | Login con Google, logout, sesión rechazada. |
 | `js/routine.js` | Modelo de la rutina editable + sincronización con el servidor. |
 | `js/outbox.js` | Series pendientes y cola de envío con reintentos. |
+| `js/body-svg.js` | Dibujo del cuerpo (frente/espalda) con zonas musculares finas. |
 | `js/muscles.js` | Zonas musculares y diagrama de carga. |
 | `js/planning.js` | Reequilibrio semanal, semana de descanso, recomendaciones. |
 | `js/body.js` | Peso corporal y altura. |
@@ -61,3 +62,11 @@ versión con la que se cargó y, si no coinciden, se recarga una vez sola.
 
 - `tests/adapter.test.js`: el adaptador de Supabase contra una API simulada.
 - `tests/smoke.test.js`: arranca la página real en jsdom (con y sin sesión) y navega entre vistas.
+
+
+## Dónde sentir el esfuerzo (feel-*.js)
+- `js/feel-data.js`: una ficha por tipo de ejercicio (músculo principal/apoyo, parte a notar, indicaciones, aviso, animación). Para añadir un ejercicio nuevo basta con una entrada más en `FEEL_PROFILES`.
+- `js/feel-anim.js`: motor de animación (muñeco con huesos en SVG) y los 23 patrones de movimiento.
+- `js/feel.js`: línea "SIENTE", silueta y panel desplegable de la tarjeta.
+- Un ejercicio se enlaza con su ficha por la clave `feel` (se elige en Editar → "Músculo y animación"), si no por su nombre y, si no, por su icono.
+- `tests/feel.test.js` comprueba que todos los ejercicios tienen ficha y que las animaciones se pintan sin errores.

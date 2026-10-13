@@ -16,7 +16,7 @@
 <title>IronLog · Rutina de fuerza</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link rel="stylesheet" href="styles.css?v=f939f49c">
+<link rel="stylesheet" href="styles.css?v=c73f70d9">
 </head>
 <body>
 
@@ -70,30 +70,8 @@
       <button id="muscleViewBtnBack" onclick="setMuscleView('back')">Espalda</button>
     </div>
     <div class="muscle-svg-wrap">
-      <svg id="muscleSvgFront" viewBox="0 0 160 380" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="80" cy="24" r="20" fill="var(--icon-bg)" stroke="#3a3f47" stroke-width="1"/>
-        <rect x="72" y="40" width="16" height="12" fill="var(--icon-bg)"/>
-        <ellipse id="zone-hombros-front-L" cx="40" cy="60" rx="16" ry="14" stroke="#3a3f47" stroke-width="1"/>
-        <ellipse id="zone-hombros-front-R" cx="120" cy="60" rx="16" ry="14" stroke="#3a3f47" stroke-width="1"/>
-        <path id="zone-pectoral" d="M50,52 Q80,44 110,52 L106,96 Q80,104 54,96 Z" stroke="#3a3f47" stroke-width="1"/>
-        <rect id="zone-biceps-L" x="18" y="58" width="24" height="130" rx="12" stroke="#3a3f47" stroke-width="1"/>
-        <rect id="zone-biceps-R" x="118" y="58" width="24" height="130" rx="12" stroke="#3a3f47" stroke-width="1"/>
-        <path id="zone-core" d="M56,96 Q80,102 104,96 L98,180 Q80,190 62,180 Z" stroke="#3a3f47" stroke-width="1"/>
-        <rect id="zone-piernas-front-L" x="50" y="182" width="26" height="180" rx="13" stroke="#3a3f47" stroke-width="1"/>
-        <rect id="zone-piernas-front-R" x="84" y="182" width="26" height="180" rx="13" stroke="#3a3f47" stroke-width="1"/>
-      </svg>
-      <svg id="muscleSvgBack" viewBox="0 0 160 380" xmlns="http://www.w3.org/2000/svg" style="display:none;">
-        <circle cx="80" cy="24" r="20" fill="var(--icon-bg)" stroke="#3a3f47" stroke-width="1"/>
-        <rect x="72" y="40" width="16" height="12" fill="var(--icon-bg)"/>
-        <ellipse id="zone-hombros-back-L" cx="40" cy="60" rx="16" ry="14" stroke="#3a3f47" stroke-width="1"/>
-        <ellipse id="zone-hombros-back-R" cx="120" cy="60" rx="16" ry="14" stroke="#3a3f47" stroke-width="1"/>
-        <path id="zone-dorsales" d="M48,52 Q80,44 112,52 L104,110 Q80,120 56,110 Z" stroke="#3a3f47" stroke-width="1"/>
-        <rect id="zone-triceps-L" x="18" y="58" width="24" height="130" rx="12" stroke="#3a3f47" stroke-width="1"/>
-        <rect id="zone-triceps-R" x="118" y="58" width="24" height="130" rx="12" stroke="#3a3f47" stroke-width="1"/>
-        <path d="M56,110 Q80,118 104,110 L100,180 Q80,188 60,180 Z" fill="var(--icon-bg)" stroke="#3a3f47" stroke-width="1"/>
-        <rect id="zone-piernas-back-L" x="50" y="182" width="26" height="180" rx="13" stroke="#3a3f47" stroke-width="1"/>
-        <rect id="zone-piernas-back-R" x="84" y="182" width="26" height="180" rx="13" stroke="#3a3f47" stroke-width="1"/>
-      </svg>
+      <svg id="muscleSvgFront" viewBox="0 0 160 380" xmlns="http://www.w3.org/2000/svg"></svg>
+      <svg id="muscleSvgBack" viewBox="0 0 160 380" xmlns="http://www.w3.org/2000/svg" style="display:none;"></svg>
     </div>
     <div id="muscleLoadList" class="muscle-legend-list"></div>
     <div class="muscle-scale-legend">
@@ -224,6 +202,8 @@
     <div class="ed-field"><label for="exEditReps">Repeticiones o tiempo objetivo (siempre 3 series)</label><input id="exEditReps" type="text" maxlength="30" placeholder="8-10  ·  30 seg"></div>
     <div class="ed-field"><label for="exEditIcon">Icono</label>
       <div class="ed-icon-row"><div class="icon-box" id="exEditIconPreview"></div><select id="exEditIcon" onchange="updateEditorIconPreview()"></select></div></div>
+    <div class="ed-field"><label for="exEditFeel">Músculo y animación (qué se muestra en "Siente")</label>
+      <select id="exEditFeel"></select></div>
     <div class="ed-field"><label for="exEditPrimary">Máquina o material habitual</label><input id="exEditPrimary" type="text" maxlength="100"></div>
     <div class="ed-field"><label for="exEditAlts">Alternativas si está ocupada (una por línea)</label><textarea id="exEditAlts" rows="3"></textarea></div>
     <div class="ed-field"><label for="exEditHowTo">Cómo hacerlo</label><textarea id="exEditHowTo" rows="3"></textarea></div>
@@ -252,7 +232,7 @@
 <div class="toast" id="toast">Guardado ✓</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
-<script>window.IRONLOG_BUILD = '9915c7c7'; // lo escribe tools/stamp.js</script>
+<script>window.IRONLOG_BUILD = 'af22c786'; // lo escribe tools/stamp.js</script>
 <script src="js/config.js?v=4d929179"></script>
 <script src="js/utils.js?v=e65abf34"></script>
 <script src="js/icons.js?v=91462c98"></script>
@@ -262,14 +242,18 @@
 <script src="js/auth.js?v=7381c302"></script>
 <script src="js/routine.js?v=f17fbe87"></script>
 <script src="js/outbox.js?v=571f2f51"></script>
-<script src="js/muscles.js?v=a69ed986"></script>
+<script src="js/body-svg.js?v=3fc81c63"></script>
+<script src="js/muscles.js?v=38459975"></script>
 <script src="js/planning.js?v=d4d7df59"></script>
 <script src="js/body.js?v=0eda30b7"></script>
 <script src="js/history.js?v=77cd5f41"></script>
 <script src="js/metrics.js?v=43b15386"></script>
 <script src="js/summary.js?v=38ac23c3"></script>
-<script src="js/day-view.js?v=26e6bb4f"></script>
-<script src="js/editor.js?v=c6f640c3"></script>
+<script src="js/feel-data.js?v=68c71982"></script>
+<script src="js/feel-anim.js?v=eb45c8e0"></script>
+<script src="js/feel.js?v=e98b2186"></script>
+<script src="js/day-view.js?v=09c58dd5"></script>
+<script src="js/editor.js?v=82298a81"></script>
 <script src="js/progress.js?v=fed85023"></script>
 <script src="js/navigation.js?v=77cc7958"></script>
 <script src="js/main.js?v=fb4cc768"></script>

@@ -205,6 +205,7 @@ function removeBorrowedExercise(targetDayName, idx){
 function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
   const zone = ZONE_META[ICON_TO_ZONE[ex.icon]] || ZONE_META.libre;
   const alts = ex.alts || [];
+  const feel = Feel.summaryHTML(ex, logId);
   return `
     <button class="icon-box" type="button" onclick="openExerciseVideo('${jsArg(ex.name)}')" title="Ver vídeo de cómo hacerlo">${ICONS[ex.icon] || ''}<span class="play-badge">▶</span></button>
     <div class="card-body">
@@ -219,6 +220,7 @@ function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
         ${alts.length ? `<div class="machine-row"><span class="tag alt">SI OCUPADA</span></div>
         <div class="alt-list">${alts.map(escHtml).join(' &nbsp;·&nbsp; ')}</div>` : ''}
       </div>` : ''}
+      ${feel.row}
       ${ex.howTo ? `<div class="howto"><b>Cómo hacerlo:</b> ${escHtml(ex.howTo)}</div>` : ''}
       <div class="card-actions">
         <button class="log-toggle" onclick="toggleLog('${logId}')">📈 Registrar serie</button>
@@ -243,6 +245,8 @@ function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
       </div>
       <div class="pending-wrap" id="pendingWrap-${logId}" data-dia="${escHtml(dia)}" data-grupo="${escHtml(grupo)}" data-ejercicio="${escHtml(ex.name)}"></div>
     </div>
+    ${feel.mini}
+    ${feel.more}
   `;
 }
 
