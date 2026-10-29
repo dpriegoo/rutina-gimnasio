@@ -1,8 +1,9 @@
 // =====================================================================
 // Vista del día  (day-view.js)
-// Pestañas de día, tarjetas de ejercicio, ejercicios prestados y resaltados (récords,
-// series de la semana).
-// Depende de: routine, outbox, planning, utils.
+// Tarjetas de ejercicio (carrusel horizontal), ejercicios prestados y resaltados (récords,
+// series de la semana). La pantalla de elegir día y la tira de progreso viven en day-picker.js;
+// las gráficas de cada tarjeta en progress-chart.js.
+// Depende de: routine, outbox, planning, utils, progress-chart.
 // =====================================================================
 
 function weeklySeriesCount(dia, ejercicio){
@@ -101,7 +102,10 @@ function updateCardHighlights(){
       if (last && pesoInput) pesoInput.placeholder = 'Últ: ' + last.peso + 'kg';
       if (last && repsInput) repsInput.placeholder = 'Últ: ' + last.reps;
     }
+
+    renderCardProgress(cardEl);
   });
+  renderStrip();
 }
  // logId -> {ids, count}, para poder deshacer el último guardado
 
@@ -144,18 +148,11 @@ function isDayStarted(day){
   return exerciseNames.some(name => weeklySeriesCount(day.name, name) > 0);
 }
 
+// Refresca todo lo que depende del estado semanal: fichas de la pantalla de elegir día y
+// tira de progreso del día abierto (ambas en day-picker.js). Se llama desde muchos sitios.
 function renderTabs(){
-  const wrap = document.getElementById('daytabs');
-  wrap.innerHTML = '';
-  DAYS.forEach((d, i) => {
-    const b = document.createElement('button');
-    const complete = isDayComplete(d);
-    const partial = !complete && isDayStarted(d);
-    b.className = 'daytab' + (i===currentDay ? ' active' : '') + (complete ? ' done' : '') + (partial ? ' partial' : '');
-    b.textContent = d.name.split('·')[0].trim() + (complete ? ' ✓' : (partial ? ' …' : ''));
-    b.onclick = () => { currentDay = i; renderTabs(); renderDay(); };
-    wrap.appendChild(b);
-  });
+  renderDayPicker();
+  renderStrip();
 }
 
 let borrowedExercises = JSON.parse(localStorage.getItem('borrowedExercises') || '{}');
@@ -207,25 +204,18 @@ function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
   const alts = ex.alts || [];
   const feel = Feel.summaryHTML(ex, logId);
   return `
-    <button class="icon-box" type="button" onclick="openExerciseVideo('${jsArg(ex.name)}')" title="Ver vídeo de cómo hacerlo">${ICONS[ex.icon] || ''}<span class="play-badge">▶</span></button>
-    <div class="card-body">
-      <div class="card-top">
+    <div class="card-head">
+      <button class="icon-box" type="button" onclick="openExerciseVideo('${jsArg(ex.name)}')" title="Ver vídeo de cómo hacerlo">${ICONS[ex.icon] || ''}<span class="play-badge">▶</span></button>
+      <div class="card-headtext">
         <div class="exname">${escHtml(ex.name)}<span class="zone-badge" style="background:${zone.color}" title="${zone.label}">${zone.icon}</span>${extraBadgeHtml || ''}<span class="done-badge">✓ hecho</span></div>
-        <div class="sets">${escHtml(ex.sets)}</div>
+        <div class="card-sub"><span class="grouptag">${escHtml(grupo)}</span><span class="sets">${escHtml(ex.sets)}</span><span class="series-progress"></span></div>
       </div>
-      <div class="series-progress"></div>
+    </div>
+    <div class="card-body">
+      <button class="pg" type="button" onclick="openProgressSheet('${jsArg(ex.name)}')" aria-label="Ver progresión de ${escHtml(ex.name)}"></button>
       <div class="beat-last-week"></div>
-      ${(ex.primary || alts.length) ? `<div class="machine">
-        ${ex.primary ? `<div class="machine-row"><span class="tag primary">USA</span><span class="txt">${escHtml(ex.primary)}</span></div>` : ''}
-        ${alts.length ? `<div class="machine-row"><span class="tag alt">SI OCUPADA</span></div>
-        <div class="alt-list">${alts.map(escHtml).join(' &nbsp;·&nbsp; ')}</div>` : ''}
-      </div>` : ''}
-      ${feel.row}
-      ${ex.howTo ? `<div class="howto"><b>Cómo hacerlo:</b> ${escHtml(ex.howTo)}</div>` : ''}
-      <div class="card-actions">
-        <button class="log-toggle" onclick="toggleLog('${logId}')">📈 Registrar serie</button>
-      </div>
-      <div class="log-form" id="${logId}">
+      <div class="log-title">Registrar serie</div>
+      <div class="log-form open" id="${logId}">
         <div class="log-form-main">
           ${isTimedExercise(ex.name)
             ? `<input class="inp-reps" type="number" inputmode="numeric" placeholder="Segundos">`
@@ -244,8 +234,19 @@ function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
         </div>
       </div>
       <div class="pending-wrap" id="pendingWrap-${logId}" data-dia="${escHtml(dia)}" data-grupo="${escHtml(grupo)}" data-ejercicio="${escHtml(ex.name)}"></div>
+      <div class="card-info">
+        <div class="card-info-text">
+          ${(ex.primary || alts.length) ? `<div class="machine">
+            ${ex.primary ? `<div class="machine-row"><span class="tag primary">USA</span><span class="txt">${escHtml(ex.primary)}</span></div>` : ''}
+            ${alts.length ? `<div class="machine-row"><span class="tag alt">SI OCUPADA</span></div>
+            <div class="alt-list">${alts.map(escHtml).join(' &nbsp;·&nbsp; ')}</div>` : ''}
+          </div>` : ''}
+          ${feel.row}
+        </div>
+        ${feel.mini}
+      </div>
+      ${ex.howTo ? `<div class="howto"><b>Cómo hacerlo:</b> ${escHtml(ex.howTo)}</div>` : ''}
     </div>
-    ${feel.mini}
     ${feel.more}
   `;
 }
@@ -253,20 +254,14 @@ function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
 function renderDay(){
   const day = DAYS[currentDay];
   const main = document.getElementById('main');
+  const extras = document.getElementById('dayExtras');
   main.innerHTML = '';
+  extras.innerHTML = '';
 
-  const title = document.createElement('h2');
-  title.className = 'dayname';
-  title.style.fontSize = '17px';
-  title.style.margin = '4px 0 0';
-  title.textContent = day.name;
-  main.appendChild(title);
+  document.getElementById('dayTitle').textContent = day.name.split('·')[0].trim() + ' · ' + (day.name.split('·')[1] || '').trim();
+  document.getElementById('dayScreen').style.setProperty('--c', dayColorVar(currentDay));
 
-  const compareBtn = document.createElement('button');
-  compareBtn.className = 'day-compare-btn';
-  compareBtn.textContent = '📊 Comparar con la semana pasada';
-  compareBtn.onclick = () => showDayComparison(currentDay);
-  main.appendChild(compareBtn);
+  document.getElementById('dayCompareBtn').onclick = () => showDayComparison(currentDay);
 
   const profileForOverride = getProfile();
   const activeOverride = profileForOverride && getWeekOverride(profileForOverride);
@@ -276,55 +271,36 @@ function renderDay(){
     notice.style.marginLeft = '0';
     notice.style.marginRight = '0';
     notice.innerHTML = '🔄 Esta semana este día es de <b>' + activeOverride.toGroupLabel + '</b> en vez de ' + activeOverride.fromGroupLabel + '. <button class="rest-week-toggle" onclick="revertWeekOverride()">Deshacer</button>';
-    main.appendChild(notice);
+    extras.appendChild(notice);
   }
 
+  // Cada ejercicio es una tarjeta del carrusel (el grupo muscular va como etiqueta dentro de la tarjeta)
   effectiveDayGroups(day).forEach(g => {
-    const groupEl = document.createElement('div');
-    groupEl.className = 'group';
-
-    const label = document.createElement('div');
-    label.className = 'group-label';
-    label.innerHTML = '<span class="dot"></span>' + g.label;
-    groupEl.appendChild(label);
-
     g.exercises.forEach(ex => {
       const logId = 'log-' + currentDay + '-' + ex.id;
       const card = document.createElement('div');
       card.className = 'card';
       card.setAttribute('data-exercise', ex.name);
       card.innerHTML = buildCardHTML(ex, day.name, g.label, logId, '');
-      groupEl.appendChild(card);
+      main.appendChild(card);
       renderPendingWrap(logId);
     });
-
-    main.appendChild(groupEl);
   });
 
   const borrowed = borrowedExercises[day.name] || [];
-  if (borrowed.length > 0) {
-    const groupEl = document.createElement('div');
-    groupEl.className = 'group';
-    const label = document.createElement('div');
-    label.className = 'group-label';
-    label.innerHTML = '<span class="dot" style="background:var(--amber);"></span>Pendiente de otros días';
-    groupEl.appendChild(label);
-
-    borrowed.forEach((ex, bIdx) => {
-      const logId = 'borrow-' + currentDay + '-' + bIdx;
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.setAttribute('data-exercise', ex.name);
-      card.setAttribute('data-borrow-dia', ex.originalDayName);
-      const badge = `<span class="borrow-badge" title="Pendiente de ${ex.originalDayLabel}">de ${ex.originalDayLabel}</span>`;
-      card.innerHTML = buildCardHTML(ex, ex.originalDayName, ex.grupo, logId, badge) +
-        `<button class="borrow-remove" onclick="removeBorrowedExercise('${day.name.replace(/'/g,"\\'")}', ${bIdx})" title="Quitar">✕</button>`;
-      groupEl.appendChild(card);
-      renderPendingWrap(logId);
-    });
-
-    main.appendChild(groupEl);
-  }
+  borrowed.forEach((ex, bIdx) => {
+    const logId = 'borrow-' + currentDay + '-' + bIdx;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.setAttribute('data-exercise', ex.name);
+    card.setAttribute('data-borrow-dia', ex.originalDayName);
+    const badge = `<span class="borrow-badge" title="Pendiente de ${ex.originalDayLabel}">de ${ex.originalDayLabel}</span>`;
+    card.innerHTML = buildCardHTML(ex, ex.originalDayName, ex.grupo, logId, badge) +
+      `<button class="borrow-remove" onclick="removeBorrowedExercise('${day.name.replace(/'/g,"\\'")}', ${bIdx})" title="Quitar">✕</button>`;
+    main.appendChild(card);
+    renderPendingWrap(logId);
+  });
 
   updateCardHighlights();
+  restoreExerciseScroll();
 }

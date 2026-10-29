@@ -1135,3 +1135,145 @@
   .feel-bigsil{width:96px !important; height:228px !important;}
   .feel-bodynote{font-size:12.5px; color:var(--muted); line-height:1.5;}
   .feel-bodynote span{font-size:11.5px;}
+
+  /* ---- Elegir día + carrusel de ejercicios + gráficas (day-picker.js, progress-chart.js) ---- */
+  :root{--d1:#7ba2f7; --d2:#3cc0cc; --d3:#f09060; --d4:#a995ff; --d5:#e888b9; --on-day:#0e151b;}
+
+  /* Pantalla de elegir día */
+  .dp-hero{padding:22px 16px 4px;}
+  .dp-title{margin:0; font-size:30px; font-weight:700; letter-spacing:-0.2px;}
+  .dp-date{margin-top:4px; color:var(--muted); font-size:14px;}
+  .dp-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:16px 16px 6px;}
+  .dp-tile{
+    position:relative; display:flex; flex-direction:column; justify-content:space-between;
+    min-height:176px; padding:14px 14px 12px; border:none; border-radius:18px; text-align:left;
+    background:var(--c); color:var(--on-day); font-family:inherit; cursor:pointer;
+    transition:transform 0.15s ease;
+  }
+  .dp-tile:active{transform:scale(0.97);}
+  .dp-wide{grid-column:span 2; min-height:124px;}
+  .dp-num{font-size:74px; font-weight:800; line-height:0.85; opacity:0.9; letter-spacing:-2px;}
+  .dp-wide .dp-num{font-size:58px;}
+  .dp-info{display:block;}
+  .dp-name{display:block; font-size:18px; font-weight:700; line-height:1.15;}
+  .dp-meta{display:block; font-size:12.5px; margin-top:4px; opacity:0.85;}
+  .dp-tag{position:absolute; top:12px; right:12px; background:var(--on-day); color:#fff; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:99px;}
+  .dp-segs{display:flex; gap:4px; margin-top:10px;}
+  .dp-segs i{flex:1; height:5px; border-radius:3px; background:rgba(14,21,27,0.25);}
+  .dp-segs i.warn{background:rgba(14,21,27,0.55);}
+  .dp-segs i.done{background:var(--on-day);}
+  .dp-foot{display:flex; justify-content:center; padding:14px 16px 8px;}
+
+  /* Cabecera del día abierto */
+  #dayScreen{--c:var(--blue);}
+  .day-back{
+    flex:0 0 auto; min-height:38px; padding:0 14px 0 10px; border-radius:20px;
+    border:1px solid var(--card-border); background:var(--card); color:var(--text);
+    font-family:inherit; font-size:13.5px; font-weight:600;
+  }
+  .day-title{flex:1; min-width:0; font-size:15px; font-weight:700; color:var(--c); line-height:1.15;}
+  .ex-strip{display:flex; gap:6px; padding:6px 16px 0;}
+  .ex-strip button{flex:1; min-width:12px; height:26px; display:flex; align-items:center; border:none; background:none; padding:0;}
+  .ex-strip button i{display:block; width:100%; height:6px; border-radius:3px; background:var(--card-border); transition:background 0.2s;}
+  .ex-strip button.done i{background:var(--green);}
+  .ex-strip button.warn i{background:var(--amber);}
+  .ex-strip button.cur i{height:10px; box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--c);}
+  .ex-bar{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:2px 16px 0 18px;}
+  .ex-pos{flex:1; min-width:0; font-size:12.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .ex-bar .day-compare-btn{display:inline-block; width:auto; flex:0 0 auto; margin:0; padding:6px 11px; font-size:11.5px; white-space:nowrap;}
+  #dayExtras{padding:0 16px;}
+
+  /* Carrusel: una tarjeta por ejercicio, deslizando de lado, con un trozo de la siguiente asomando */
+  #main.rail{
+    position:relative; display:flex; align-items:flex-start; gap:12px;
+    overflow-x:auto; scroll-snap-type:x mandatory; scroll-padding-inline:7%;
+    padding:10px 7% 18px; scrollbar-width:none; overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+  #main.rail::-webkit-scrollbar{display:none;}
+  #main.rail > .card{
+    flex:0 0 86%; scroll-snap-align:center; flex-direction:column; flex-wrap:nowrap;
+    gap:12px; margin-bottom:0; padding:16px; min-width:0;
+  }
+  #main.rail .card-head{display:flex; align-items:center; gap:12px;}
+  #main.rail .card-head .icon-box{width:46px; height:46px;}
+  #main.rail .card-head .icon-box svg{width:28px; height:28px;}
+  .card-headtext{flex:1; min-width:0;}
+  #main.rail .exname{font-size:17px;}
+  .card-sub{display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; margin-top:4px; font-size:11.5px;}
+  .grouptag{color:var(--muted);}
+  .card-body{display:flex; flex-direction:column; gap:12px;}
+  .card-info{display:flex; gap:10px; align-items:flex-start;}
+  .card-info-text{flex:1; min-width:0;}
+  #main.rail .feel-more{flex:0 0 auto;}
+  .beat-last-week:empty{display:none;}
+  #main.rail .done-badge{display:none !important;} /* en el carrusel ya lo dicen el borde verde, la tira y "3/3 esta semana" */
+  .log-title{font-size:13px; font-weight:700; margin-bottom:-4px;}
+  #main.rail .qrtip{margin-top:4px;}
+  #main.rail .log-form-main input{padding:11px 6px; font-size:15px;}
+  #main.rail .log-add{padding:0 16px; min-height:44px;}
+  .borrow-remove{z-index:2;}
+
+  /* Gráfica de progresión dentro de la tarjeta */
+  .pg{
+    display:block; width:100%; text-align:left; font-family:inherit; color:var(--text);
+    background:var(--icon-bg); border:none; border-radius:14px; padding:12px 12px 8px; cursor:pointer;
+  }
+  .pg:disabled{cursor:default;}
+  .pg-row{display:flex; justify-content:space-between; align-items:flex-end; gap:8px;}
+  .pg-big{font-size:36px; font-weight:800; line-height:0.95; letter-spacing:-0.5px;}
+  .pg-big small{font-size:16px; font-weight:600; color:var(--muted); margin-left:3px; letter-spacing:0;}
+  .pg-cap{font-size:11.5px; color:var(--muted); margin-top:4px;}
+  .pg-delta{flex:0 0 auto; white-space:nowrap; font-size:12.5px; font-weight:700; padding:3px 9px; border-radius:99px; background:var(--card); color:var(--muted);}
+  .pg-delta.up{color:var(--green);}
+  .pg-delta.down{color:#e0656a;}
+  .pg-empty{font-size:12.5px; color:var(--muted); line-height:1.4; padding:2px 0 4px;}
+  .pg-more{font-size:11.5px; color:var(--muted); text-decoration:underline; text-underline-offset:3px; margin:2px 0 2px;}
+  .pg-spark{display:block; width:100%; height:auto; margin-top:6px; overflow:visible;}
+  .pg-area{fill:var(--c); opacity:0.15;}
+  .pg-line{fill:none; stroke:var(--c); stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round;}
+  .pg-halo{fill:var(--c); opacity:0.25;}
+  .pg-dot{fill:var(--c);}
+
+  /* Hoja de detalle (se abre desde abajo al tocar la gráfica) */
+  .pg-scrim{position:fixed; inset:0; background:rgba(0,0,0,0.6); opacity:0; pointer-events:none; transition:opacity 0.25s; z-index:58;}
+  .pg-scrim.on{opacity:1; pointer-events:auto;}
+  .pg-sheet{
+    --c:var(--blue);
+    position:fixed; left:0; right:0; bottom:0; max-width:560px; margin:0 auto; max-height:90vh; overflow-y:auto;
+    background:var(--card); color:var(--text); border:1px solid var(--card-border); border-bottom:none;
+    border-radius:24px 24px 0 0; padding:10px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+    transform:translateY(105%); transition:transform 0.3s cubic-bezier(0.2,0.8,0.2,1); z-index:59;
+  }
+  .pg-sheet.on{transform:none;}
+  .pg-grab{width:44px; height:5px; border-radius:3px; background:var(--card-border); margin:0 auto 10px;}
+  .pg-shead{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .pg-shead h2{margin:0; font-size:22px; font-weight:700; line-height:1.15;}
+  .pg-close{flex:0 0 auto; min-width:40px; min-height:40px; border-radius:50%; border:none; background:var(--icon-bg); color:var(--text); font-size:16px; font-weight:700;}
+  .pg-where{display:flex; gap:6px; flex-wrap:wrap; margin:8px 0 10px;}
+  .pg-chip{font-size:12px; font-weight:700; padding:3px 10px; border-radius:99px; background:var(--icon-bg); color:var(--c);}
+  .pg-hint{margin:-2px 0 8px; font-size:12.5px; color:var(--muted);}
+  .pg-stats{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:10px 0;}
+  .pg-stat{background:var(--icon-bg); border-radius:14px; padding:10px 10px 9px;}
+  .pg-stat b{display:block; font-size:24px; font-weight:800; line-height:1;}
+  .pg-stat span{font-size:11.5px; color:var(--muted);}
+  .pg-chart{display:block; width:100%; height:auto;}
+  .pg-gl{stroke:var(--card-border); stroke-width:1;}
+  .pg-tk{fill:var(--muted); font-size:10.5px;}
+  .pg-ln{fill:none; stroke:var(--c); stroke-width:2.8; stroke-linejoin:round; stroke-linecap:round;}
+  .pg-pt{fill:var(--c); stroke:var(--card); stroke-width:2;}
+  .pg-pt.hol{fill:var(--card); stroke:var(--c); stroke-width:2.5;}
+  .pg-pr{stroke:var(--text); stroke-width:1.2; stroke-dasharray:4 4; opacity:0.55;}
+  .pg-prl{fill:var(--text); font-size:10.5px; font-weight:700;}
+  .pg-bar{fill:var(--card-border);}
+  .pg-bar.last{fill:var(--c);}
+  .pg-leg{display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--muted); margin:6px 0 2px;}
+  .pg-leg i{display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--c); margin-right:5px; vertical-align:-1px;}
+  .pg-leg i.h{background:var(--card); border:2.5px solid var(--c);}
+  .pg-note{margin:12px 0; padding:11px 13px; border-radius:14px; background:var(--icon-bg); font-size:13.5px; line-height:1.45;}
+  .pg-sec{font-weight:700; font-size:13.5px; margin:16px 0 6px;}
+  .pg-sess{display:grid; grid-template-columns:58px 1fr auto; gap:8px; align-items:center; padding:9px 0; border-top:1px solid var(--card-border); font-size:13.5px;}
+  .pg-sess small{color:var(--muted);}
+  @media (prefers-reduced-motion:reduce){
+    .pg-sheet,.pg-scrim,.dp-tile{transition:none;}
+  }

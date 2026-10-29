@@ -16,7 +16,7 @@
 <title>IronLog · Rutina de fuerza</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link rel="stylesheet" href="styles.css?v=c73f70d9">
+<link rel="stylesheet" href="styles.css?v=814a3f54">
 </head>
 <body>
 
@@ -41,21 +41,42 @@
 </div>
 
 <div id="rutinaView">
-<div class="daytabs-row">
-  <div class="daytabs" id="daytabs"></div>
-  <button class="week-summary-btn" onclick="showWeekSummary()">📋 Resumen</button>
+
+<!-- Pantalla inicial: ¿qué día entrenas? (la rellena day-picker.js) -->
+<div id="dayPicker" class="daypicker">
+  <div class="dp-hero">
+    <h2 class="dp-title">¿Qué día entrenas?</h2>
+    <div class="dp-date" id="dpDate"></div>
+  </div>
+  <div class="priority-banner" id="priorityBanner" style="display:none;"></div>
+  <div class="dp-grid" id="dpGrid"></div>
+  <div class="dp-foot"><button class="week-summary-btn" onclick="showWeekSummary()">📋 Resumen de la semana</button></div>
 </div>
 
-<div class="qrtip" style="display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px;">
-  <span>🏋️ Peso libre</span>
-  <span>⚙️ Máquinas</span>
-  <span>🔗 Poleas</span>
-  <span>🧘 Suelo</span>
+<!-- Día abierto: tira de progreso + carrusel de ejercicios -->
+<div id="dayScreen" style="display:none;">
+  <div class="daytabs-row">
+    <button class="day-back" onclick="showDayPicker()" aria-label="Volver a elegir día">‹ Días</button>
+    <div class="day-title" id="dayTitle"></div>
+    <button class="week-summary-btn" onclick="showWeekSummary()">📋 Resumen</button>
+  </div>
+  <div class="ex-strip" id="exStrip" role="tablist" aria-label="Ejercicios del día"></div>
+  <div class="ex-bar">
+    <div class="ex-pos" id="exPos"></div>
+    <button class="day-compare-btn" id="dayCompareBtn" type="button">📊 Vs. semana pasada</button>
+  </div>
+  <div id="dayExtras"></div>
+
+  <main id="main" class="rail"></main>
+
+  <div class="qrtip" style="display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px;">
+    <span>🏋️ Peso libre</span>
+    <span>⚙️ Máquinas</span>
+    <span>🔗 Poleas</span>
+    <span>🧘 Suelo</span>
+  </div>
 </div>
 
-<div class="priority-banner" id="priorityBanner" style="display:none;"></div>
-
-<main id="main"></main>
 </div>
 
 <div id="metricasView" style="display:none;">
@@ -232,7 +253,7 @@
 <div class="toast" id="toast">Guardado ✓</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
-<script>window.IRONLOG_BUILD = '4965ae85'; // lo escribe tools/stamp.js</script>
+<script>window.IRONLOG_BUILD = '491c55b0'; // lo escribe tools/stamp.js</script>
 <script src="js/config.js?v=4d929179"></script>
 <script src="js/utils.js?v=e65abf34"></script>
 <script src="js/icons.js?v=91462c98"></script>
@@ -252,7 +273,9 @@
 <script src="js/feel-data.js?v=72b2bdef"></script>
 <script src="js/feel-anim.js?v=31248ac0"></script>
 <script src="js/feel.js?v=e98b2186"></script>
-<script src="js/day-view.js?v=09c58dd5"></script>
+<script src="js/progress-chart.js?v=d6e0ea21"></script>
+<script src="js/day-view.js?v=2b114303"></script>
+<script src="js/day-picker.js?v=68e87e7c"></script>
 <script src="js/editor.js?v=82298a81"></script>
 <script src="js/progress.js?v=fed85023"></script>
 <script src="js/navigation.js?v=77cc7958"></script>
