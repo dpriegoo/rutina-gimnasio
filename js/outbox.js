@@ -50,10 +50,8 @@ function addPendingRow(logId){
     id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
   });
   savePendingRows(rows);
-  const pesoEl = box.querySelector('.inp-peso');
-  if (pesoEl) pesoEl.value = '';
-  box.querySelector('.inp-reps').value = '';
-  // La variante seleccionada se mantiene (si sigues usando la alternativa, no hay que reelegirla en cada serie).
+  // Peso y reps se CONSERVAN: lo normal es repetir carga en las series siguientes y así solo se corrige lo que cambie.
+  // La variante seleccionada también se mantiene (si sigues usando la alternativa, no hay que reelegirla en cada serie).
   const calentamientoEl = box.querySelector('.inp-calentamiento');
   if (calentamientoEl) calentamientoEl.checked = false;
   const notaEl = box.querySelector('.inp-nota');
@@ -301,10 +299,10 @@ function renderPendingWrap(logId){
         return `
         <div class="pending-row">
           <div>
-            <span>Serie ${i + 1}: ${timed ? r.reps + ' seg' : r.peso + ' kg × ' + r.reps + ' reps'}</span>
+            <span>Serie ${i + 1}: ${timed ? r.reps + ' seg' : fmtNum(parseFloat(r.peso), 2) + ' kg × ' + r.reps + ' reps'}</span>
             ${badges ? `<div class="pending-row-badges">${badges}</div>` : ''}
           </div>
-          <button class="pending-del" onclick="removePendingRow('${logId}', ${i})" ${saving ? 'disabled' : ''}>✕</button>
+          <button class="pending-del" type="button" aria-label="Quitar serie ${i + 1}" onclick="removePendingRow('${logId}', ${i})" ${saving ? 'disabled' : ''}>✕</button>
         </div>
       `;
       }).join('')}

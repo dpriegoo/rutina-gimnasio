@@ -89,3 +89,52 @@ function isWarmupRow(r){
   const v = r['Calentamiento'];
   return v === true || v === 'true' || v === 'TRUE' || v === 1 || v === '1';
 }
+
+// Números en español, siempre igual en toda la app: coma decimal y punto de millar
+// (toLocaleString('es-ES') no agrupa los de 4 cifras: "1234" frente a "15.161"). dec = decimales máximos.
+function fmtNum(v, dec){
+  const n = Number(v);
+  if (!isFinite(n)) return '–';
+  dec = dec == null ? 1 : dec;
+  const f = Math.pow(10, dec);
+  const r = Math.round(Math.abs(n) * f) / f;
+  const parts = r.toFixed(dec).split('.');
+  const int = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const frac = (parts[1] || '').replace(/0+$/, '');
+  return (n < 0 && r !== 0 ? '-' : '') + int + (frac ? ',' + frac : '');
+}
+function fmtKg(v, dec){ return fmtNum(v, dec == null ? 2 : dec) + ' kg'; }
+
+// Colores del tema para Chart.js y SVG: se leen de las variables de styles.css (una sola fuente).
+// El segundo argumento es el valor por defecto (por si no hay CSS, p. ej. en las pruebas).
+function themeColor(name, fallback){
+  try {
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--' + name).trim();
+    return v || fallback;
+  } catch (e) { return fallback; }
+}
+function chartTheme(){
+  if (typeof window !== 'undefined' && window.Chart && window.Chart.defaults) window.Chart.defaults.locale = 'es-ES';
+  return {
+    text: themeColor('muted', '#9aa1ab'), grid: themeColor('card-border', '#2a2e35'),
+    blue: themeColor('blue', '#3f7cf0'), amber: themeColor('amber', '#f2a93b'), green: themeColor('green', '#4caf7d'),
+    blueFill: 'rgba(63,124,240,0.15)', greenFill: 'rgba(76,175,125,0.15)',
+  };
+}
+
+// Foco al abrir/cerrar pantallas superpuestas (resumen, comparativa, diálogos): al abrir pasa al botón de cerrar
+// (o al propio diálogo) y al cerrar vuelve a donde estaba, para quien navega con teclado o lector de pantalla.
+const _focusStack = [];
+function focusOpen(containerId){
+  _focusStack.push(document.activeElement);
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  let t = el.querySelector('.summary-close');
+  if (!t) { t = el.querySelector('.modal-card'); if (t) t.setAttribute('tabindex', '-1'); }
+  if (t && t.focus) t.focus({ preventScroll: true });
+}
+function focusClose(){
+  const prev = _focusStack.pop();
+  if (prev && prev.focus && document.contains(prev)) prev.focus({ preventScroll: true });
+}
+function isShown(id){ const el = document.getElementById(id); return !!el && !!el.style.display && el.style.display !== 'none'; }

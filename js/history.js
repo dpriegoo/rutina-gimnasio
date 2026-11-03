@@ -142,7 +142,7 @@ function renderHistorial(){
               <input class="edit-reps" type="number" inputmode="numeric" value="${r['Reps']}" placeholder="segundos">
               <button class="draft-edit-save" onclick="saveEditHist('${id}')">OK</button>
             </div>
-            <button class="draft-del" onclick="cancelEditHist()">✕</button>
+            <button class="draft-del" type="button" aria-label="Cancelar edición" onclick="cancelEditHist()">✕</button>
           </div>
         `;
       }
@@ -154,7 +154,7 @@ function renderHistorial(){
             <input class="edit-series" type="number" inputmode="numeric" value="${r['Series']}" placeholder="series">
             <button class="draft-edit-save" onclick="saveEditHist('${id}')">OK</button>
           </div>
-          <button class="draft-del" onclick="cancelEditHist()">✕</button>
+          <button class="draft-del" type="button" aria-label="Cancelar edición" onclick="cancelEditHist()">✕</button>
         </div>
       `;
     }
@@ -165,9 +165,9 @@ function renderHistorial(){
     ].filter(Boolean).join(' · ');
     return `
       <div class="draft-item" data-hist-id="${id}">
-        <div class="di-text">${r['Ejercicio']}<div class="di-sub">${String(r['Fecha']).slice(0,10)} · ${timed ? r['Reps'] + ' seg' : r['Peso (kg)'] + ' kg · ' + r['Reps'] + ' reps'} · ${r['Series']} series</div>${badges ? `<div class="di-sub" style="color:var(--amber);">${badges}</div>` : ''}</div>
-        <button class="draft-edit" onclick="startEditHist('${id}')">✏️</button>
-        <button class="draft-del" onclick="deleteHist('${id}')">✕</button>
+        <div class="di-text">${r['Ejercicio']}<div class="di-sub">${String(r['Fecha']).slice(0,10)} · ${timed ? r['Reps'] + ' seg' : fmtNum(parseFloat(r['Peso (kg)']), 2) + ' kg · ' + r['Reps'] + ' reps'} · ${r['Series']} series</div>${badges ? `<div class="di-sub" style="color:var(--amber);">${badges}</div>` : ''}</div>
+        <button class="draft-edit" type="button" aria-label="Editar serie" onclick="startEditHist('${id}')">✏️</button>
+        <button class="draft-del" type="button" aria-label="Borrar serie" onclick="deleteHist('${id}')">✕</button>
       </div>
     `;
   }).join('');

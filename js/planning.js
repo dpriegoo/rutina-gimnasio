@@ -239,12 +239,13 @@ function maybeShowRebalanceModal(){
       'La semana pasada no entrenaste ' + plan.neglectedLabel + ' con la misma intensidad que el resto de grupos musculares. ¿Quieres añadir ' + plan.pick.exerciseName + ' al ' + plan.pick.targetDayLabel + ' para compensarlo?';
   }
   document.getElementById('rebalanceModal').style.display = 'flex';
+  focusOpen('rebalanceModal');
   localStorage.setItem(seenKey, '1');
 }
 
 function acceptRebalance(){
   const plan = window._rebalancePlan;
-  document.getElementById('rebalanceModal').style.display = 'none';
+  hideRebalanceModal();
   if (!plan) return;
   const profile = getProfile();
 
@@ -263,8 +264,14 @@ function acceptRebalance(){
   }
 }
 
-function declineRebalance(){
+function hideRebalanceModal(){
+  const was = isShown('rebalanceModal');
   document.getElementById('rebalanceModal').style.display = 'none';
+  if (was) focusClose();
+}
+
+function declineRebalance(){
+  hideRebalanceModal();
 }
 
 function revertWeekOverride(){
@@ -424,7 +431,7 @@ function pendingFromPartialDays(){
           recommendedDay: recommendDayForExercise(e.name, dayIdx),
           id: 'pend-' + dayIdx + '-' + mi,
         }));
-      pending.push({ dayLabel: day.name.split('·')[0].trim(), missing: missing });
+      pending.push({ dayLabel: day.name.split('·')[0].trim(), dayIdx: dayIdx, missing: missing });
     }
   });
   return pending;

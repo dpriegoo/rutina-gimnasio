@@ -222,7 +222,7 @@ const ANIMS={
  function start(key,svg,ph,tp){
    const A=ANIMS[key];if(!A)return function(){};svg.innerHTML='';svg.setAttribute('viewBox',A.vb);const o=A.build(svg);
    tp.innerHTML=A.phases.map(p=>`<i style="flex:${p[1]-p[0]}"><em></em></i>`).join('');
-   let stop=false;const t0=performance.now();const freeze=(typeof window!=='undefined'&&window.FEEL_FREEZE!=null)?Number(window.FEEL_FREEZE):null;
+   let stop=false;const t0=performance.now();const freeze=(typeof window!=='undefined'&&window.FEEL_FREEZE!=null)?Number(window.FEEL_FREEZE):((typeof motionOK==='function'&&!motionOK())?A.cycle*0.35:null);
    (function frame(now){
      if(stop||!svg.isConnected)return;
      const t=freeze!==null?freeze:((now-t0)/1000)%A.cycle;const u=A.u(t),tn=A.tension(t,u);A.draw(o,u,tn);

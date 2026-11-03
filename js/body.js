@@ -108,7 +108,7 @@ function renderWeightChart(){
           type: 'bar',
           label: 'Volumen ese día (kg)',
           data: volData,
-          backgroundColor: 'rgba(242,169,59,0.35)',
+          backgroundColor: chartTheme().amber + '59',
           yAxisID: 'y1',
           order: 3,
           borderRadius: 3,
@@ -117,10 +117,10 @@ function renderWeightChart(){
           type: 'line',
           label: 'Peso (kg)',
           data: raw,
-          borderColor: 'rgba(63,124,240,0.35)',
+          borderColor: chartTheme().blue + '59',
           backgroundColor: 'transparent',
           pointRadius: 3,
-          pointBackgroundColor: 'rgba(63,124,240,0.6)',
+          pointBackgroundColor: chartTheme().blue + '99',
           borderWidth: 1,
           tension: 0.2,
           yAxisID: 'y',
@@ -130,8 +130,8 @@ function renderWeightChart(){
           type: 'line',
           label: 'Media 7 días',
           data: movingAvg,
-          borderColor: '#4caf7d',
-          backgroundColor: 'rgba(76,175,125,0.12)',
+          borderColor: chartTheme().green,
+          backgroundColor: chartTheme().green + '1f',
           pointRadius: 0,
           borderWidth: 3,
           tension: 0.3,
@@ -145,12 +145,12 @@ function renderWeightChart(){
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: true, labels: { color: '#9aa1ab', font: { size: 11 }, boxWidth: 12 } }
+        legend: { display: true, labels: { color: chartTheme().text, font: { size: 12 }, boxWidth: 12 } }
       },
       scales: {
-        x: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } },
-        y: { position: 'left', ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' }, title: { display: true, text: 'kg corporales', color: '#9aa1ab', font: { size: 10 } } },
-        y1: { position: 'right', ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { display: false }, title: { display: true, text: 'volumen gym (kg)', color: '#9aa1ab', font: { size: 10 } } }
+        x: { ticks: { color: chartTheme().text, font: { size: 11 } }, grid: { color: chartTheme().grid } },
+        y: { position: 'left', ticks: { color: chartTheme().text, font: { size: 11 } }, grid: { color: chartTheme().grid }, title: { display: true, text: 'kg corporales', color: chartTheme().text, font: { size: 11 } } },
+        y1: { position: 'right', ticks: { color: chartTheme().text, font: { size: 11 }, callback: v => fmtNum(v, 0) }, grid: { display: false }, title: { display: true, text: 'volumen gym (kg)', color: chartTheme().text, font: { size: 11 } } }
       }
     }
   });
@@ -166,10 +166,10 @@ function renderWeightTrend(){
     return;
   }
 
-  let text = 'Peso actual: ' + pesoActual + ' kg';
+  let text = 'Peso actual: ' + fmtNum(pesoActual, 1) + ' kg';
   if (pesoHaceSemana) {
     const delta = Math.round((pesoActual - pesoHaceSemana) * 10) / 10;
-    text += ' (' + (delta >= 0 ? '+' : '') + delta + ' kg vs. hace una semana)';
+    text += ' (' + (delta >= 0 ? '+' : '') + fmtNum(delta, 1) + ' kg vs. hace una semana)';
   }
   if (dias !== null && dias >= 3) {
     text += '<br><span style="color:var(--amber);">⚠️ Han pasado ' + dias + ' días desde tu último peso — te iría bien registrar uno hoy.</span>';

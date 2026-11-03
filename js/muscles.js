@@ -18,10 +18,10 @@ const MUSCLE_ZONES = {
 
 const MUSCLE_LOAD_LEVELS = [
   { label: 'Sin carga',     color: 'var(--card-border)' },
-  { label: 'Carga baja',    color: '#1e3a72' },
-  { label: 'Carga media',   color: '#274a94' },
-  { label: 'Carga alta',    color: '#3f7cf0' },
-  { label: 'Carga muy alta', color: '#8ab4ff' },
+  { label: 'Carga baja',    color: themeColor('heat1', '#1e3a72') },
+  { label: 'Carga media',   color: themeColor('heat2', '#274a94') },
+  { label: 'Carga alta',    color: themeColor('heat3', '#3f7cf0') },
+  { label: 'Carga muy alta', color: themeColor('heat4', '#8ab4ff') },
 ];
 
 // El Día 5 guarda 2 ejercicios distintos bajo la etiqueta genérica "Brazos" en el
@@ -120,6 +120,8 @@ function setMuscleView(view){
   document.getElementById('muscleSvgBack').style.display = view === 'back' ? 'block' : 'none';
   document.getElementById('muscleViewBtnFront').classList.toggle('active', view === 'front');
   document.getElementById('muscleViewBtnBack').classList.toggle('active', view === 'back');
+  document.getElementById('muscleViewBtnFront').setAttribute('aria-pressed', String(view === 'front'));
+  document.getElementById('muscleViewBtnBack').setAttribute('aria-pressed', String(view === 'back'));
 }
 
 function renderMuscleLoad(){

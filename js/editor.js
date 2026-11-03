@@ -78,6 +78,7 @@ function openNewExercise(dayIdx){
   const first = ROUTINE.days[dayIdx].groups.length ? ROUTINE.days[dayIdx].groups[0].label : 'Pectoral';
   fillEditor(dayIdx, null, first);
   $id('exerciseEditorModal').style.display = 'flex';
+  focusOpen('exerciseEditorModal');
 }
 
 function openExerciseEditor(dayIdx, exId){
@@ -88,10 +89,13 @@ function openExerciseEditor(dayIdx, exId){
   $id('exEditArchiveBtn').style.display = 'block';
   fillEditor(dayIdx, loc.ex, loc.group.label);
   $id('exerciseEditorModal').style.display = 'flex';
+  focusOpen('exerciseEditorModal');
 }
 
 function closeExerciseEditor(){
+  const was = isShown('exerciseEditorModal');
   $id('exerciseEditorModal').style.display = 'none';
+  if (was) focusClose();
 }
 
 // Las series pendientes de una tarjeta se guardan con una clave que incluye el día
@@ -217,9 +221,14 @@ function openDayRename(dayIdx){
   $id('dayRenameInput').value = ROUTINE.days[dayIdx].name;
   $id('dayRenameError').textContent = '';
   $id('dayRenameModal').style.display = 'flex';
+  focusOpen('dayRenameModal');
 }
 
-function closeDayRename(){ $id('dayRenameModal').style.display = 'none'; }
+function closeDayRename(){
+  const was = isShown('dayRenameModal');
+  $id('dayRenameModal').style.display = 'none';
+  if (was) focusClose();
+}
 
 // Lo que estuviera guardado con el nombre antiguo del día (ejercicios prestados, ajuste semanal)
 function migrateDayReferences(oldName, newName){
@@ -267,7 +276,7 @@ function renderEditView(){
   const archived = [];
   let html = '<div class="edit-intro">Aquí gestionas tus días y ejercicios: toca un ejercicio para editarlo, cambiarlo de grupo o de día, o archivarlo. Los cambios se ven al momento en la pestaña Rutina.</div>';
   ROUTINE.days.forEach((day, di) => {
-    html += `<div class="edit-day">
+    html += `<div class="edit-day" style="--c:${dayColorVar(di)}">
       <div class="edit-day-head">
         <div class="edit-day-name">${escHtml(day.name)}</div>
         <button class="edit-mini-btn" onclick="openDayRename(${di})">Renombrar</button>

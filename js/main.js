@@ -17,6 +17,9 @@ renderDay();
 
 initGoogleSignIn();
 
+// Entrada de las fichas: con splash la lanza skipIntro() al abrirse el telón; sin él, directamente
+if (!document.getElementById('introSplash')) playPickerIntro();
+
 if (getProfile() && getSessionToken()) {
   document.getElementById('profileScreen').style.display = 'none';
   updateProfileIndicator();

@@ -69,6 +69,7 @@ async function handleCredentialResponse(response){
   localStorage.setItem('sessionToken', data.sessionToken);
   localStorage.setItem('profile', data.profile);
   document.getElementById('profileScreen').style.display = 'none';
+  if (typeof playPickerIntro === 'function') playPickerIntro();   // las fichas entran tras el login
   updateProfileIndicator();
   const routineChanged = loadRoutineForProfile(data.profile);
   renderTabs();

@@ -76,7 +76,14 @@ function updateCardHighlights(){
     const exName = cardEl.getAttribute('data-exercise');
     const diaForCount = cardEl.getAttribute('data-borrow-dia') || day.name;
     const count = weeklySeriesCount(diaForCount, exName);
+    const wasDone = cardEl.classList.contains('done');
     cardEl.classList.toggle('done', count >= 3);
+    // Pulso verde al completar las 3 series (no en la primera pintada de una tarjeta ya completa)
+    if (cardEl.dataset.init && !wasDone && count >= 3) {
+      cardEl.classList.add('just-done');
+      setTimeout(() => cardEl.classList.remove('just-done'), 900);
+    }
+    cardEl.dataset.init = '1';
     const prog = cardEl.querySelector('.series-progress');
     if (prog) prog.textContent = count + '/3 esta semana';
 
@@ -89,7 +96,7 @@ function updateCardHighlights(){
       } else if (lastWeek.timed) {
         beatEl.textContent = '🎯 Supera: ' + lastWeek.reps + 's (semana pasada' + variantNote + ')';
       } else {
-        beatEl.textContent = '🎯 Supera: ' + lastWeek.peso + 'kg × ' + lastWeek.reps + ' (semana pasada' + variantNote + ')';
+        beatEl.textContent = '🎯 Supera: ' + fmtNum(lastWeek.peso, 2) + ' kg × ' + lastWeek.reps + ' (semana pasada' + variantNote + ')';
       }
     }
 
@@ -99,7 +106,7 @@ function updateCardHighlights(){
     if (last && isTimedExercise(exName) && repsInput) {
       repsInput.placeholder = 'Últ: ' + last.reps + 's';
     } else {
-      if (last && pesoInput) pesoInput.placeholder = 'Últ: ' + last.peso + 'kg';
+      if (last && pesoInput) pesoInput.placeholder = 'Últ: ' + fmtNum(last.peso, 2) + ' kg';
       if (last && repsInput) repsInput.placeholder = 'Últ: ' + last.reps;
     }
 
@@ -281,6 +288,7 @@ function renderDay(){
       const card = document.createElement('div');
       card.className = 'card';
       card.setAttribute('data-exercise', ex.name);
+      card.style.setProperty('--i', main.children.length);   // orden de la animación de entrada
       card.innerHTML = buildCardHTML(ex, day.name, g.label, logId, '');
       main.appendChild(card);
       renderPendingWrap(logId);
@@ -294,9 +302,10 @@ function renderDay(){
     card.className = 'card';
     card.setAttribute('data-exercise', ex.name);
     card.setAttribute('data-borrow-dia', ex.originalDayName);
+    card.style.setProperty('--i', main.children.length);
     const badge = `<span class="borrow-badge" title="Pendiente de ${ex.originalDayLabel}">de ${ex.originalDayLabel}</span>`;
     card.innerHTML = buildCardHTML(ex, ex.originalDayName, ex.grupo, logId, badge) +
-      `<button class="borrow-remove" onclick="removeBorrowedExercise('${day.name.replace(/'/g,"\\'")}', ${bIdx})" title="Quitar">✕</button>`;
+      `<button class="borrow-remove" onclick="removeBorrowedExercise('${day.name.replace(/'/g,"\\'")}', ${bIdx})" title="Quitar" aria-label="Quitar ejercicio de este día">✕</button>`;
     main.appendChild(card);
     renderPendingWrap(logId);
   });

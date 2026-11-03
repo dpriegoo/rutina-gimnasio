@@ -64,10 +64,10 @@ function renderHeatmap(){
 
   function heatColor(n){
     if (!n) return 'var(--card-border)';
-    if (n <= 2) return '#1e3a72';
-    if (n <= 5) return '#274a94';
-    if (n <= 9) return '#3f7cf0';
-    return '#8ab4ff';
+    if (n <= 2) return themeColor('heat1', '#1e3a72');
+    if (n <= 5) return themeColor('heat2', '#274a94');
+    if (n <= 9) return themeColor('heat3', '#3f7cf0');
+    return themeColor('heat4', '#8ab4ff');
   }
 
   const grid = document.getElementById('heatmapGrid');
@@ -97,22 +97,18 @@ function populateExerciseSelect(){
   populateHistorialExerciseSelect();
 }
 
+// Progresión de un ejercicio. Misma métrica que la hoja de cada ejercicio y el Resumen (ver progress-chart.js):
+// una "fuerza estimada" por sesión (media de las series de trabajo) y su tendencia (media de 3 sesiones).
 function renderProgressChart(){
   const rows = myRows().filter(r => !isWarmupRow(r));
   const exercise = document.getElementById('exerciseSelect').value;
   const timed = isTimedExercise(exercise);
-  const filtered = rows
-    .filter(r => r['Ejercicio'] === exercise)
-    .sort((a,b) => String(a['Fecha']).localeCompare(String(b['Fecha'])));
+  const sess = exercise ? exerciseSessions(exercise) : [];
 
-  const labels = filtered.map(r => String(r['Fecha']).slice(5));
-  const weights = filtered.map(r => Number(r['Peso (kg)']) || 0);
-  const seconds = filtered.map(r => Number(r['Reps']) || 0);
-  const oneRM = filtered.map(r => {
-    const p = Number(r['Peso (kg)']) || 0;
-    const reps = Number(r['Reps']) || 0;
-    return reps ? Math.round(p * (1 + reps / 30) * 10) / 10 : 0;
-  });
+  const labels = sess.map(s => s.fecha.slice(5));
+  const values = sess.map(s => Math.round(s.value * 10) / 10);
+  const trend = pgTrend(values).map(v => Math.round(v * 10) / 10);
+  const T = chartTheme();
 
   const subEl = document.getElementById('progressSub');
   const ctx = document.getElementById('progressChart');
@@ -129,77 +125,34 @@ function renderProgressChart(){
     return;
   }
 
+  const common = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: { ticks: { color: T.text, font: { size: 11 } }, grid: { color: T.grid } },
+      y: { ticks: { color: T.text, font: { size: 11 } }, grid: { color: T.grid } }
+    }
+  };
+
   if (timed) {
-    subEl.textContent = 'Ejercicio por tiempo: segundos aguantados en cada serie';
-    progressChartInstance = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Segundos',
-          data: seconds,
-          borderColor: '#4caf7d',
-          backgroundColor: 'rgba(76,175,125,0.15)',
-          tension: 0.3,
-          fill: true,
-          pointRadius: 3,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } },
-          y: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } }
-        }
-      }
-    });
-    return;
+    subEl.textContent = 'Ejercicio por tiempo: mejor serie de cada sesión (segundos) · línea ámbar: tendencia (media de 3 sesiones)';
+  } else {
+    subEl.textContent = 'Línea azul: fuerza estimada de cada sesión (media de tus series de trabajo) · línea ámbar: tendencia (media de 3 sesiones). Toca “Peso de la mejor serie” en la leyenda para verlo también.';
   }
-
-  subEl.textContent = 'Línea azul: peso levantado · línea ámbar: 1RM estimado (fórmula de Epley)';
-
+  const datasets = [
+    { label: timed ? 'Mejor serie (s)' : 'Fuerza estimada (kg)', data: values, borderColor: timed ? T.green : T.blue,
+      backgroundColor: timed ? T.greenFill : T.blueFill, tension: 0.3, fill: true, pointRadius: 3 },
+    { label: 'Tendencia (media de 3)', data: trend, borderColor: T.amber, backgroundColor: 'transparent',
+      borderDash: [5, 4], tension: 0.3, fill: false, pointRadius: 0, borderWidth: 3 },
+  ];
+  if (!timed) {
+    datasets.push({ label: 'Peso de la mejor serie (kg)', data: sess.map(s => s.peso), borderColor: T.text, backgroundColor: 'transparent',
+      tension: 0.3, fill: false, pointRadius: 2, borderWidth: 1.5, hidden: true });
+  }
   progressChartInstance = new Chart(ctx, {
     type: 'line',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: 'Peso (kg)',
-          data: weights,
-          borderColor: '#3f7cf0',
-          backgroundColor: 'rgba(63,124,240,0.15)',
-          tension: 0.3,
-          fill: true,
-          pointRadius: 3,
-        },
-        {
-          label: '1RM estimado',
-          data: oneRM,
-          borderColor: '#f2a93b',
-          backgroundColor: 'transparent',
-          borderDash: [5, 4],
-          tension: 0.3,
-          fill: false,
-          pointRadius: 2,
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: true,
-          labels: { color: '#9aa1ab', font: { size: 11 }, boxWidth: 12 }
-        }
-      },
-      scales: {
-        x: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } },
-        y: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } }
-      }
-    }
+    data: { labels: labels, datasets: datasets },
+    options: Object.assign({}, common, { plugins: { legend: { display: true, labels: { color: T.text, font: { size: 12 }, boxWidth: 12 } } } })
   });
 }
 
@@ -244,60 +197,48 @@ function renderVolumeChart(){
       datasets: [{
         label: 'Volumen (kg)',
         data: values,
-        backgroundColor: '#3f7cf0',
+        backgroundColor: chartTheme().blue,
         borderRadius: 4,
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => 'Volumen: ' + fmtNum(c.parsed.y, 0) + ' kg' } } },
       scales: {
-        x: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { display: false } },
-        y: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } }
+        x: { ticks: { color: chartTheme().text, font: { size: 11 } }, grid: { display: false } },
+        y: { ticks: { color: chartTheme().text, font: { size: 11 }, callback: v => fmtNum(v, 0) }, grid: { color: chartTheme().grid } }
       }
     }
   });
 }
 
 // ---- Índice de fuerza (tendencia de fondo, no solo esta semana vs. la pasada) ----
+// Para cada ejercicio, su fuerza estimada (media de series de cada sesión) relativa a su primera sesión
+// registrada; cada semana es la media de esos porcentajes entre todos los ejercicios.
 function computeStrengthIndexByWeek(profile){
-  const cache = window._progressCache || [];
-  const rows = cache.filter(r => (r['Perfil'] || '') === profile && !isWarmupRow(r) && !isTimedExercise(r['Ejercicio']));
-  if (rows.length === 0) return { labels: [], values: [] };
+  const names = [];
+  myRows().forEach(r => { const ex = r['Ejercicio']; if (ex && !isWarmupRow(r) && !isTimedExercise(ex) && names.indexOf(ex) < 0) names.push(ex); });
+  if (names.length === 0) return { labels: [], values: [] };
 
-  function rm(r){
-    const p = Number(r['Peso (kg)']) || 0, rp = Number(r['Reps']) || 0;
-    return rp ? p * (1 + rp / 30) : 0;
-  }
-
-  // Línea base: primer 1RM>0 registrado de cada ejercicio (por orden de fecha)
-  const baseline = {};
-  const sorted = rows.slice().sort((a, b) => String(a['Fecha']).localeCompare(String(b['Fecha'])));
-  sorted.forEach(r => {
-    const ex = r['Ejercicio'];
-    const v = rm(r);
-    if (v > 0 && !(ex in baseline)) baseline[ex] = v;
-  });
-
-  // Mejor 1RM por semana y ejercicio
-  const byWeekEx = {};
-  rows.forEach(r => {
-    const v = rm(r);
-    if (v <= 0) return;
-    const ex = r['Ejercicio'];
-    if (!(ex in baseline) || baseline[ex] <= 0) return;
-    const wk = isoWeekLabel(String(r['Fecha']));
-    if (!byWeekEx[wk]) byWeekEx[wk] = {};
-    if (!byWeekEx[wk][ex] || v > byWeekEx[wk][ex]) byWeekEx[wk][ex] = v;
+  const baseline = {}, byWeekEx = {};
+  names.forEach(ex => {
+    const sess = exerciseSessions(ex);
+    if (!sess.length || !(sess[0].value > 0)) return;
+    baseline[ex] = sess[0].value;
+    sess.forEach(x => {
+      const wk = isoWeekLabel(x.fecha);
+      if (!byWeekEx[wk]) byWeekEx[wk] = {};
+      if (!byWeekEx[wk][ex]) byWeekEx[wk][ex] = [];
+      byWeekEx[wk][ex].push(x.value);
+    });
   });
 
   const weekKeys = Object.keys(byWeekEx).sort().slice(-12);
   const values = weekKeys.map(wk => {
     const exMap = byWeekEx[wk];
-    const ratios = Object.keys(exMap).map(ex => (exMap[ex] / baseline[ex]) * 100);
-    const avg = ratios.reduce((s, v) => s + v, 0) / ratios.length;
-    return Math.round(avg * 10) / 10;
+    const ratios = Object.keys(exMap).map(ex => (pgMean(exMap[ex]) / baseline[ex]) * 100);
+    return Math.round(pgMean(ratios) * 10) / 10;
   });
 
   return { labels: weekKeys, values };
@@ -319,7 +260,7 @@ function renderStrengthIndexChart(){
     subEl.textContent = 'Necesitas un par de semanas con registros para ver la tendencia de fondo.';
     return;
   }
-  subEl.textContent = '100% = tu primera marca registrada de cada ejercicio (1RM estimado, sin calentamientos). Por encima de 100%, vas a más de media.';
+  subEl.textContent = '100% = tu primera sesión registrada de cada ejercicio (fuerza estimada: media de tus series de trabajo, sin calentamientos). Por encima de 100%, vas a más de media.';
 
   strengthIndexChartInstance = new Chart(ctx, {
     type: 'line',
@@ -328,8 +269,8 @@ function renderStrengthIndexChart(){
       datasets: [{
         label: 'Índice de fuerza',
         data: values,
-        borderColor: '#3f7cf0',
-        backgroundColor: 'rgba(63,124,240,0.15)',
+        borderColor: chartTheme().blue,
+        backgroundColor: chartTheme().blueFill,
         tension: 0.3,
         fill: true,
         pointRadius: 3,
@@ -340,8 +281,8 @@ function renderStrengthIndexChart(){
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: '#9aa1ab', font: { size: 10 } }, grid: { color: '#2a2e35' } },
-        y: { ticks: { color: '#9aa1ab', font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#2a2e35' } }
+        x: { ticks: { color: chartTheme().text, font: { size: 11 } }, grid: { color: chartTheme().grid } },
+        y: { ticks: { color: chartTheme().text, font: { size: 11 }, callback: v => v + '%' }, grid: { color: chartTheme().grid } }
       }
     }
   });
