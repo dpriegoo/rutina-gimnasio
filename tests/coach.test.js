@@ -149,7 +149,17 @@ const J = x => JSON.parse(JSON.stringify(x));       // normaliza objetos que vie
     await assert.rejects(() => w.coachAsk('hola'), e => e.coachCode === code, 'HTTP ' + st + ' -> ' + code);
     assert.strictEqual(J(w.eval('coachContents')).length, before, 'tras el error la conversación no cambia');
   }
+  // el motivo que da el servidor llega al usuario (para ver qué falta sin abrir las herramientas del navegador)
+  for (const [st, msg] of [[503, 'Falta configurar GEMINI_API_KEY en la función'], [503, 'No se pudo comprobar la cuenta o el límite diario (¿falta ejecutar supabase/coach.sql?)'], [503, 'Gemini respondió con un error: You exceeded your current quota']]) {
+    script = [() => ({ error: { message: 'x', context: { status: st, json: async () => ({ code: 'unavailable', message: msg }) } } })];
+    let caught; try { await w.coachAsk('hola'); } catch (e) { caught = e; }
+    assert(w.coachErrorText(caught).indexOf('Detalle: ' + msg) > 0, 'el chat enseña el motivo: ' + msg);
+  }
+  assert.strictEqual(w.coachErrorText({ coachCode: 'limit', message: 'Límite diario alcanzado' }), w.coachErrorText({ coachCode: 'limit' }), 'los demás avisos no cambian');
+  assert(w.coachErrorText({ coachCode: 'unavailable', message: 'x'.repeat(1000) }).length < 500, 'el detalle se acota');
   script = [() => model([{ text: '' }])]; await assert.rejects(() => w.coachAsk('hola'), e => e.coachCode === 'empty');
+  script = [() => ({ error: { name: 'FunctionsFetchError', message: 'Failed to send a request to the Edge Function', context: new TypeError('Failed to fetch') } })];
+  await assert.rejects(() => w.coachAsk('hola'), e => e.coachCode === 'unreachable', 'vía clásica: sin código HTTP -> no se pudo conectar');
   script = [() => ({ data: { blocked: true } })]; await assert.rejects(() => w.coachAsk('hola'), e => e.coachCode === 'blocked');
   // 6d) bucle infinito de herramientas
   script = Array.from({ length: 20 }, () => () => model([{ functionCall: { name: 'get_context', args: {} } }]));
@@ -322,7 +332,8 @@ const J = x => JSON.parse(JSON.stringify(x));       // normaliza objetos que vie
   fscript = [() => sres([ev({ promptFeedback: { blockReason: 'SAFETY' } })])]; await assert.rejects(() => w.coachAsk('x', {}, { data: [] }), e => e.coachCode === 'blocked');
   fscript = [() => sres([])]; await assert.rejects(() => w.coachAsk('x', {}, { data: [] }), e => e.coachCode === 'empty');
   fscript = [() => sres([cc([{ text: 'a' }]), ev({ error: { message: 'boom' } })])]; await assert.rejects(() => w.coachAsk('x', {}, { data: [] }), e => e.coachCode === 'unavailable', 'un error a mitad del flujo');
-  fscript = [() => { throw new Error('sin red'); }]; await assert.rejects(() => w.coachAsk('x', {}, { data: [] }), e => e.coachCode === 'unavailable');
+  fscript = [() => { throw new TypeError('Failed to fetch'); }]; await assert.rejects(() => w.coachAsk('x', {}, { data: [] }), e => e.coachCode === 'unreachable', 'un fallo de red / función inexistente (la petición previa CORS da 404) apunta al despliegue');
+  assert(/desplegada en Supabase/.test(w.coachErrorText({ coachCode: 'unreachable' })) && /«coach»/.test(w.coachErrorText({ coachCode: 'unreachable' })), 'el mensaje dice dónde mirar y el nombre exacto');
   assert.strictEqual(J(w.eval('coachContents')).length, 0, 'tras los errores la conversación sigue limpia');
   const origSb = w.sbClient; w.sbClient = () => ({ auth: { getSession: async () => ({ data: { session: null } }) } }); await assert.rejects(() => w.coachAsk('x', {}, { data: [] }), e => e.coachCode === 'unauthorized', 'sin sesión no se intenta'); w.sbClient = origSb;
   fscript = [() => ({ ok: true, status: 200, body: null, text: async () => cc([{ text: 'sin lector' }], 'STOP') })]; assert.strictEqual((await w.coachAsk('x', {}, { data: [] })).text, 'sin lector', 'sin ReadableStream también funciona (lee el texto entero)');

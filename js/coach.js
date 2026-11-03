@@ -28,12 +28,19 @@ const COACH_ERRORS = {
   limit: 'Has llegado al límite diario de consultas. Vuelve mañana.',
   not_deployed: 'El entrenador aún no está activado en el servidor (falta desplegar la función «coach»).',
   unavailable: 'El entrenador no está disponible ahora mismo. Inténtalo de nuevo en un rato.',
+  unreachable: 'No se pudo conectar con la función «coach» del servidor. Si es la primera vez, comprueba que está desplegada en Supabase (Edge Functions) y que se llama exactamente «coach». El detalle está en la consola del navegador.',
   blocked: 'Gemini no ha podido responder a esa pregunta. Prueba a plantearla de otra forma.',
   too_many_steps: 'He dado demasiadas vueltas con esta pregunta. Prueba a hacerla más concreta.',
   offline: 'Sin conexión. Comprueba tu red e inténtalo de nuevo.',
   empty: 'Gemini no ha devuelto ninguna respuesta. Inténtalo de nuevo.',
 };
-function coachErrorText(e){ return COACH_ERRORS[e && e.coachCode] || COACH_ERRORS.unavailable; }
+// Para los fallos que devuelve el servidor se añade el motivo que da la función (ya sin claves): así se ve qué falta
+// (la clave de Gemini, el SQL, un modelo mal escrito…) sin abrir las herramientas del navegador.
+function coachErrorText(e){
+  const code = e && e.coachCode, base = COACH_ERRORS[code] || COACH_ERRORS.unavailable;
+  const detail = e && e.message ? String(e.message).replace(/\s+/g, ' ').trim().slice(0, 240) : '';
+  return detail && (code === 'unavailable' || code === 'blocked' || code === 'forbidden') ? base + ' Detalle: ' + detail : base;
+}
 
 function coachSystemPrompt(){
   const now = new Date();
@@ -82,11 +89,14 @@ function coachHttpError(st, j, fallback){
 async function coachCall(body){
   let r;
   try { r = await sbClient().functions.invoke(COACH_FUNCTION, { body: body }); }
-  catch (e) { throw coachErr(navigator.onLine === false ? 'offline' : 'unavailable', String((e && e.message) || e)); }
+  catch (e) { throw coachErr(navigator.onLine === false ? 'offline' : 'unreachable', String((e && e.message) || e)); }
   if (r.error) {
     let j = null;
     try { j = await r.error.context.json(); } catch (e) {}
-    throw coachHttpError(r.error.context && r.error.context.status, j, String(r.error.message || r.error));
+    const st = r.error.context && r.error.context.status;
+    // Sin código HTTP = ni siquiera hubo respuesta (red caída, o la función no existe y el navegador bloqueó la petición)
+    if (st === undefined && !j) throw coachErr(navigator.onLine === false ? 'offline' : 'unreachable', String(r.error.message || r.error));
+    throw coachHttpError(st, j, String(r.error.message || r.error));
   }
   return r.data;
 }
@@ -128,7 +138,11 @@ async function coachCallStream(body, onText){
       method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token, apikey: SUPABASE_KEY },
       body: JSON.stringify(Object.assign({}, body, { stream: true })),
     });
-  } catch (e) { throw coachErr(navigator.onLine === false ? 'offline' : 'unavailable', String((e && e.message) || e)); }
+  } catch (e) {
+    // Aquí el navegador NO distingue un 404 (la función no existe) de una red caída: ambas llegan como un fallo de red
+    // (con un 404 en la comprobación previa CORS, la petición ni sale). Por eso el mensaje apunta al despliegue.
+    throw coachErr(navigator.onLine === false ? 'offline' : 'unreachable', String((e && e.message) || e));
+  }
   if (!res.ok) { let j = null; try { j = await res.json(); } catch (e) {} throw coachHttpError(res.status, j); }
 
   const acc = { parts: [], finish: null, blocked: null };
@@ -166,7 +180,10 @@ async function coachWarm(){
     await fetch(SUPABASE_URL + '/functions/v1/' + COACH_FUNCTION, {
       method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token, apikey: SUPABASE_KEY }, body: JSON.stringify({ ping: true }),
     });
-  } catch (e) { /* es solo una optimización */ }
+  } catch (e) {
+    // Es solo una optimización, pero avisa en la consola nada más abrir el chat si la función no responde
+    if (typeof console !== 'undefined') console.warn('[coach] la función «' + COACH_FUNCTION + '» no responde. ¿Está desplegada en Supabase (Edge Functions) con ese nombre? Ver supabase/README.md');
+  }
 }
 
 // ---------- Datos adelantados ----------
