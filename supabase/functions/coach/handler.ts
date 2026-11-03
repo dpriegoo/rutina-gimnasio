@@ -19,7 +19,14 @@ export interface Deps {
   // Ajuste del razonamiento de Gemini (opcional, p. ej. {"thinkingBudget":0} o {"thinkingLevel":"low"}; depende del modelo).
   // Razonar menos suele ser lo que más acelera la respuesta. Si Gemini lo rechaza (400 que menciona "think"), se reintenta sin él.
   thinkingConfig?: Record<string, unknown> | null;
+  // Modelo de repuesto (opcional): si el principal sigue fallando por saturación tras los reintentos, se prueba con este.
+  fallbackModel?: string;
+  sleep?: (ms: number) => Promise<void>;     // para poder probar los reintentos sin esperar
 }
+
+// Los reintentos solo se hacen ante fallos PASAJEROS de Gemini (saturación y errores del servidor), no ante errores de petición ni de cuota.
+const TRANSIENT = [500, 502, 503, 504];
+const RETRY_DELAYS_MS = [350, 900];        // hasta 2 reintentos con espera creciente
 
 export const LIMITS = {
   maxBodyChars: 600_000, maxContents: 80, maxParts: 16, maxTextChars: 40_000, maxSystemChars: 20_000,
@@ -155,15 +162,26 @@ export async function handleCoach(req: Request, deps: Deps): Promise<Response> {
   const stream = body.stream === true;
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), deps.timeoutMs ?? (stream ? 90_000 : 55_000));
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(deps.model)}:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   // La clave va en una cabecera (no en la URL), para que no quede en registros de peticiones
-  const send = () => deps.fetch(url, { method: 'POST', signal: ctl.signal, headers: { 'content-type': 'application/json', 'x-goog-api-key': deps.geminiKey }, body: JSON.stringify(payload) });
-  let res: Response;
+  const send = (model: string) => deps.fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`,
+    { method: 'POST', signal: ctl.signal, headers: { 'content-type': 'application/json', 'x-goog-api-key': deps.geminiKey }, body: JSON.stringify(payload) });
+  // Un intento completo con un modelo: el ajuste de razonamiento se quita si el modelo no lo admite, y la saturación pasajera se reintenta
+  const attempt = async (model: string): Promise<Response> => {
+    let r = await send(model);
+    if (r.status === 400 && generationConfig.thinkingConfig) {
+      const t = await r.clone().text().catch(() => '');
+      if (/think/i.test(t)) { delete generationConfig.thinkingConfig; r = await send(model); }   // este modelo no admite ese ajuste: sin él
+    }
+    for (let i = 0; i < RETRY_DELAYS_MS.length && TRANSIENT.includes(r.status); i++) { await sleep(RETRY_DELAYS_MS[i]); r = await send(model); }
+    return r;
+  };
+  let res: Response, usedModel = deps.model;
   try {
-    res = await send();
-    if (res.status === 400 && generationConfig.thinkingConfig) {
-      const t = await res.clone().text().catch(() => '');
-      if (/think/i.test(t)) { delete generationConfig.thinkingConfig; res = await send(); }   // este modelo no admite ese ajuste: sin él
+    res = await attempt(deps.model);
+    if (TRANSIENT.includes(res.status) && deps.fallbackModel && deps.fallbackModel !== deps.model) {
+      usedModel = deps.fallbackModel; res = await attempt(deps.fallbackModel);                     // el principal sigue saturado: modelo de repuesto
     }
   } catch (e) {
     clearTimeout(timer);
@@ -173,7 +191,7 @@ export async function handleCoach(req: Request, deps: Deps): Promise<Response> {
   if (res.ok && stream && res.body) {
     // Se reenvía el flujo de Gemini tal cual: el navegador va pintando el texto según llega
     const piped = res.body.pipeThrough(new TransformStream({ flush() { clearTimeout(timer); } }));
-    return new Response(piped, { status: 200, headers: { ...CORS, 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-accel-buffering': 'no' } });
+    return new Response(piped, { status: 200, headers: { ...CORS, 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-accel-buffering': 'no', 'x-coach-model': usedModel } });
   }
   clearTimeout(timer);
 
@@ -183,12 +201,14 @@ export async function handleCoach(req: Request, deps: Deps): Promise<Response> {
 
   if (!res.ok) {
     const detail = scrub(data?.error?.message || ('HTTP ' + res.status), deps.geminiKey);
-    // 429 de Gemini NO es nuestro límite diario: se devuelve como "no disponible" para no confundir
-    return fail(res.status === 429 || res.status >= 500 ? 503 : 502, 'unavailable', 'Gemini respondió con un error: ' + detail);
+    // 429 de Gemini NO es nuestro límite diario: se devuelve como "no disponible" para no confundir.
+    // La saturación pasajera (503, "high demand") tiene su propio código para poder avisar de que basta con reintentar.
+    const overloaded = res.status === 503 || /high demand|overloaded/i.test(detail);
+    return fail(res.status === 429 || res.status >= 500 ? 503 : 502, overloaded ? 'overloaded' : 'unavailable', 'Gemini respondió con un error: ' + detail);
   }
   const cand = data?.candidates?.[0];
   if (data?.promptFeedback?.blockReason || (!cand?.content && cand?.finishReason && cand.finishReason !== 'STOP')) {
     return fail(422, 'blocked', 'Gemini no pudo responder (' + scrub(data?.promptFeedback?.blockReason || cand?.finishReason, deps.geminiKey) + ')');
   }
-  return reply(200, { content: cand?.content ?? null, finishReason: cand?.finishReason ?? null, usage: data?.usageMetadata ?? null, remaining: left });
+  return reply(200, { content: cand?.content ?? null, finishReason: cand?.finishReason ?? null, usage: data?.usageMetadata ?? null, remaining: left, model: usedModel });
 }

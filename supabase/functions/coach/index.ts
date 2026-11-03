@@ -1,6 +1,6 @@
 // Punto de entrada de la función "coach" (Deno / Supabase Edge Functions). La lógica está en handler.ts.
 // Variables (supabase secrets set …):  GEMINI_API_KEY (obligatoria) · GEMINI_MODEL (por defecto gemini-3.6-flash) · COACH_MAX_PER_DAY (por defecto 300)
-//   GEMINI_THINKING (opcional, JSON: razonamiento de Gemini, p. ej. {"thinkingBudget":0} o {"thinkingLevel":"low"}) · COACH_STRICT_AUTH=1 (comprueba el JWT con el servicio de autenticación en cada llamada: algo más lento)
+//   GEMINI_FALLBACK_MODEL (opcional: modelo de repuesto si el principal está saturado) · GEMINI_THINKING (opcional, JSON: razonamiento de Gemini, p. ej. {"thinkingBudget":0} o {"thinkingLevel":"low"}) · COACH_STRICT_AUTH=1 (comprueba el JWT con el servicio de autenticación en cada llamada: algo más lento)
 // SUPABASE_URL y SUPABASE_ANON_KEY las pone Supabase solo.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { handleCoach, decodeJwt, cached } from './handler.ts';
@@ -21,6 +21,7 @@ Deno.serve((req: Request) => handleCoach(req, {
   geminiKey: Deno.env.get('GEMINI_API_KEY') ?? '',
   model: Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.6-flash',
   maxPerDay: Number(Deno.env.get('COACH_MAX_PER_DAY') ?? '300'),
+  fallbackModel: Deno.env.get('GEMINI_FALLBACK_MODEL') ?? '',
   thinkingConfig: thinking,
   // Identidad leída del propio JWT (sin viaje de red). La firma la valida la pasarela de Supabase y, aun así, allowed_users y el
   // límite diario se consultan con ese JWT contra la base de datos, que rechaza uno falso. Con COACH_STRICT_AUTH=1 se comprueba también en Auth.

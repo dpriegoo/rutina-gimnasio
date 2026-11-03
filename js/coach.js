@@ -27,6 +27,7 @@ const COACH_ERRORS = {
   forbidden: 'Esta cuenta no tiene acceso al entrenador.',
   limit: 'Has llegado al límite diario de consultas. Vuelve mañana.',
   not_deployed: 'El entrenador aún no está activado en el servidor (falta desplegar la función «coach»).',
+  overloaded: 'Gemini está saturado en este momento (alta demanda). Suele ser un pico corto: prueba de nuevo en unos segundos.',
   unavailable: 'El entrenador no está disponible ahora mismo. Inténtalo de nuevo en un rato.',
   unreachable: 'No se pudo conectar con la función «coach» del servidor. Si es la primera vez, comprueba que está desplegada en Supabase (Edge Functions) y que se llama exactamente «coach». El detalle está en la consola del navegador.',
   blocked: 'Gemini no ha podido responder a esa pregunta. Prueba a plantearla de otra forma.',

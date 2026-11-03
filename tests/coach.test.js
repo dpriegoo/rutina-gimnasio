@@ -157,6 +157,10 @@ const J = x => JSON.parse(JSON.stringify(x));       // normaliza objetos que vie
   }
   assert.strictEqual(w.coachErrorText({ coachCode: 'limit', message: 'Límite diario alcanzado' }), w.coachErrorText({ coachCode: 'limit' }), 'los demás avisos no cambian');
   assert(w.coachErrorText({ coachCode: 'unavailable', message: 'x'.repeat(1000) }).length < 500, 'el detalle se acota');
+  // saturación pasajera de Gemini: aviso propio (sin "Detalle"), porque basta con reintentar
+  script = [() => ({ error: { message: 'x', context: { status: 503, json: async () => ({ code: 'overloaded', message: 'Gemini respondió con un error: This model is currently experiencing high demand.' }) } } })];
+  let ov; try { await w.coachAsk('hola'); } catch (e) { ov = e; }
+  assert.strictEqual(ov.coachCode, 'overloaded'); assert(/saturado/.test(w.coachErrorText(ov)) && !/Detalle/.test(w.coachErrorText(ov)), 'aviso claro de alta demanda');
   script = [() => model([{ text: '' }])]; await assert.rejects(() => w.coachAsk('hola'), e => e.coachCode === 'empty');
   script = [() => ({ error: { name: 'FunctionsFetchError', message: 'Failed to send a request to the Edge Function', context: new TypeError('Failed to fetch') } })];
   await assert.rejects(() => w.coachAsk('hola'), e => e.coachCode === 'unreachable', 'vía clásica: sin código HTTP -> no se pudo conectar');
