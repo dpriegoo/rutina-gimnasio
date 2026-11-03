@@ -195,7 +195,11 @@ async function acceptPending(logId){
   const rows = getPendingRows()[logId] || [];
   if (rows.length === 0) return;
 
-  const priorBest = allTimeBestBeforeNow(dia, ejercicio);
+  // Marca previa POR MÁQUINA (variante), calculada antes de añadir lo nuevo: una serie en la secundaria, que mueve
+  // otro peso, ni bate ni impide batir el récord de la habitual. Si el ejercicio no tenía ninguna marca, la primera cuenta.
+  const priorByMachine = {};
+  rows.forEach(r => { const v = r.variante || ''; if (!(v in priorByMachine)) priorByMachine[v] = allTimeBestBeforeNow(dia, ejercicio, v); });
+  const hadAnyMark = !!allTimeBestBeforeNow(dia, ejercicio);
 
   const entries = rows.map(r => ({
     fecha: localDateStr(),
@@ -220,14 +224,15 @@ async function acceptPending(logId){
   applyOutboxToCache();
 
   // ¿Alguna de las series NO-calentamiento de esta tanda bate tu mejor marca de siempre en este ejercicio?
-  let newBest = null;
   const timed = isTimedExercise(ejercicio);
+  let isPR = false;
   entries.forEach((e, i) => {
     if (rows[i].calentamiento) return;
     const value = timed ? (Number(e.reps) || 0) : (Number(e.reps) ? Number(e.peso) * (1 + Number(e.reps) / 30) : 0);
-    if (newBest === null || value > newBest) newBest = value;
+    if (!(value > 0)) return;
+    const prior = priorByMachine[e.variante || ''];
+    if (prior ? value > prior.value : !hadAnyMark) isPR = true;
   });
-  const isPR = newBest !== null && newBest > 0 && (!priorBest || newBest > priorBest.value);
 
   showToast(isPR
     ? '🏆 ¡Marca personal en ' + ejercicio + '!'

@@ -70,6 +70,7 @@ async function handleCredentialResponse(response){
   localStorage.setItem('profile', data.profile);
   document.getElementById('profileScreen').style.display = 'none';
   if (typeof playPickerIntro === 'function') playPickerIntro();   // las fichas entran tras el login
+  if (typeof coachInit === 'function') coachInit();               // y aparece el botón del entrenador
   updateProfileIndicator();
   const routineChanged = loadRoutineForProfile(data.profile);
   renderTabs();
@@ -126,6 +127,7 @@ function handleUnauthorized(){
 
 function showProfileScreen(){
   if (getSessionToken() && !confirm('¿Cerrar sesión?')) return;
+  if (typeof coachOnLogout === 'function') coachOnLogout();   // el chat del entrenador no sobrevive al cierre de sesión
   // Cerrar sesión: se invalida también en el servidor
   if (getSessionToken()) postToSheetChecked({ action: 'logout' }).catch(() => {});
   localStorage.removeItem('profile');

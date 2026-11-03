@@ -45,6 +45,25 @@ for (let i = 0; i < 10; i++) {
   rows.push(row({ Fecha: d, 'Día': 'Día 3 · Pierna', Ejercicio: 'Sentadilla', 'Peso (kg)': 80, Reps: 8 + (i % 2) }));
   rows.push(row({ Fecha: d, 'Día': 'Día 3 · Pierna', Ejercicio: 'Prensa', 'Peso (kg)': 100 + i * 5, Reps: 10 }));
 }
+// Femoral: la máquina habitual mueve ~40 de fuerza y la secundaria (Leg Curl) ~1,3 veces más (+30 %), intercaladas.
+// La fuerza real NO cambia (plano): con las sesiones mezcladas la gráfica daría saltos falsos.
+for (let i = 0; i < 10; i++) {
+  const d = '2026-08-' + String(1 + i * 3).padStart(2, '0');
+  const sec = (i === 2 || i === 4 || i === 7);
+  rows.push(row({ Fecha: d, 'Día': 'Día 3 · Pierna', Ejercicio: 'Femoral', 'Peso (kg)': sec ? 52 : 40, Reps: 8, Variante: sec ? 'Leg Curl' : '' }));
+}
+// Hombro: las 3 ÚLTIMAS sesiones son en la secundaria, mucho más ligera (la habitual estaba ocupada): sin base para ajustarla
+for (let i = 0; i < 10; i++) {
+  const d = '2026-07-' + String(1 + i * 3).padStart(2, '0');
+  const sec = i >= 7;
+  rows.push(row({ Fecha: d, 'Día': 'Día 4 · Hombro', Ejercicio: 'Hombro', 'Peso (kg)': sec ? 20 : 30, Reps: 8, Variante: sec ? 'Mancuernas' : '' }));
+}
+// Cambio definitivo de máquina: las últimas 8 sesiones son todas en la secundaria
+for (let i = 0; i < 10; i++) {
+  const d = '2026-06-' + String(1 + i * 3).padStart(2, '0');
+  const sec = i >= 2;
+  rows.push(row({ Fecha: d, 'Día': 'Día 2 · Espalda', Ejercicio: 'Jalón', 'Peso (kg)': sec ? 70 : 55, Reps: 8, Variante: sec ? 'Lat Machine' : '' }));
+}
 get('window._progressCache = ' + JSON.stringify(rows));
 
 // 1) Sesiones: una por fecha, juntando días, sin calentamiento ni otros perfiles
@@ -104,20 +123,73 @@ const timed = mk('Plancha');
 assert(timed.querySelector('.pg-big').textContent.includes('s') && !timed.querySelector('.pg-big').textContent.includes('kg'), 'por tiempo: segundos');
 assert(timed.querySelector('.pg-cap').textContent.includes('Mejor serie'));
 
-// 7) Hoja de detalle
+// 7) Máquinas (variantes): referencia, ajuste y exclusión
+const sessF = get("exerciseSessions('Femoral')");
+assert.strictEqual(sessF.length, 10);
+assert.strictEqual(get("pgReferenceMachine(exerciseSessions('Femoral'))"), '', 'la habitual es la de referencia (más sesiones)');
+const facF = get("pgMachineFactors(exerciseSessions('Femoral'), '')");
+assert(Math.abs(facF['Leg Curl'] - 40 / 52) < 1e-9, 'el factor lleva la secundaria a la escala de la habitual: ' + JSON.stringify(facF));
+const serF = get("exerciseSeries('Femoral')");
+assert.strictEqual(serF.sessions.length, 10, 'las 3 sesiones secundarias se ajustan y entran');
+assert.strictEqual(serF.adjusted, 3); assert.strictEqual(serF.excluded, 0);
+const vF = Array.from(serF.sessions.map(x => x.value));
+assert(Math.max(...vF) - Math.min(...vF) < 1e-9, 'ajustada, la serie es plana (la fuerza real no cambia)');
+const rawF = Array.from(sessF.map(x => x.value));
+assert(Math.max(...rawF) / Math.min(...rawF) > 1.25, 'sin ajustar (lo que se hacía antes) habría saltos de ~30 %');
+assert.strictEqual(serF.sessions.filter(x => x.adj).length, 3, 'las ajustadas quedan marcadas');
+// solo una máquina, sin ajustar
+const onlyLeg = get("exerciseSeries('Femoral', undefined, 'm:Leg Curl')");
+assert.strictEqual(onlyLeg.sessions.length, 3); assert.strictEqual(onlyLeg.excluded, 7);
+// peor caso: las últimas 3 sesiones en la secundaria, sin sesiones habituales posteriores -> no se pueden ajustar, no entran
+const serH = get("exerciseSeries('Hombro')");
+assert.strictEqual(serH.sessions.length, 7, 'las 3 sesiones del final, sin base para ajustar, NO entran'); assert.strictEqual(serH.excluded, 3);
+assert(Math.max(...Array.from(serH.sessions.map(x => x.value))) - Math.min(...Array.from(serH.sessions.map(x => x.value))) < 1e-9, 'la serie no muestra un falso retroceso');
+// cambio definitivo: la de referencia pasa a ser la secundaria
+assert.strictEqual(get("pgReferenceMachine(exerciseSessions('Jalón'))"), 'Lat Machine', 'tras cambiar de máquina, la de referencia es la nueva');
+const serJ = get("exerciseSeries('Jalón')");
+assert(serJ.sessions.every(x => x.variante === 'Lat Machine'), 'la serie son solo las sesiones de la máquina nueva');
+// una misma fecha con dos máquinas = dos sesiones separadas
+get("window._progressCache = window._progressCache.concat([{ Perfil: 'David', Fecha: '2026-12-01', 'Día': 'Día 3 · Pierna', Ejercicio: 'Mixto', 'Peso (kg)': 40, Reps: 8, Series: 3, Calentamiento: false, Variante: '' }, { Perfil: 'David', Fecha: '2026-12-01', 'Día': 'Día 3 · Pierna', Ejercicio: 'Mixto', 'Peso (kg)': 52, Reps: 8, Series: 3, Calentamiento: false, Variante: 'Leg Curl' }])");
+assert.strictEqual(get("exerciseSessions('Mixto')").length, 2, 'mismo día, dos máquinas: dos sesiones, cada una con su peso');
+
+// 8) Tarjeta: avisa de lo que entra y lo que no
+const cF = mk('Femoral'), cH = mk('Hombro'), cB = mk('Press banca');
+assert(/incluye 3 sesiones de otra máquina, ajustadas/.test(cF.querySelector('.pg-mnote').textContent), 'la tarjeta dice que hay sesiones ajustadas');
+assert(/3 sesiones en otra máquina no entran/.test(cH.querySelector('.pg-mnote').textContent), 'la tarjeta dice que las del final no entran');
+assert(/1 sesión en otra máquina no entra/.test(cB.querySelector('.pg-mnote').textContent), 'una sola sesión secundaria no se puede ajustar');
+assert(!/NaN|undefined/.test(cF.innerHTML));
+
+// 9) Hoja de detalle
 const sheet = () => doc.getElementById('pgSheet');
 get("openProgressSheet('Press banca')");
 assert(sheet().classList.contains('on'));
 assert(sheet().textContent.includes('Día 1') && sheet().textContent.includes('Día 4'), 'muestra en qué días se hace');
 assert(sheet().textContent.includes('varios días'));
 assert(sheet().querySelectorAll('svg.pg-chart').length === 2, 'gráfica de fuerza + volumen');
-assert(sheet().querySelector('.pg-trendln'), 'línea de tendencia en la gráfica grande');
-assert(sheet().querySelector('.pg-pt.hol'), 'la sesión con otra variante lleva punto hueco');
-assert(sheet().textContent.includes('Con 8 o más sesiones'), 'con 3 sesiones no se afirma tendencia');
+assert(sheet().textContent.includes('Con 8 o más sesiones'), 'con pocas sesiones no se afirma tendencia');
 assert(sheet().textContent.includes('no cuánto de fuerte eres'), 'aviso sobre el volumen');
 assert(sheet().textContent.includes('no coincide con el 1RM'), 'nota sobre la diferencia con el 1RM de otras pantallas');
 assert(!/NaN|undefined|Infinity/.test(sheet().innerHTML), 'la hoja no debe tener valores inválidos');
+assert(/Chest Press[^<]*no entra/.test(sheet().innerHTML), 'la lista de sesiones marca la que no entra');
+
+get("openProgressSheet('Femoral')");
+assert(sheet().querySelectorAll('.pg-mchip').length === 3, 'selector: Combinada + una por máquina');
+assert.strictEqual(sheet().querySelector('.pg-mchip[aria-pressed="true"]').textContent, 'Combinada');
+assert(sheet().querySelector('.pg-trendln'), 'línea de tendencia en la gráfica grande');
+assert(sheet().querySelectorAll('.pg-pt.hol').length === 3, 'las 3 sesiones ajustadas llevan punto hueco');
+assert(/Leg Curl ×0,77/.test(sheet().textContent), 'se dice qué factor se aplica: ' + sheet().querySelector('.pg-hint:nth-of-type(1)'));
+assert(/ajustada ×0,77/.test(sheet().textContent), 'la lista marca las sesiones ajustadas');
+// cambiar a la máquina secundaria sola
+const chips = [...sheet().querySelectorAll('.pg-mchip')];
+const legIdx = chips.findIndex(b => /Leg Curl/.test(b.textContent));
+get('pgPickMachine(' + legIdx + ')');
+assert(/Solo las sesiones en/.test(sheet().textContent) && /Leg Curl/.test(sheet().textContent));
+assert.strictEqual(sheet().querySelectorAll('.pg-pt.hol').length, 0, 'una máquina sola no lleva puntos ajustados');
+assert.strictEqual(sheet().querySelector('.pg-stat:nth-child(3) b').textContent, '3', 'solo 3 sesiones en esa máquina');
+assert.strictEqual(sheet().querySelector('.pg-mchip[aria-pressed="true"]').textContent.indexOf('Leg Curl'), 0);
+
 get("openProgressSheet('Sentadilla')");
+assert(!sheet().querySelector('.pg-mchip'), 'con una sola máquina no hay selector');
 assert(sheet().textContent.includes('Sin tendencia al alza'), 'sentadilla plana -> aviso de estancamiento');
 get("openProgressSheet('Prensa')");
 assert(sheet().textContent.includes('Tendencia al alza'), 'prensa creciendo -> tendencia al alza');
@@ -127,5 +199,5 @@ assert(!sheet().textContent.includes('no coincide con el 1RM'), 'por tiempo: sin
 get('closeProgressSheet()');
 assert(!sheet().classList.contains('on'));
 
-console.log('OK progress-chart: métrica por series, cambio y tendencia, avisos y hoja de detalle');
+console.log('OK progress-chart: métrica por series, máquinas secundarias, cambio y tendencia, avisos y hoja de detalle');
 process.exit(0);

@@ -110,8 +110,8 @@ function renderDayComparison(dayIdx){
   const rowsHtml = exerciseEntries.map(e => {
     const thisMark = pgWeekValue(e.name, thisWeekStart, day.name);
     const lastMark = pgWeekValue(e.name, lastWeekStart, day.name);
-    const thisTxt = !thisMark ? 'Sin registrar' : (e.timed ? thisMark.reps + 's' : fmtNum(thisMark.peso, 2) + 'kg × ' + thisMark.reps);
-    const lastTxt = !lastMark ? 'Sin datos' : (e.timed ? lastMark.reps + 's' : fmtNum(lastMark.peso, 2) + 'kg × ' + lastMark.reps);
+    const thisTxt = !thisMark ? (pgWeekHasAny(e.name, thisWeekStart, day.name) ? 'Solo en otra máquina' : 'Sin registrar') : (e.timed ? thisMark.reps + 's' : fmtNum(thisMark.peso, 2) + 'kg × ' + thisMark.reps);
+    const lastTxt = !lastMark ? (pgWeekHasAny(e.name, lastWeekStart, day.name) ? 'Solo en otra máquina' : 'Sin datos') : (e.timed ? lastMark.reps + 's' : fmtNum(lastMark.peso, 2) + 'kg × ' + lastMark.reps);
 
     let deltaHtml = '';
     if (thisMark && lastMark) {

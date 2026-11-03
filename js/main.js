@@ -17,6 +17,8 @@ renderDay();
 
 initGoogleSignIn();
 
+coachInit();   // botón flotante del entrenador IA (solo se ve con sesión)
+
 // Entrada de las fichas: con splash la lanza skipIntro() al abrirse el telón; sin él, directamente
 if (!document.getElementById('introSplash')) playPickerIntro();
 

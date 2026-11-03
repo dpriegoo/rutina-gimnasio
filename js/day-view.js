@@ -21,18 +21,22 @@ function weeklySeriesCount(dia, ejercicio){
     .reduce((sum, r) => sum + (Number(r['Series']) || 0), 0);
 }
 
-function lastSessionValue(ejercicio){
+// variante: undefined = cualquier máquina; '' = la habitual; 'Nombre' = esa máquina. Un peso de otra máquina no es
+// comparable (la secundaria suele mover más o menos peso), así que "Últ", "Supera" y la marca personal van por máquina.
+function sameMachine(r, variante){ return variante === undefined || (r['Variante'] || '') === variante; }
+
+function lastSessionValue(ejercicio, variante){
   const profile = getProfile();
   const cache = window._progressCache || [];
   const fromSheet = cache
-    .filter(r => (r['Perfil'] || '') === profile && r['Ejercicio'] === ejercicio && !isWarmupRow(r))
+    .filter(r => (r['Perfil'] || '') === profile && r['Ejercicio'] === ejercicio && !isWarmupRow(r) && sameMachine(r, variante))
     .map(r => ({ fecha: String(r['Fecha']).slice(0,10), peso: r['Peso (kg)'], reps: r['Reps'] }));
   if (fromSheet.length === 0) return null;
   fromSheet.sort((a, b) => a.fecha.localeCompare(b.fecha));
   return fromSheet[fromSheet.length - 1];
 }
 
-function bestMarkInWeek(dia, ejercicio, weekStart){
+function bestMarkInWeek(dia, ejercicio, weekStart, variante){
   const profile = getProfile();
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 7);
@@ -41,6 +45,7 @@ function bestMarkInWeek(dia, ejercicio, weekStart){
     if ((r['Perfil'] || '') !== profile) return false;
     if (r['Día'] !== dia || r['Ejercicio'] !== ejercicio) return false;
     if (isWarmupRow(r)) return false; // el calentamiento no cuenta como marca
+    if (!sameMachine(r, variante)) return false;
     const f = parseLocalDate(r['Fecha']);
     return f >= weekStart && f < weekEnd;
   });
@@ -63,8 +68,48 @@ function bestMarkInWeek(dia, ejercicio, weekStart){
   return { timed: false, peso: Number(best['Peso (kg)']) || 0, reps: Number(best['Reps']) || 0, rm: Math.round(bestRM * 10) / 10, variante: best['Variante'] || '' };
 }
 
-function lastWeekBestMark(dia, ejercicio){
-  return bestMarkInWeek(dia, ejercicio, getWeekStartOffset(-1));
+function lastWeekBestMark(dia, ejercicio, variante){
+  return bestMarkInWeek(dia, ejercicio, getWeekStartOffset(-1), variante);
+}
+
+// Máquina seleccionada en la tarjeta ('' = la habitual)
+function cardVariant(cardEl){
+  const sel = cardEl.querySelector('.inp-variante');
+  return sel ? (sel.value || '') : '';
+}
+
+// "Supera" y "Últ" de una tarjeta, SOLO con las series de la máquina seleccionada (se refresca al cambiarla)
+function updateCardHints(cardEl){
+  const day = DAYS[currentDay];
+  if (!cardEl || !day) return;
+  const exName = cardEl.getAttribute('data-exercise');
+  const diaForCount = cardEl.getAttribute('data-borrow-dia') || day.name;
+  const v = cardVariant(cardEl);
+
+  const beatEl = cardEl.querySelector('.beat-last-week');
+  if (beatEl) {
+    const lastWeek = lastWeekBestMark(diaForCount, exName, v);
+    if (!lastWeek) {
+      // ¿hay marcas de otra máquina? entonces se dice, para que no parezca que no hay datos
+      const other = v !== '' || lastWeekBestMark(diaForCount, exName) ? lastWeekBestMark(diaForCount, exName) : null;
+      beatEl.textContent = other ? '🎯 Sin marcas de la semana pasada en esta máquina' : '';
+    } else if (lastWeek.timed) {
+      beatEl.textContent = '🎯 Supera: ' + lastWeek.reps + 's (semana pasada' + (v ? ', ' + v : '') + ')';
+    } else {
+      beatEl.textContent = '🎯 Supera: ' + fmtNum(lastWeek.peso, 2) + ' kg × ' + lastWeek.reps + ' (semana pasada' + (v ? ', ' + v : '') + ')';
+    }
+  }
+
+  const last = lastSessionValue(exName, v);
+  const pesoInput = cardEl.querySelector('.inp-peso');
+  const repsInput = cardEl.querySelector('.inp-reps');
+  const timed = isTimedExercise(exName);
+  if (timed) {
+    if (repsInput) repsInput.placeholder = last ? 'Últ: ' + last.reps + 's' : 'Segundos';
+  } else {
+    if (pesoInput) pesoInput.placeholder = last ? 'Últ: ' + fmtNum(last.peso, 2) + ' kg' : 'Peso kg';
+    if (repsInput) repsInput.placeholder = last ? 'Últ: ' + last.reps : 'Reps';
+  }
 }
 
 function updateCardHighlights(){
@@ -87,28 +132,7 @@ function updateCardHighlights(){
     const prog = cardEl.querySelector('.series-progress');
     if (prog) prog.textContent = count + '/3 esta semana';
 
-    const beatEl = cardEl.querySelector('.beat-last-week');
-    if (beatEl) {
-      const lastWeek = lastWeekBestMark(diaForCount, exName);
-      const variantNote = (lastWeek && lastWeek.variante) ? ' (con ' + lastWeek.variante + ')' : '';
-      if (!lastWeek) {
-        beatEl.textContent = '';
-      } else if (lastWeek.timed) {
-        beatEl.textContent = '🎯 Supera: ' + lastWeek.reps + 's (semana pasada' + variantNote + ')';
-      } else {
-        beatEl.textContent = '🎯 Supera: ' + fmtNum(lastWeek.peso, 2) + ' kg × ' + lastWeek.reps + ' (semana pasada' + variantNote + ')';
-      }
-    }
-
-    const last = lastSessionValue(exName);
-    const pesoInput = cardEl.querySelector('.inp-peso');
-    const repsInput = cardEl.querySelector('.inp-reps');
-    if (last && isTimedExercise(exName) && repsInput) {
-      repsInput.placeholder = 'Últ: ' + last.reps + 's';
-    } else {
-      if (last && pesoInput) pesoInput.placeholder = 'Últ: ' + fmtNum(last.peso, 2) + ' kg';
-      if (last && repsInput) repsInput.placeholder = 'Últ: ' + last.reps;
-    }
+    updateCardHints(cardEl);
 
     renderCardProgress(cardEl);
   });
@@ -116,10 +140,10 @@ function updateCardHighlights(){
 }
  // logId -> {ids, count}, para poder deshacer el último guardado
 
-function allTimeBestBeforeNow(dia, ejercicio){
+function allTimeBestBeforeNow(dia, ejercicio, variante){
   const profile = getProfile();
   const cache = window._progressCache || [];
-  const rows = cache.filter(r => (r['Perfil'] || '') === profile && r['Día'] === dia && r['Ejercicio'] === ejercicio && !isWarmupRow(r));
+  const rows = cache.filter(r => (r['Perfil'] || '') === profile && r['Día'] === dia && r['Ejercicio'] === ejercicio && !isWarmupRow(r) && sameMachine(r, variante));
   if (rows.length === 0) return null;
   if (isTimedExercise(ejercicio)) {
     let best = 0;
@@ -232,7 +256,7 @@ function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
         </div>
         <button class="log-adv-toggle" type="button" onclick="toggleAdvanced('${logId}')">⚙️ Variante / calentamiento / nota</button>
         <div class="log-advanced" id="adv-${logId}">
-          <select class="inp-variante">
+          <select class="inp-variante" onchange="updateCardHints(this.closest('.card'))" aria-label="Máquina o variante">
             <option value="">Variante: ${escHtml(ex.primary || 'la habitual')} (la habitual)</option>
             ${alts.map(a => `<option value="${escHtml(a)}">Variante: ${escHtml(a)}</option>`).join('')}
           </select>

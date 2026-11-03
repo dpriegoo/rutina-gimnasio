@@ -103,7 +103,8 @@ function renderProgressChart(){
   const rows = myRows().filter(r => !isWarmupRow(r));
   const exercise = document.getElementById('exerciseSelect').value;
   const timed = isTimedExercise(exercise);
-  const sess = exercise ? exerciseSessions(exercise) : [];
+  const ser = exercise ? exerciseSeries(exercise) : { sessions: [], machines: [], adjusted: 0, excluded: 0, ref: '' };
+  const sess = ser.sessions;
 
   const labels = sess.map(s => s.fecha.slice(5));
   const values = sess.map(s => Math.round(s.value * 10) / 10);
@@ -137,7 +138,8 @@ function renderProgressChart(){
   if (timed) {
     subEl.textContent = 'Ejercicio por tiempo: mejor serie de cada sesión (segundos) · línea ámbar: tendencia (media de 3 sesiones)';
   } else {
-    subEl.textContent = 'Línea azul: fuerza estimada de cada sesión (media de tus series de trabajo) · línea ámbar: tendencia (media de 3 sesiones). Toca “Peso de la mejor serie” en la leyenda para verlo también.';
+    subEl.textContent = 'Línea azul: fuerza estimada de cada sesión (media de tus series de trabajo) · línea ámbar: tendencia (media de 3 sesiones). Toca “Peso de la mejor serie” en la leyenda para verlo también.' +
+      (ser.machines.length > 1 ? ' Varias máquinas: referencia ' + (ser.ref || 'habitual') + (ser.adjusted ? ', con ' + ser.adjusted + ' sesión(es) de otras máquinas ajustadas' : '') + (ser.excluded ? ', ' + ser.excluded + ' sin ajustar no entran' : '') + '.' : '');
   }
   const datasets = [
     { label: timed ? 'Mejor serie (s)' : 'Fuerza estimada (kg)', data: values, borderColor: timed ? T.green : T.blue,
@@ -223,7 +225,7 @@ function computeStrengthIndexByWeek(profile){
 
   const baseline = {}, byWeekEx = {};
   names.forEach(ex => {
-    const sess = exerciseSessions(ex);
+    const sess = exerciseSeries(ex).sessions;
     if (!sess.length || !(sess[0].value > 0)) return;
     baseline[ex] = sess[0].value;
     sess.forEach(x => {
