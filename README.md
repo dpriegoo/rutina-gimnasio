@@ -31,6 +31,7 @@ No hay build ni framework: el navegador carga los archivos tal cual.
 | `js/coach.js` | Entrenador IA: bucle con Gemini (pregunta → herramientas → respuesta), prompt de sistema y errores. |
 | `js/coach-ui.js` | Entrenador IA: botón flotante, hoja de chat y menú guiado. |
 | `supabase/` | Función de servidor `coach` (guarda la clave de Gemini), su SQL de límite diario y cómo desplegarla (ver `supabase/README.md`). |
+| `js/export.js` | Exportar datos: tarjeta al final de Métricas que exporta los registros de un rango de fechas (md para Claude, csv o json). |
 | `js/day-view.js` | Tarjetas de ejercicio (carrusel horizontal), ejercicios prestados y resaltados. |
 | `js/motion.js` | Bloqueo de zoom y animación de entrada a la app (barra con discos). Se omite con "reducir movimiento". |
 | `js/day-picker.js` | Pantalla inicial "¿Qué día entrenas?", tira de progreso del día y desplazamiento del carrusel. |
@@ -72,6 +73,7 @@ versión con la que se cargó y, si no coinciden, se recarga una vez sola.
 - `tests/smoke.test.js`: arranca la página real en jsdom (con y sin sesión), elige día, recorre el carrusel, abre la hoja de progresión y navega entre vistas.
 - `tests/style.test.js`: contraste, tamaño mínimo de texto, escalas de tipografía/radios/colores, campos a 16 px, zoom bloqueado y que las animaciones respeten "reducir movimiento".
 - `tests/coach.test.js`, `tests/coach-edge.test.js`: entrenador IA (ver su sección).
+- `tests/export.test.js`: exportación (rango, formatos, ida y vuelta, tarjeta, datos frescos).
 - `tests/machines.test.js`: "Últ", "Supera" y marca personal por máquina (sin 🏆 falsos ni récords bloqueados por otra máquina).
 - `tests/coherence.test.js`: formato de números y misma métrica en hoja de ejercicio, Resumen e índice de fuerza.
 - `tests/a11y.test.js`: etiquetas, roles, estados, teclado, foco y reducir movimiento en "Siente".
@@ -116,3 +118,11 @@ Un botón flotante abre un chat con Gemini que responde **con los datos del prop
 - **Velocidad:** la app adelanta en local los datos que cada opción del menú necesita (`coachPrefetchPlan`) y los manda en el primer mensaje, así que una pregunta guiada cuesta **1 llamada a Gemini** (antes 3); la respuesta llega en streaming (`coachCallStream`) y se pinta según se escribe; al abrir el chat se "calienta" la función (`coachWarm`). En el servidor: JWT leído sin llamar a Auth, cuenta permitida en caché 5 min y consultas en paralelo; el razonamiento de Gemini es ajustable con `GEMINI_THINKING` (ver `supabase/README.md`). `COACH_STREAM = false` desactiva el streaming. Los datos adelantados van solo en el último mensaje del usuario (no se acumulan) y salen en "Datos consultados" como *(adelantado)*.
 - **Seguridad:** la clave de Gemini solo existe en la función de servidor; esta comprueba la sesión y `allowed_users`, aplica un límite diario, solo acepta texto y las herramientas de la app, y manda la clave en una cabecera. Lo que escribe Gemini se pinta siempre escapado (nunca como HTML).
 - **Pruebas:** `tests/coach.test.js` (herramientas con tu escenario, bucle con Gemini simulado, errores, interfaz) y `tests/coach-edge.test.js` (la función de servidor, con Node 22+).
+
+## Exportar datos (export.js)
+Tarjeta **Exportar datos** al final de la pestaña Métricas: se elige un rango de fechas (atajos 30 días / 90 días / este año / todo) y se exportan los registros de **todos los ejercicios** de ese rango, **solo del perfil con sesión**, con los dos extremos incluidos. Pensado para pasárselo a Claude y preguntarle sobre la rutina.
+- **Formatos:** `md` (por defecto: lleva dentro la explicación de las columnas, la rutina actual, un resumen semanal y las series en un bloque CSV, así Claude lo entiende sin más contexto), `csv` (solo las series, con BOM para Excel y protección contra fórmulas en las notas) y `json` (una serie por línea). Números con **punto decimal** y fechas `AAAA-MM-DD` (legibles por máquinas), a diferencia de la pantalla.
+- **Opciones:** incluir calentamientos (marcados con `calentamiento = 1`) e incluir peso corporal. La vista previa muestra registros, series de trabajo, sesiones y tamaño.
+- **Salida:** *Descargar*, *Compartir* (menú del sistema, solo si el navegador lo permite) y *Copiar* (para pegar en el chat).
+- **Origen de los datos:** la caché local, que se vuelve a leer de la base de datos al abrir Métricas si tiene más de 1 minuto (`exportFetchFresh`) y cada 2 minutos. El archivo dice de cuándo son (`window._lastSyncAt`) y si hay registros pendientes de sincronizar.
+- **Pruebas:** `tests/export.test.js` incluye un viaje de ida y vuelta (notas con comas, comillas y saltos de línea salen intactas).

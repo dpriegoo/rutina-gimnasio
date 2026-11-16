@@ -14,7 +14,7 @@ function setView(v){
   document.getElementById('viewBtnEditar').classList.toggle('active', v === 'editar');
   ['Rutina', 'Metricas', 'Editar'].forEach(n => document.getElementById('viewBtn' + n).setAttribute('aria-pressed', String(v === n.toLowerCase())));
   if (v === 'editar') renderEditView();
-  if (v === 'metricas') renderSyncTiming();
+  if (v === 'metricas') { renderSyncTiming(); exportInit(); }
   if (v === 'metricas' && !metricsLoadedOnce) {
     metricsLoadedOnce = true;
     loadMetrics(false);

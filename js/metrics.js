@@ -20,6 +20,7 @@ async function loadMetrics(force){
     const data = await fetchSheetData();
     if (data && data.error === 'unauthorized') { handleUnauthorized(); return; }
     window._progressCache = data;
+    window._lastSyncAt = Date.now();   // última vez que se leyó la base de datos (lo usa la exportación)
     try { localStorage.setItem('progressCache', JSON.stringify(data)); } catch(e) {}
     applyOutboxToCache();
     renderHeatmap();

@@ -16,7 +16,7 @@
 <title>IronLog · Rutina de fuerza</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link rel="stylesheet" href="styles.css?v=3591b76f">
+<link rel="stylesheet" href="styles.css?v=cb42a934">
 </head>
 <body>
 
@@ -167,6 +167,37 @@
     <div class="metric-sub" id="strengthIndexSub">Tendencia de fondo: promedio de tu 1RM estimado en todos los ejercicios, respecto a tu primera marca de cada uno</div>
     <div class="chart-wrap"><canvas id="strengthIndexChart" role="img" aria-label="Gráfica del índice de fuerza"></canvas></div>
   </div>
+
+  <div class="metric-card" id="exportCard">
+    <div class="metric-title">Exportar datos</div>
+    <div class="metric-sub">Guarda tus registros de un rango de fechas en un archivo para pasárselo a Claude y hacerle preguntas sobre tu rutina. El formato «Para Claude» lleva dentro la explicación de las columnas y tu rutina.</div>
+    <div class="exp-presets" role="group" aria-label="Rangos rápidos">
+      <button type="button" class="exp-chip" onclick="exportPreset('30')">30 días</button>
+      <button type="button" class="exp-chip" onclick="exportPreset('90')">90 días</button>
+      <button type="button" class="exp-chip" onclick="exportPreset('year')">Este año</button>
+      <button type="button" class="exp-chip" onclick="exportPreset('all')">Todo</button>
+    </div>
+    <div class="exp-range">
+      <label class="exp-field" for="expFrom">Desde<input type="date" id="expFrom" class="exp-date" onchange="exportRefresh()"></label>
+      <label class="exp-field" for="expTo">Hasta<input type="date" id="expTo" class="exp-date" onchange="exportRefresh()"></label>
+    </div>
+    <label class="exp-field" for="expFormat">Formato
+      <select class="metric-select" id="expFormat" onchange="exportRefresh()">
+        <option value="md">Para Claude (.md): explicación + datos</option>
+        <option value="csv">CSV (.csv): solo las series, para hojas de cálculo</option>
+        <option value="json">JSON (.json): explicación + datos</option>
+      </select>
+    </label>
+    <label class="exp-check"><input type="checkbox" id="expWarm" checked onchange="exportRefresh()"> Incluir calentamientos</label>
+    <label class="exp-check"><input type="checkbox" id="expBody" checked onchange="exportRefresh()"> Incluir peso corporal</label>
+    <div class="exp-preview" id="expPreview" aria-live="polite"></div>
+    <div class="exp-error" id="expError" role="alert"></div>
+    <div class="exp-actions">
+      <button type="button" class="exp-btn primary" id="expDownload" onclick="exportDownload()">⬇️ Descargar</button>
+      <button type="button" class="exp-btn" id="expShare" onclick="exportShare()" hidden>📤 Compartir</button>
+      <button type="button" class="exp-btn" id="expCopy" onclick="exportCopy()">📋 Copiar</button>
+    </div>
+  </div>
 </div>
 
 <div id="editView" style="display:none;">
@@ -253,7 +284,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite">Guardado ✓</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
-<script>window.IRONLOG_BUILD = '9cf848a1'; // lo escribe tools/stamp.js</script>
+<script>window.IRONLOG_BUILD = '91736359'; // lo escribe tools/stamp.js</script>
 <script src="js/motion.js?v=7298014a"></script>
 <script src="js/config.js?v=4d929179"></script>
 <script src="js/utils.js?v=3734d2d1"></script>
@@ -269,8 +300,9 @@
 <script src="js/planning.js?v=a26b757d"></script>
 <script src="js/body.js?v=181d9edb"></script>
 <script src="js/history.js?v=d785551b"></script>
-<script src="js/metrics.js?v=45fd5059"></script>
+<script src="js/metrics.js?v=3b97934d"></script>
 <script src="js/summary.js?v=ecd544d1"></script>
+<script src="js/export.js?v=19164744"></script>
 <script src="js/feel-data.js?v=72b2bdef"></script>
 <script src="js/feel-anim.js?v=254a5b63"></script>
 <script src="js/feel.js?v=e98b2186"></script>
@@ -281,8 +313,8 @@
 <script src="js/coach.js?v=79e01680"></script>
 <script src="js/coach-ui.js?v=20016e0c"></script>
 <script src="js/editor.js?v=178be335"></script>
-<script src="js/progress.js?v=fed85023"></script>
-<script src="js/navigation.js?v=025385b4"></script>
+<script src="js/progress.js?v=4497a730"></script>
+<script src="js/navigation.js?v=acad0202"></script>
 <script src="js/main.js?v=c038782c"></script>
 
 </body>
