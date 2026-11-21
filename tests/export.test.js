@@ -83,13 +83,15 @@ function parseCsv(t) {
   const csvRaw = w.exportSerialize(w.exportCollect(O), 'csv', false), csvFile = w.exportSerialize(w.exportCollect(O), 'csv', true);
   assert.strictEqual(csvFile[0], '\uFEFF', 'el archivo CSV lleva BOM (Excel respeta los acentos)'); assert.strictEqual(csvFile.slice(1), csvRaw); assert(csvRaw[0] !== '\uFEFF', 'copiar/compartir texto no lleva BOM');
   const rowsCsv = parseCsv(csvRaw);
-  assert.deepStrictEqual(rowsCsv[0], ['fecha', 'dia', 'grupo', 'ejercicio', 'peso_kg', 'reps', 'series', 'variante', 'calentamiento', 'nota']);
+  assert.deepStrictEqual(rowsCsv[0], ['fecha', 'dia', 'grupo', 'ejercicio', 'peso_kg', 'reps', 'series', 'variante', 'calentamiento', 'rir', 'nota']);
+  assert(collect({ warmups: true }).series.every(s => s.rir === null), 'sin RIR anotado, vacío (null) y no 0');
+  w._progressCache.find(x => x['Ejercicio'] === 'Press banca plano' && !x['Calentamiento'])['RIR'] = 2; const cr = collect({ warmups: true }).series; assert(cr.filter(s => s.rir === 2).length === 1, 'el RIR anotado sale en su serie'); assert(/calentamiento,rir,nota/.test(w.eval('exportCsvRows')(w.eval('EXPORT_COLS'), cr, false)), 'la columna rir viaja en el CSV'); assert(/NO asumas que fue al fallo/.test(JSON.stringify(collect({ warmups: true }).columnas || collect({ warmups: true }).leyenda || collect({ warmups: true }))), 'la leyenda explica que vacío no es fallo');
   assert.strictEqual(rowsCsv.length, 10);
-  const noteRow = rowsCsv.find(x => x[4] === '62.5'); assert.strictEqual(noteRow[9], NOTE, 'comas, comillas y saltos de línea sobreviven intactos');
+  const noteRow = rowsCsv.find(x => x[4] === '62.5'); assert.strictEqual(noteRow[10], NOTE, 'comas, comillas y saltos de línea sobreviven intactos');
   assert(rowsCsv.some(x => x[3] === 'Jalón, agarre neutro'), 'una coma en el nombre del ejercicio no rompe columnas');
-  assert(rowsCsv.every(x => x.length === 10), 'todas las filas tienen 10 columnas');
+  assert(rowsCsv.every(x => x.length === 11), 'todas las filas tienen 11 columnas');
   assert(/,62\.5,/.test(csvRaw) && !/62,5/.test(csvRaw), 'punto decimal, no coma');
-  assert(rowsCsv.find(x => x[4] === '65')[9] === "'=1+1" && rowsCsv.find(x => x[4] === '66')[9] === "'-2+3" && rowsCsv.find(x => x[4] === '57.5' && x[3].startsWith('Jal'))[9] === "'@SUMA(A1)", 'en CSV, las notas que empiezan por = + - @ se protegen contra fórmulas de hojas de cálculo');
+  assert(rowsCsv.find(x => x[4] === '65')[10] === "'=1+1" && rowsCsv.find(x => x[4] === '66')[10] === "'-2+3" && rowsCsv.find(x => x[4] === '57.5' && x[3].startsWith('Jal'))[10] === "'@SUMA(A1)", 'en CSV, las notas que empiezan por = + - @ se protegen contra fórmulas de hojas de cálculo');
   assert.strictEqual(rowsCsv.find(x => x[4] === '65')[7], 'Chest Press (Technogym)', 'la variante se exporta');
 
   // ---------- 3) JSON ----------
@@ -110,8 +112,8 @@ function parseCsv(t) {
   assert(/\| Día \| Nombre del día \| Grupo \| Ejercicio \| Series · reps \|/.test(md), 'tabla de la rutina');
   const blocks = [...md.matchAll(/```csv\n([\s\S]*?)\n```/g)].map(m => m[1]);
   assert.strictEqual(blocks.length, 2, 'dos bloques CSV: series y peso corporal');
-  const back = parseCsv(blocks[0]); assert.strictEqual(back.length, 10); assert.strictEqual(back.find(x => x[4] === '62.5')[9], NOTE, 'viaje de ida y vuelta: la nota con coma, comillas y salto de línea sale igual');
-  assert.strictEqual(back.find(x => x[4] === '65')[9], '=1+1', 'en el .md las notas no se alteran (no es para hojas de cálculo)');
+  const back = parseCsv(blocks[0]); assert.strictEqual(back.length, 10); assert.strictEqual(back.find(x => x[4] === '62.5')[10], NOTE, 'viaje de ida y vuelta: la nota con coma, comillas y salto de línea sale igual');
+  assert.strictEqual(back.find(x => x[4] === '65')[10], '=1+1', 'en el .md las notas no se alteran (no es para hojas de cálculo)');
   assert.deepStrictEqual(parseCsv(blocks[1]), [['fecha', 'peso_kg'], ['2026-10-02', '79.4'], ['2026-10-09', '79']]);
   assert(!/NaN|undefined|\[object/.test(md), 'sin valores inválidos');
   const mdNoBody = w.exportSerialize(w.exportCollect({ ...O, body: false }), 'md', true); assert(!/## Peso corporal/.test(mdNoBody) && /sin peso corporal/.test(mdNoBody));

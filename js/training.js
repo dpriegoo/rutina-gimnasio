@@ -61,7 +61,7 @@ function renderPlan(cardEl){
   if (!box || !ex || !DAYS[currentDay]) return;
   const logId = box.dataset.log, dia = trainDia(cardEl), v = cardVariant(cardEl);
   const timed = isTimedExercise(ex.name);
-  const plan = rxPlan(ex, v), spec = plan.spec, step = timed ? 5 : rxStep(ex, spec);
+  const plan = rxPlan(ex, v), spec = plan.spec, step = timed ? 5 : rxStep(ex, spec, v);
   const done = rxWeekSets(dia, ex.name), st = trainSt(logId);
   const nPlan = plan.sets.length, idx = done.length;
   const complete = idx >= nPlan && !st.extra;
@@ -74,6 +74,19 @@ function renderPlan(cardEl){
   const reps = st.reps[idx] !== undefined ? st.reps[idx] : target.reps;
   st.cur = { peso: basePeso, reps: reps, step: step, idx: idx };
 
+  // Calentamiento sugerido (solo pesados, antes de la primera serie de trabajo): se apunta como calentamiento y no cuenta para nada
+  const hoyS = localDateStr();
+  const warm = (done.length === 0 && !timed) ? rxWarmup(ex, spec, basePeso, step) : [];
+  const warmToday = myRows().filter(r => isWarmupRow(r) && r['Día'] === dia && r['Ejercicio'] === ex.name && String(r['Fecha']).slice(0, 10) === hoyS).length;
+  let warmHtml = '';
+  if (warm.length) {
+    const wopen = !!st.warm;
+    warmHtml = '<div class="warm-box"><button type="button" class="warm-toggle" aria-expanded="' + wopen + '" onclick="warmToggle(\'' + logId + '\')">' + uiIcon('flame', 's') + ' Calentamiento <span class="mini-sub">(opcional · ' + warm.length + ' series)</span><span class="grow"></span>' + uiIcon(wopen ? 'chevU' : 'chevD', 's') + '</button>' +
+      (wopen ? '<div class="warm-rows">' + warm.map((w, i) => '<div class="warm-row' + (i < warmToday ? ' done' : '') + '"><span class="warm-txt">' + fmtNum(w.peso, 2) + ' kg × ' + w.reps + '</span>' +
+        (i < warmToday ? '<span class="warm-ok" aria-label="Hecha">' + uiIcon('check', 's') + '</span>' : '<button type="button" class="warm-go" ' + (i > warmToday ? 'disabled' : '') + ' onclick="warmDone(\'' + logId + '\', ' + i + ')">Hecha</button>') + '</div>').join('') +
+        '<div class="mini-sub">Una rampa hacia tu carga de trabajo, con poco cansancio. No cuenta para tus series ni para tu progreso. Es un criterio práctico, no un dato.</div></div>' : '') + '</div>';
+  }
+
   const unit = timed ? 's' : 'reps';
   let rows = '';
   for (let i = 0; i < nRows; i++) {
@@ -83,7 +96,9 @@ function renderPlan(cardEl){
     if (i < idx) {
       const d = done[i], tgt = i < nPlan ? t.reps : null;
       const sub = 'Serie ' + (i + 1) + (tgt !== null ? ' · objetivo ' + tgt : '') + (d.variante ? ' · ' + escHtml(d.variante) : '');
-      rows += '<div class="sr done"><span class="sn">' + uiIcon('check') + '</span><div class="sr-main"><div class="sr-goal">' + (timed ? d.reps + ' s' : fmtNum(d.peso, 2) + ' kg × ' + d.reps) + '</div><div class="sr-sub">' + sub + '</div></div></div>';
+      const rirBtn = d.id === undefined ? '' : '<button type="button" class="rir-tag' + (d.rir === null ? ' none' : '') + '" aria-expanded="' + (st.rirOpen === String(d.id)) + '" aria-label="' + (d.rir === null ? 'Anotar cuántas te quedaban' : 'RIR ' + d.rir + ': cambiar') + '" onclick="rirInline(\'' + logId + '\', \'' + jsArg(String(d.id)) + '\')">' + (d.rir === null ? 'RIR' : 'RIR ' + (d.rir >= 3 ? '3+' : d.rir)) + '</button>';
+      const inl = (d.id !== undefined && st.rirOpen === String(d.id)) ? '<div class="rir-inline"><span class="sr-lbl">¿Cuántas te quedaban? <button type="button" class="rir-help-btn" onclick="rirHelpOpen()" aria-label="Cómo saber cuántas te quedaban">?</button></span><div class="rir-chips" role="group" aria-label="Repeticiones que te quedaban">' + RIR_CHIPS.map(n => '<button type="button" class="rir-pick" aria-pressed="' + (d.rir === n) + '" onclick="rirInlinePick(\'' + logId + '\', \'' + jsArg(String(d.id)) + '\', ' + n + ')">' + (n === 3 ? '3+' : n) + '</button>').join('') + '</div></div>' : '';
+      rows += '<div class="sr done"><span class="sn">' + uiIcon('check') + '</span><div class="sr-main"><div class="sr-goal">' + (timed ? d.reps + ' s' : fmtNum(d.peso, 2) + ' kg × ' + d.reps) + '</div><div class="sr-sub">' + sub + '</div></div>' + rirBtn + inl + '</div>';
     } else if (i === idx) {
       rows += '<div class="sr act"><span class="sn">' + (i + 1) + '</span><div class="sr-main"><div class="sr-goal">' + goalTxt + '</div>' +
         '<div class="sr-sub">' + chip + (rir !== null ? ' ' + rxRirHelp(rir) : '') + '</div></div>' +
@@ -105,7 +120,7 @@ function renderPlan(cardEl){
   const foot = complete
     ? '<div class="plan-done">' + uiIcon('check') + ' Ejercicio completo</div><div class="plan-foot"><span class="mini-sub">Descanso recomendado ' + rxFmtRestRange(spec) + '</span><button type="button" class="link-btn" onclick="planExtra(\'' + logId + '\')">Añadir serie extra</button></div>'
     : '<div class="plan-foot"><span class="mini-sub">' + uiIcon('timer', 's') + ' Descanso recomendado ' + rxFmtRestRange(spec) + '</span></div>';
-  box.innerHTML = head + why + rows + foot;
+  box.innerHTML = head + why + warmHtml + rows + foot;
   box.setAttribute('data-complete', complete ? '1' : '0');
   if (st.focus) { const f = box.querySelector('[data-f="' + st.focus + '"]'); st.focus = null; if (f && f.focus) f.focus({ preventScroll: true }); }
 }
@@ -125,14 +140,29 @@ function planToggleWhy(logId){
   card.querySelector('.plan').classList.toggle('show-why'); renderPlan(card);
 }
 
+// RIR de una serie ya hecha, desde su propia fila
+function rirInline(logId, id){ const st = trainSt(logId); st.rirOpen = st.rirOpen === String(id) ? null : String(id); renderPlan(trainCard(logId)); }
+function rirInlinePick(logId, id, n){ rirAnnotate(id, n); trainSt(logId).rirOpen = null; if (typeof updateCardHighlights === 'function') updateCardHighlights(); }
+
+function warmToggle(logId){ const st = trainSt(logId); st.warm = !st.warm; renderPlan(trainCard(logId)); }
+function warmDone(logId, i){
+  const card = trainCard(logId), st = trainSt(logId); if (!card || !st.cur) return;
+  const ex = card._ex, spec = prescriptionSpec(ex, cardVariant(card)), w = rxWarmup(ex, spec, st.cur.peso, st.cur.step)[i];
+  if (!w) return;
+  sessionEnsureStart();
+  quickLogSet(logId, { peso: w.peso, reps: w.reps, variante: cardVariant(card), calentamiento: true });
+  renderPlan(card);
+}
+
 function planExtra(logId){ trainSt(logId).extra = true; renderPlan(trainCard(logId)); }
 
 // Guarda una serie por el flujo de siempre: pendiente + aceptar (la cola de envío y el "deshacer" siguen igual)
 function quickLogSet(logId, v){
+  const id = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
   const rows = getPendingRows();
-  (rows[logId] = rows[logId] || []).push({ peso: String(v.peso), reps: String(v.reps), variante: v.variante || '', calentamiento: false, nota: '', id: Date.now() + '-' + Math.random().toString(36).slice(2, 7) });
+  (rows[logId] = rows[logId] || []).push({ peso: String(v.peso), reps: String(v.reps), variante: v.variante || '', calentamiento: !!v.calentamiento, nota: '', rir: (v.rir === undefined ? null : v.rir), id: id });
   savePendingRows(rows);
-  return acceptPending(logId);
+  return { id: id, done: acceptPending(logId) };
 }
 
 function planDone(logId){
@@ -145,22 +175,23 @@ function planDone(logId){
   st.peso = cur.peso; st.reps = {}; st.focus = 'go';
   trainJustLogged = true;
   sessionEnsureStart();
-  quickLogSet(logId, { peso: timed ? 0 : cur.peso, reps: cur.reps, variante: v });
+  const logged = quickLogSet(logId, { peso: timed ? 0 : cur.peso, reps: cur.reps, variante: v });
   const nextIdx = cur.idx + 1, nPlan = plan.sets.length;
-  if (nextIdx < nPlan) restStart(rxRestSeconds(plan.spec), 'Siguiente: serie ' + (nextIdx + 1) + ' · ' + plan.sets[nextIdx].reps + (timed ? ' s' : ' reps') + ' · ' + rxRirLabel(plan.sets[nextIdx].rir));
-  else restStart(rxRestSeconds(plan.spec), nextIdx === nPlan ? 'Ejercicio completo. Respira antes del siguiente.' : 'Serie extra hecha.');
+  if (nextIdx < nPlan) restStart(rxRestSeconds(plan.spec), 'Siguiente: serie ' + (nextIdx + 1) + ' · ' + plan.sets[nextIdx].reps + (timed ? ' s' : ' reps') + ' · ' + rxRirLabel(plan.sets[nextIdx].rir), logged.id);
+  else restStart(rxRestSeconds(plan.spec), nextIdx === nPlan ? 'Ejercicio completo. Respira antes del siguiente.' : 'Serie extra hecha.', logged.id);
   renderPlan(card);
 }
 
 // ---------- Descanso ----------
 let restState = null, restHideTimer = null, restInterval = null;
 function restEl(id){ return document.getElementById(id); }
-function restStart(sec, sub){
-  restState = { end: Date.now() + sec * 1000, total: sec, sub: sub || '' };
+function restStart(sec, sub, setId){
+  restState = { end: Date.now() + sec * 1000, total: sec, sub: sub || '', setId: setId || null, rir: null };
   const card = restEl('restCard'); if (!card) return;
   clearTimeout(restHideTimer);
   card.hidden = false; card.classList.remove('fin');
   restEl('rcTitle').textContent = 'Descanso'; restEl('rcSub').textContent = restState.sub;
+  const rr = restEl('rcRir'); if (rr) { rr.hidden = !setId; rr.classList.remove('picked'); if (setId) rr.querySelector('.rir-chips').innerHTML = rirChipsHtml(null, 'rirPick'); }   // anotar el RIR de la serie que acabas de hacer (opcional)
   clearInterval(restInterval); restInterval = setInterval(restTick, 250); restTick();
 }
 function restTick(){
@@ -191,6 +222,22 @@ function restSkip(){
   const card = restEl('restCard'); if (card) { card.hidden = true; card.classList.remove('fin'); }
 }
 
+// ---------- Duración estimada ----------
+// Por ejercicio que falta: 45 s por serie + el descanso recomendado entre series; 80 s para cambiar de máquina entre ejercicios.
+// Es una estimación (tus tiempos reales varían); cuenta solo las series que quedan.
+function dayEstimateMin(day){
+  const target = weeklyTarget();
+  let sec = 0, n = 0;
+  effectiveDayGroups(day).forEach(g => g.exercises.forEach(ex => {
+    const left = Math.max(0, target - weeklySeriesCount(day.name, ex.name));
+    if (!left) return;
+    const spec = prescriptionSpec(ex, '');
+    sec += left * 45 + Math.max(0, left - 1) * rxRestSeconds(spec); n++;
+  }));
+  if (n > 1) sec += (n - 1) * 80;
+  return sec ? Math.max(5, Math.round(sec / 60 / 5) * 5) : 0;   // al múltiplo de 5 más cercano: no aparenta más precisión de la que hay
+}
+
 // ---------- Barra de sesión ----------
 function sessionKey(){ return 'sess_' + getProfile() + '_' + localDateStr() + '_' + currentDay; }
 function sessionStartGet(){ const n = Number(localStorage.getItem(sessionKey())); return n > 0 ? n : null; }
@@ -206,7 +253,8 @@ function renderSessionBar(){
   const start = sessionStartGet(), t = document.getElementById('sbTime');
   t.textContent = start && Date.now() - start < 8 * 3600e3 ? sessionFmt(Date.now() - start) : '--:--';
   const cards = exerciseCards(), n = cards.filter(c => c.classList.contains('done')).length;
-  document.getElementById('sbProg').textContent = n + ' de ' + cards.length + ' ejercicios';
+  const est = dayEstimateMin(DAYS[currentDay]);
+  document.getElementById('sbProg').textContent = n + ' de ' + cards.length + ' ejercicios' + (est ? ' · quedan ≈ ' + est + ' min' : '');
   const next = document.getElementById('sbNext'), all = sessionAllDone();
   next.textContent = all ? 'Terminar' : 'Siguiente'; next.classList.toggle('ok', all);
 }

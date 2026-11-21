@@ -66,8 +66,9 @@ function dayTileData(d, i, sug){
   const done = counts.filter(c => c >= weeklyTarget()).length;
   const any = counts.filter(c => c > 0).length;
   const status = done === names.length && names.length > 0 ? 'Completo' : (any ? 'Empezado · ' + done + '/' + names.length : 'Pendiente');
+  const est = (typeof dayEstimateMin === 'function' && !(done === names.length && names.length > 0)) ? dayEstimateMin(d) : 0;
   return {
-    meta: names.length + ' ejercicios · ' + status,
+    meta: names.length + ' ejercicios · ' + status + (est ? ' · ≈ ' + est + ' min' : ''),
     segs: counts.map((c, k) => '<i class="' + exState(c) + '" style="--k:' + k + '"></i>').join(''),
     aria: 'Día ' + dayNumberOf(d, i) + ', ' + dayGroupsLabel(d) + ', ' + status,
     sug: i === sug,
@@ -78,6 +79,7 @@ function renderDayPicker(){
   const grid = document.getElementById('dpGrid');
   if (!grid) return;
   if (typeof renderDeloadCard === 'function') renderDeloadCard();
+  if (typeof renderCheckinCard === 'function') renderCheckinCard();
   const sug = suggestedDayIdx();
   const sig = DAYS.map(d => d.name).join('|');
 

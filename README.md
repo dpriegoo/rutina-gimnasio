@@ -147,3 +147,25 @@ Tarjeta **Exportar datos** al final de la pestaña Métricas: se elige un rango 
 - **Comparaciones justas:** el resumen semanal compara con la semana pasada **hasta el mismo día**; la comparativa de un día a medias, con **los mismos ejercicios** de la semana pasada. En curso solo se destaca la subida (nunca alarma roja); con el día completo, la comparación de siempre.
 - **Métricas por secciones:** Resumen · Cuerpo · Ejercicios · Datos (se recuerda la última). Las gráficas con menos de 4 puntos (3 semanas en el índice de fuerza) muestran «Aún pocos datos» en vez de una curva inventada; el historial se abre ya con lo último que hiciste; la altura se pone una vez y luego solo se muestra.
 - **Editar:** tocar la fila edita; las flechas solo aparecen en el modo «Ordenar ejercicios»; el editor incluye categoría, descanso y RIR por serie, y enseña el rango efectivo.
+
+## RIR real, calibración y panel del plan (v3)
+
+Todo esto es **opcional** y la app funciona igual sin ello.
+
+- **RIR real por serie.** Tras «Hecha», el descanso pregunta «¿cuántas te quedaban?» (0, 1, 2, 3+); también se anota o corrige después desde la fila de la serie. El botón «?» explica cómo estimarlo. El motor (`js/prescription.js`) usa el RIR anotado como capacidad real de la serie; sin él supone que acabaste cerca del fallo, como antes. `js/rir.js`.
+- **Calibración** (Métricas > Ejercicios): una serie en una máquina o poleas, nunca con barra libre, que compara lo que crees que te queda con lo que te queda al llegar al fallo. Se guarda solo en el dispositivo.
+- **¿Te funciona el plan?** (`js/plan-panel.js`): compara las 6 semanas anteriores a usar el plan con el periodo con el plan (caída entre series 1 y 3, sesiones con la serie 3 en rango, fuerza estimada, cumplimiento, RIR). Es una observación, no una prueba. Necesita al menos 2 semanas y 8 sesiones en cada periodo.
+- **Calentamiento sugerido** (solo pesados, plegado) y **saltos de carga aprendidos** de tu historial por ejercicio y máquina (`rxLearnStep`). La rampa es un criterio práctico, sin evidencia verificada.
+- **Duración estimada** en las fichas de día y la barra de sesión (45 s por serie + el descanso recomendado + 80 s por cambio de máquina; redondeada a 5 min).
+- **Chequeo diario** (sueño, agujetas, energía; `js/checkin.js`): una señal más para proponer la descarga. No hay evidencia verificada de que añada algo a tus datos de entreno.
+- **Estado en el servidor** (`js/state-sync.js`): la semana de descarga y los chequeos se guardan también fuera del dispositivo; gana el cambio más reciente.
+- La exportación incluye la columna `rir` (vacía = no anotado; no asumir fallo).
+
+### SQL (una vez, en Supabase > SQL Editor; es seguro repetirlos)
+1. `supabase/rir.sql`: añade `sets.rir`. La app lo detecta sola al descargar tus series. Hasta entonces el RIR se queda en el dispositivo.
+2. `supabase/estado.sql`: tabla cerrada `user_state` y funciones `state_get` / `state_set`. Hasta entonces la descarga y los chequeos se quedan en el dispositivo.
+
+### Convenciones
+- Los textos de la interfaz no llevan emojis; el aviso de que algo es un criterio práctico va siempre visible, no escondido.
+- Las pruebas que dependen de la cola de envío la desactivan (`flushOutbox`) para no depender del tiempo.
+

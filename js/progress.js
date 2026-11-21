@@ -25,6 +25,7 @@ async function fetchProgressSilently(retriesLeft){
     window._height = heightRes && heightRes.altura ? heightRes.altura : null;
     window._weightHistory = Array.isArray(weightsRes) ? weightsRes : [];
     onServerInfo(heightRes);
+    if (typeof stateSync === 'function') stateSync();   // descarga y chequeos: se sincronizan con el servidor si existe el SQL
   } catch (e) {
     if (retriesLeft > 0) {
       await new Promise(r => setTimeout(r, 1500));

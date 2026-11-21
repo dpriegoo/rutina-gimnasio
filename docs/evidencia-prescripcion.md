@@ -42,3 +42,15 @@ Se enseña siempre el motivo y la advertencia de que no hay criterio validado; �
 - Schoenfeld, Ogborn & Krieger, 2017, *J Sports Sci* (volumen semanal) y Schoenfeld et al., 2017, *J Strength Cond Res* (cargas bajas y altas).
 - Coleman et al., 2024 (descarga de una semana en entrenados).
 - Remmert et al., 2025; Pelland et al., 2026; Pancar et al., 2026 (no confirmadas).
+
+## Lo añadido en la v3 y su respaldo
+
+| Elemento | Respaldo |
+|---|---|
+| RIR anotado como capacidad real de la serie | Lógica, no ensayo: si se sabe cuántas quedaban, no hace falta suponerlo. La estimación tiene error (de media se subestima cerca de 1 repetición, más con más de 12), por eso es una propuesta editable. |
+| Calibración del RIR | Mismo motivo: mide TU sesgo en lugar de usar el promedio de la literatura. Solo en máquinas o poleas por seguridad. |
+| Calentamiento (50/70/85 % o 60/80 %) | Criterio práctico habitual, **sin evidencia verificada** de una rampa concreta. |
+| Saltos de carga aprendidos | Ingeniería: usar los escalones que de verdad tienes en cada máquina. |
+| Chequeo diario como señal de descarga | **Sin evidencia verificada** de que mejore la decisión frente a los datos de entreno. Opcional. |
+| Panel «¿te funciona el plan?» | Observación sin grupo de control; no demuestra causalidad. |
+

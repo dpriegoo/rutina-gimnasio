@@ -16,7 +16,7 @@
 <title>IronLog · Rutina de fuerza</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link rel="stylesheet" href="styles.css?v=e7f780a7">
+<link rel="stylesheet" href="styles.css?v=2e15ed8e">
 </head>
 <body>
 
@@ -46,6 +46,7 @@
   </div>
   <div class="priority-banner" id="priorityBanner" style="display:none;"></div>
   <div class="deload-card dl-none" id="deloadCard"></div>
+  <div class="checkin-card ck-none" id="checkinCard"></div>
   <div class="dp-grid" id="dpGrid"></div>
   <div class="dp-foot"><button type="button" class="week-summary-btn" onclick="showWeekSummary()"><span data-ic="clipboard"></span> Resumen de la semana</button></div>
   <details class="info">
@@ -148,6 +149,16 @@
       <span class="heatmap-cell" style="background:var(--heat4)"></span>
       <span>Más</span>
     </div>
+  </div>
+
+  <div class="metric-card" id="planPanelCard" data-msec="ejercicios">
+    <div class="metric-title">¿Te funciona el plan?</div>
+    <div id="planPanelBody"></div>
+  </div>
+
+  <div class="metric-card" id="calStatCard" data-msec="ejercicios">
+    <div class="metric-title">Calibrar tu RIR</div>
+    <div id="calStatBody"></div>
   </div>
 
   <div class="metric-card" data-msec="ejercicios">
@@ -307,6 +318,27 @@
     <button type="button" class="rc-btn" onclick="restAdjust(15)" aria-label="Añadir 15 segundos">+15</button>
     <button type="button" class="rc-btn rc-skip" onclick="restSkip()">Saltar</button>
   </div>
+  <div class="rc-rir" id="rcRir" hidden>
+    <span class="rc-rir-lbl">Te quedaban</span>
+    <div class="rir-chips" role="group" aria-label="Repeticiones que te quedaban al acabar la serie"></div>
+    <button type="button" class="rir-help-btn" onclick="rirHelpOpen()" aria-label="Cómo saber cuántas te quedaban">?</button>
+    <div class="rc-rir-hint">¿Habrías podido hacer otra con buena técnica? <span class="rc-opt">(opcional)</span></div>
+  </div>
+</div>
+
+<div class="sessdone" id="rirSheet" role="dialog" aria-modal="true" aria-labelledby="rirSheetTitle" style="display:none;">
+  <div class="sd-card" id="rirCard" tabindex="-1">
+    <h2 class="sd-title" id="rirSheetTitle" style="text-align:left;font-size:20px;">Cómo saber cuántas te quedaban</h2>
+    <div class="rir-help" id="rirHelpBody"></div>
+    <div class="sd-btns"><button type="button" class="pri" onclick="rirHelpClose()">Entendido</button><button type="button" onclick="rirHelpClose(); calOpen()">Calibrar mi RIR en una máquina</button></div>
+  </div>
+</div>
+
+<div class="sessdone" id="calSheet" role="dialog" aria-modal="true" aria-labelledby="calTitle" style="display:none;">
+  <div class="sd-card" id="calCard" tabindex="-1">
+    <h2 class="sd-title" id="calTitle" style="text-align:left;font-size:20px;">Calibrar mi RIR</h2>
+    <div id="calBody"></div>
+  </div>
 </div>
 
 <div class="sessionbar" id="sessionBar">
@@ -334,40 +366,44 @@
 <div class="toast" id="toast" role="status" aria-live="polite">Guardado ✓</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
-<script>window.IRONLOG_BUILD = '0f796161'; // lo escribe tools/stamp.js</script>
+<script>window.IRONLOG_BUILD = 'f945e889'; // lo escribe tools/stamp.js</script>
 <script src="js/motion.js?v=7298014a"></script>
 <script src="js/config.js?v=4d929179"></script>
 <script src="js/ui-icons.js?v=bcc3f18b"></script>
 <script src="js/utils.js?v=3734d2d1"></script>
 <script src="js/icons.js?v=91462c98"></script>
 <script src="js/routine-default.js?v=7400eda4"></script>
-<script src="js/api-supabase.js?v=c23ddc13"></script>
+<script src="js/api-supabase.js?v=c031580b"></script>
 <script src="js/api.js?v=684a8597"></script>
 <script src="js/auth.js?v=25c0501e"></script>
 <script src="js/routine.js?v=f17fbe87"></script>
-<script src="js/outbox.js?v=9b013bbe"></script>
+<script src="js/outbox.js?v=dc6cb8f3"></script>
 <script src="js/body-svg.js?v=3fc81c63"></script>
 <script src="js/muscles.js?v=6f3b7688"></script>
 <script src="js/planning.js?v=5e449824"></script>
 <script src="js/body.js?v=a784bc90"></script>
 <script src="js/history.js?v=4c11d7b3"></script>
-<script src="js/metrics.js?v=3fc6e695"></script>
+<script src="js/metrics.js?v=4a017133"></script>
 <script src="js/summary.js?v=1f827f4d"></script>
-<script src="js/prescription.js?v=30edaa1f"></script>
-<script src="js/deload.js?v=232262ef"></script>
-<script src="js/training.js?v=9e776da9"></script>
-<script src="js/export.js?v=2c1c0a3d"></script>
+<script src="js/prescription.js?v=f30ad127"></script>
+<script src="js/deload.js?v=9c28db67"></script>
+<script src="js/checkin.js?v=4398e89b"></script>
+<script src="js/state-sync.js?v=7d7ab950"></script>
+<script src="js/training.js?v=1556e83a"></script>
+<script src="js/rir.js?v=aa0153d6"></script>
+<script src="js/plan-panel.js?v=2b3ec21d"></script>
+<script src="js/export.js?v=44e3eea4"></script>
 <script src="js/feel-data.js?v=72b2bdef"></script>
 <script src="js/feel-anim.js?v=254a5b63"></script>
 <script src="js/feel.js?v=e98b2186"></script>
 <script src="js/progress-chart.js?v=a38785d4"></script>
 <script src="js/day-view.js?v=119775f3"></script>
-<script src="js/day-picker.js?v=06010b97"></script>
+<script src="js/day-picker.js?v=0a9a67cb"></script>
 <script src="js/coach-tools.js?v=907afa22"></script>
 <script src="js/coach.js?v=79e01680"></script>
 <script src="js/coach-ui.js?v=6eaadc4a"></script>
 <script src="js/editor.js?v=8950581e"></script>
-<script src="js/progress.js?v=4497a730"></script>
+<script src="js/progress.js?v=e0415c15"></script>
 <script src="js/navigation.js?v=e3b94915"></script>
 <script src="js/main.js?v=c038782c"></script>
 

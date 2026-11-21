@@ -24,6 +24,7 @@ function setMetricsSection(sec){
   if (MT_SECTIONS.indexOf(sec) < 0) sec = 'resumen';
   try { localStorage.setItem('mtSection', sec); } catch (e) {}
   document.querySelectorAll('#metricasView [data-msec]').forEach(el => el.classList.toggle('mt-hidden', el.getAttribute('data-msec') !== sec));
+  if (sec === 'ejercicios') { if (typeof renderCalCard === 'function') renderCalCard(); if (typeof renderPlanPanel === 'function') renderPlanPanel(); }
   MT_SECTIONS.forEach(n => {
     const b = document.getElementById('mtTab' + n.charAt(0).toUpperCase() + n.slice(1)); if (!b) return;
     b.classList.toggle('on', n === sec); b.setAttribute('aria-pressed', String(n === sec));

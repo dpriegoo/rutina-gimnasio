@@ -155,7 +155,7 @@ const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
   const vis = sec => [...d.querySelectorAll('#metricasView [data-msec]')].filter(e => !e.classList.contains('mt-hidden')).map(e => e.getAttribute('data-msec') + ':' + text(e.querySelector('.metric-title')));
   assert(vis().every(x => x.startsWith('resumen:')) && vis().length === 4, 'Resumen: ' + vis().join(' | '));
   w.setMetricsSection('cuerpo'); assert.deepStrictEqual(vis(), ['cuerpo:Mi peso', 'cuerpo:Peso corporal']); assert.strictEqual(d.getElementById('mtTabCuerpo').getAttribute('aria-pressed'), 'true'); assert.strictEqual(d.getElementById('mtTabResumen').getAttribute('aria-pressed'), 'false');
-  w.setMetricsSection('ejercicios'); assert.deepStrictEqual(vis(), ['ejercicios:Historial reciente', 'ejercicios:Progresión del ejercicio']);
+  w.setMetricsSection('ejercicios'); assert.deepStrictEqual(vis(), ['ejercicios:¿Te funciona el plan?', 'ejercicios:Calibrar tu RIR', 'ejercicios:Historial reciente', 'ejercicios:Progresión del ejercicio']);
   w.setMetricsSection('datos'); assert.deepStrictEqual(vis(), ['datos:Sincronización', 'datos:Exportar datos']); assert.strictEqual(w.metricsSectionSaved(), 'datos', 'se recuerda la sección');
   w.setMetricsSection('inventada'); assert(vis().every(x => x.startsWith('resumen:')), 'una sección desconocida vuelve a Resumen'); w.setMetricsSection('resumen');
   assert.strictEqual(d.querySelectorAll('.mt-subnav button').length, 4);

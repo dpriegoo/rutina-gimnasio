@@ -88,6 +88,7 @@ function outboxEntryToRow(e){
     'Fecha': e.fecha, 'Perfil': e.perfil, 'Día': e.dia, 'Grupo': e.grupo,
     'Ejercicio': e.ejercicio, 'Peso (kg)': e.peso, 'Reps': e.reps, 'Series': e.series,
     'Nota': e.nota, 'ID': e.id, 'Variante': e.variante, 'Calentamiento': e.calentamiento,
+    'RIR': (e.rir === null || e.rir === undefined) ? '' : e.rir,
     '_unsynced': true,
   };
 }
@@ -208,6 +209,7 @@ async function acceptPending(logId){
     peso: r.peso, reps: r.reps, series: 1,
     variante: r.variante || '',
     calentamiento: !!r.calentamiento,
+    rir: (r.rir === undefined || r.rir === '') ? null : r.rir,
     nota: r.nota || '',
     id: r.id || (Date.now() + '-' + Math.random().toString(36).slice(2, 7)), // fallback por si venía de un pendiente guardado antes de este cambio
   }));

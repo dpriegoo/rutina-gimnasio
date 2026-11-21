@@ -100,10 +100,41 @@ function prescriptionSpec(ex, variante){
   return { cat: cat, catLabel: base.label, rango: rango, rir: rir, descanso: descanso, timed: timed, series: 3, nota: nota, notaReps: notaReps, paso: Number(ex.paso_kg) > 0 ? Number(ex.paso_kg) : null };
 }
 
-function rxStep(ex, spec){
+// Salto de carga: el que pongas a mano en la rutina (paso_kg) > el que se deduce de tus cargas anteriores en ese ejercicio y esa máquina
+// (el salto más repetido entre las cargas distintas que has usado: 1,25 en unos, 5 en otras máquinas) > 2 kg con mancuernas, 2,5 en el resto
+function rxLearnStep(ejercicio, variante){
+  const seen = {};
+  myRows().forEach(r => {
+    if (r['Ejercicio'] !== ejercicio || isWarmupRow(r) || !sameMachine(r, variante || '')) return;
+    const p = Number(r['Peso (kg)']); if (p > 0) seen[Math.round(p * 100) / 100] = true;
+  });
+  const l = Object.keys(seen).map(Number).sort((a, b) => a - b);
+  if (l.length < 4) return null;
+  const freq = {};
+  for (let i = 1; i < l.length; i++) { const d = Math.round((l[i] - l[i - 1]) * 100) / 100; if (d >= 0.5 && d <= 10) freq[d] = (freq[d] || 0) + 1; }
+  let best = null;
+  Object.keys(freq).forEach(k => { const d = Number(k); if (freq[k] >= 2 && (best === null || freq[k] > freq[best] || (freq[k] === freq[best] && d < best))) best = d; });
+  return best;
+}
+function rxStep(ex, spec, variante){
   if (spec && spec.paso) return spec.paso;
+  const learned = ex && rxLearnStep(ex.name, variante);
+  if (learned) return learned;
   const txt = rxKey((ex && ex.primary) + ' ' + (ex && ex.name));
   return /mancuerna/.test(txt) ? 2 : 2.5;
+}
+
+// Calentamiento sugerido para un pesado: rampa hacia la carga de trabajo (criterio práctico; no hay evidencia verificada de una rampa concreta).
+// Con 40 kg o más, 3 series (50 % × 8, 70 % × 5, 85 % × 3); con menos, 2 (60 % × 6, 80 % × 3). Redondeado a tu salto de carga.
+function rxWarmup(ex, spec, peso, step){
+  if (!spec || spec.cat !== 'pesado' || spec.timed || !(peso >= 4 * step)) return [];
+  const ramp = peso >= 40 ? [[0.5, 8], [0.7, 5], [0.85, 3]] : [[0.6, 6], [0.8, 3]];
+  const out = [];
+  ramp.forEach(f => {
+    const p = Math.round(Math.max(step, Math.round(peso * f[0] / step) * step) * 100) / 100;
+    if (p < peso && (!out.length || p > out[out.length - 1].peso)) out.push({ peso: p, reps: f[1] });
+  });
+  return out;
 }
 
 function rxRestSeconds(spec){ return Math.round(((spec.descanso[0] + spec.descanso[1]) / 2) / 5) * 5; }
@@ -115,20 +146,26 @@ function rxRirHelp(r){ return r === 0 ? 'Hasta la última repetición con técni
 // ---------- Historial de un ejercicio en una máquina ----------
 // Sesiones (una por fecha) con sus series de trabajo en el orden registrado. Si la primera serie es mucho más ligera que
 // las demás, se trata como un calentamiento anotado como serie de trabajo (pasa a menudo) y no cuenta.
+// Series de trabajo de una sesión en el orden registrado; si la primera es mucho más ligera que las demás se trata como un calentamiento anotado como trabajo
+function rxCleanSets(list){
+  let sets = list.slice().sort((a, b) => a.i - b.i);
+  if (sets.length >= 3 && sets[0].peso > 0) {
+    const rest = sets.slice(1).map(s => s.peso).sort((a, b) => a - b), med = rest[Math.floor(rest.length / 2)];
+    if (med > 0 && sets[0].peso <= 0.85 * med) sets = sets.slice(1);
+  }
+  return sets;
+}
+
 function rxSessions(ejercicio, variante){
   const hoy = localDateStr();
   const rows = myRows().filter(r => r['Ejercicio'] === ejercicio && !isWarmupRow(r) && sameMachine(r, variante));
   const byDate = {};
   rows.forEach((r, i) => {
     const f = String(r['Fecha']).slice(0, 10);
-    (byDate[f] = byDate[f] || []).push({ peso: Number(r['Peso (kg)']) || 0, reps: Number(r['Reps']) || 0, i: i });
+    (byDate[f] = byDate[f] || []).push({ peso: Number(r['Peso (kg)']) || 0, reps: Number(r['Reps']) || 0, rir: (typeof rowRir === 'function' ? rowRir(r) : null), i: i });
   });
   return Object.keys(byDate).sort().map(f => {
-    let sets = byDate[f].sort((a, b) => a.i - b.i);
-    if (sets.length >= 3 && sets[0].peso > 0) {
-      const rest = sets.slice(1).map(s => s.peso).sort((a, b) => a - b), med = rest[Math.floor(rest.length / 2)];
-      if (med > 0 && sets[0].peso <= 0.85 * med) sets = sets.slice(1);
-    }
+    const sets = rxCleanSets(byDate[f]);
     return { fecha: f, sets: sets };
   }).filter(s => s.sets.length && s.fecha !== hoy && !(typeof deloadOn === 'function' && deloadOn(s.fecha)));   // el plan de HOY sale de sesiones anteriores (lo que registras hoy no lo cambia) y las semanas de descarga no cuentan: se entrenó menos a propósito
 }
@@ -143,7 +180,18 @@ function rxModalLoad(sets){
 
 function rxPlansKey(){ return 'rxPlans_' + getProfile(); }
 function rxLoadPlans(){ try { return JSON.parse(localStorage.getItem(rxPlansKey()) || '{}'); } catch (e) { return {}; } }
+// Registro de los planes que viste (para el panel «¿te funciona el plan?»): fecha, ejercicio, objetivo y RIR. Y desde cuándo usas el plan.
+function rxLogKey(){ return 'rxPlanLog_' + getProfile(); }
+function rxSchemeKey(){ return 'rxSchemeStart_' + getProfile(); }
+function rxPlanLog(){ try { const l = JSON.parse(localStorage.getItem(rxLogKey()) || '[]'); return Array.isArray(l) ? l : []; } catch (e) { return []; } }
+function rxSchemeStart(){ try { return localStorage.getItem(rxSchemeKey()) || null; } catch (e) { return null; } }
+function rxLogPlan(ejercicio, variante, plan){
+  const hoy = localDateStr(), l = rxPlanLog().filter(x => !(x.fecha === hoy && x.ej === ejercicio && x.v === (variante || '')));
+  l.push({ fecha: hoy, ej: ejercicio, v: variante || '', peso: plan.peso, targets: plan.sets.map(s => s.reps), rir: plan.sets.map(s => s.rir) });
+  try { localStorage.setItem(rxLogKey(), JSON.stringify(l.slice(-600))); if (!rxSchemeStart()) localStorage.setItem(rxSchemeKey(), hoy); } catch (e) {}
+}
 function rxSavePlan(ejercicio, variante, plan){
+  rxLogPlan(ejercicio, variante, plan);
   const all = rxLoadPlans();
   all[ejercicio + '|' + (variante || '')] = { fecha: localDateStr(), peso: plan.peso, targets: plan.sets.map(s => s.reps), rir: plan.sets.map(s => s.rir) };
   try { localStorage.setItem(rxPlansKey(), JSON.stringify(all)); } catch (e) {}
@@ -158,7 +206,7 @@ function rxLoadFor(L, capNow, capWanted, step){
 // ---------- Plan de hoy ----------
 // Devuelve { peso, sets: [{ n, reps, rir }], motivo, descanso, spec, primera, cambioCarga }
 function rxPlanNormal(ex, variante){
-  const spec = prescriptionSpec(ex, variante), step = rxStep(ex, spec), lo = spec.rango[0], hi = spec.rango[1];
+  const spec = prescriptionSpec(ex, variante), step = rxStep(ex, spec, variante), lo = spec.rango[0], hi = spec.rango[1];
   const mk = (peso, reps, motivo, extra) => Object.assign({
     peso: peso, sets: reps.map((r, i) => ({ n: i + 1, reps: r, rir: spec.rir[i] })), motivo: motivo, descanso: rxRestSeconds(spec), spec: spec, primera: false, cambioCarga: 0,
   }, extra || {});
@@ -170,6 +218,11 @@ function rxPlanNormal(ex, variante){
   const L = spec.timed ? 0 : rxModalLoad(last.sets);
   const atL = last.sets.filter(s => s.peso === L).map(s => s.reps);
   const R = [0, 1, 2].map(i => atL[i] !== undefined ? atL[i] : atL[atL.length - 1]);
+  // Capacidad de cada serie: lo que hiciste + el RIR que anotaste (si no lo anotaste, se supone que acabaste cerca del fallo)
+  const atLr = last.sets.filter(s => s.peso === L).map(s => s.rir);
+  const Rir = [0, 1, 2].map(i => { const v = atLr[i] !== undefined ? atLr[i] : atLr[atLr.length - 1]; return (v === null || v === undefined) ? null : v; });
+  const rirKnown = Rir.some(v => v !== null);
+  const cap = [0, 1, 2].map(i => R[i] + (Rir[i] === null ? 0 : Rir[i]));
   const prev = rxLoadPlans()[ex.name + '|' + (variante || '')];
   const havePrev = prev && prev.fecha === last.fecha && prev.peso === L && Array.isArray(prev.targets) && prev.targets.length === 3;
 
@@ -189,14 +242,14 @@ function rxPlanNormal(ex, variante){
   }
   // 3) Sin plan previo: se parte de lo que hiciste (se supone que cerca del fallo) restándole el RIR de cada serie
   if (spec.timed) return mk(0, [0, 1, 2].map(i => Math.max(lo, Math.min(hi, R[i]))), 'Parte de lo que lograste la última vez.');
-  const T = [0, 1, 2].map(i => R[i] - spec.rir[i]);
+  const T = [0, 1, 2].map(i => cap[i] - spec.rir[i]);
   if (T[0] < lo) {
-    const nuevo = rxLoadFor(L, R[0], lo + spec.rir[0], step);
+    const nuevo = rxLoadFor(L, cap[0], lo + spec.rir[0], step);
     const cambio = Math.round((nuevo - L) * 100) / 100;
     if (nuevo < L) return mk(nuevo, [lo, lo, lo], 'Con ' + rxRirLabel(spec.rir[0]) + ' desde la primera serie, tu carga útil baja un poco: prueba ' + fmtNum(nuevo, 2) + ' kg y apunta a ' + lo + ' repeticiones.', { cambioCarga: cambio });
   }
   const reps = T.map(t => Math.max(lo, Math.min(hi, t)));
-  return mk(L, reps, 'Parte de ' + R.join('·') + ' (' + fmtNum(L, 2) + ' kg): reparto sostenible dejando margen en las primeras series.');
+  return mk(L, reps, 'Parte de ' + R.join('·') + ' (' + fmtNum(L, 2) + ' kg)' + (rirKnown ? ' y del RIR que anotaste (' + Rir.map(v => v === null ? '?' : v).join('·') + ')' : '') + ': reparto sostenible dejando margen en las primeras series.');
 }
 
 // Plan de hoy. En una semana de descarga: las primeras DELOAD_SERIES series del plan normal, con la carga de siempre y un RIR más
@@ -219,6 +272,6 @@ function rxWeekSets(dia, ejercicio){
   const weekStart = getWeekStart();
   return myRows()
     .filter(r => r['Día'] === dia && r['Ejercicio'] === ejercicio && !isWarmupRow(r) && parseLocalDate(r['Fecha']) >= weekStart)
-    .map((r, i) => ({ peso: Number(r['Peso (kg)']) || 0, reps: Number(r['Reps']) || 0, variante: r['Variante'] || '', fecha: String(r['Fecha']).slice(0, 10), id: r['ID'], i: i }))
+    .map((r, i) => ({ peso: Number(r['Peso (kg)']) || 0, reps: Number(r['Reps']) || 0, variante: r['Variante'] || '', fecha: String(r['Fecha']).slice(0, 10), id: r['ID'], rir: (typeof rowRir === 'function' ? rowRir(r) : null), i: i }))
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.i - b.i);
 }

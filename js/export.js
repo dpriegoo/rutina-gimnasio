@@ -12,7 +12,7 @@
 // Depende de: utils, routine (DAYS), outbox (getOutbox), api (fetchSheetData, postToSheet), planning.
 // =====================================================================
 
-const EXPORT_COLS = ['fecha', 'dia', 'grupo', 'ejercicio', 'peso_kg', 'reps', 'series', 'variante', 'calentamiento', 'nota'];
+const EXPORT_COLS = ['fecha', 'dia', 'grupo', 'ejercicio', 'peso_kg', 'reps', 'series', 'variante', 'calentamiento', 'rir', 'nota'];
 const EXPORT_WEIGHT_COLS = ['fecha', 'peso_kg'];
 const EXPORT_BIG_KB = 600;                 // a partir de aquí se avisa de que el archivo es grande
 const EXPORT_STALE_MS = 60 * 1000;         // al abrir Métricas se vuelve a descargar de la base si hace más de esto
@@ -34,6 +34,7 @@ const EXPORT_LEYENDA = {
     series: 'nº de series que representa la fila: peso_kg × reps repetido «series» veces (normalmente 1)',
     variante: 'máquina o variante usada; vacío = la habitual (la «maquina_habitual» de la rutina)',
     calentamiento: '1 = serie de calentamiento, 0 = serie de trabajo',
+    rir: 'repeticiones que le quedaban al acabar la serie (0 = fallo técnico; 3 = tres o más); vacío = no lo anotó, NO asumas que fue al fallo',
     nota: 'comentario libre del usuario',
   },
   notas: [
@@ -63,7 +64,7 @@ function exportCollect(o){
   const series = rows.map(r => ({
     fecha: exportDay(r), dia: exportShortDay(r['Día']), grupo: r['Grupo'] || '', ejercicio: r['Ejercicio'] || '',
     peso_kg: exportNum(r['Peso (kg)']), reps: exportNum(r['Reps']), series: exportNum(r['Series']) || 1,
-    variante: r['Variante'] || '', calentamiento: isWarmupRow(r) ? 1 : 0, nota: r['Nota'] || '',
+    variante: r['Variante'] || '', calentamiento: isWarmupRow(r) ? 1 : 0, rir: rowRir(r), nota: r['Nota'] || '',
   }));
   const work = rows.filter(r => !isWarmupRow(r));
   const dates = {}; work.forEach(r => { dates[exportDay(r)] = true; });

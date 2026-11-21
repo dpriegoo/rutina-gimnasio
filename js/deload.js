@@ -27,7 +27,7 @@ function deloadList(){
     return Array.isArray(l) ? l.filter(p => p && /^\d{4}-\d{2}-\d{2}$/.test(p.start) && /^\d{4}-\d{2}-\d{2}$/.test(p.end)) : [];
   } catch (e) { return []; }
 }
-function deloadSave(l){ try { localStorage.setItem(deloadListKey(), JSON.stringify(l)); } catch (e) {} }
+function deloadSave(l){ try { localStorage.setItem(deloadListKey(), JSON.stringify(l)); } catch (e) {} if (typeof stateTouch === 'function') stateTouch('deload'); }
 function deloadAddDays(dateStr, n){ const d = parseLocalDate(dateStr); d.setDate(d.getDate() + n); return localDateStr(d); }
 
 // ¿Cae esa fecha dentro de alguna descarga (pasada o actual)?
@@ -142,7 +142,7 @@ function deloadSuggestion(){
   const snooze = localStorage.getItem(deloadSnoozeKey());
   if (snooze && localDateStr() <= snooze) return null;
   const cache = window._progressCache || [];
-  const key = cache.length + '|' + localDateStr() + '|' + JSON.stringify(deloadList()) + '|' + JSON.stringify(rxLoadPlans()).length + '|' + (typeof getOutbox === 'function' ? getOutbox().length : 0);
+  const key = cache.length + '|' + localDateStr() + '|' + JSON.stringify(deloadList()) + '|' + (typeof checkinList === 'function' ? JSON.stringify(checkinList()).length : 0) + '|' + JSON.stringify(rxLoadPlans()).length + '|' + (typeof getOutbox === 'function' ? getOutbox().length : 0);
   const memo = _deloadMemo.get(cache);
   if (memo && memo.key === key) return memo.value;
   const reasons = []; let strong = false;
@@ -150,6 +150,8 @@ function deloadSuggestion(){
   if (perf && perf.ratio <= DELOAD_PERF_RATIO) { strong = true; reasons.push('Tu fuerza estimada de las últimas 2 semanas está un ' + Math.round((1 - perf.ratio) * 100) + ' % por debajo de tu media de las 6 anteriores (' + perf.n + ' ejercicios).'); }
   const adh = deloadAdherence();
   if (adh.planned >= DELOAD_ADHERENCE_SETS && adh.met / adh.planned < DELOAD_ADHERENCE_MIN) { strong = true; reasons.push('Solo cumpliste ' + adh.met + ' de ' + adh.planned + ' series del plan en los últimos 14 días.'); }
+  const ck = typeof checkinLow === 'function' ? checkinLow() : null;
+  if (ck && ck.signal) { strong = true; reasons.push('En ' + ck.low + ' de tus últimos ' + ck.n + ' chequeos marcaste sueño, agujetas o energía en niveles bajos.'); }
   const wk = deloadWeeksSince();
   if (wk >= DELOAD_WEEKS_SOFT) reasons.push('Llevas ' + wk + ' semanas seguidas entrenando sin una descarga.');
   const value = reasons.length ? { reasons: reasons, soft: !strong } : null;
@@ -158,7 +160,8 @@ function deloadSuggestion(){
 }
 
 // ---------- Tarjeta del selector de día ----------
-let deloadManualOpen = false;
+let deloadManualOpen = false, deloadExpanded = false;
+function deloadExpand(){ deloadExpanded = true; renderDeloadCard(); }
 function deloadToggleManual(){ deloadManualOpen = !deloadManualOpen; renderDeloadCard(); }
 function deloadDM(s){ return s.slice(8, 10) + '/' + s.slice(5, 7); }
 
@@ -176,10 +179,12 @@ function renderDeloadCard(){
     const sug = deloadSuggestion();
     if (sug) {
       cls = sug.soft ? 'dl-soft' : 'dl-sug';
-      html = '<div class="dl-title">' + uiIcon('info') + ' ' + (sug.soft ? 'Podrías descargar esta semana' : 'Te sugiero una semana de descarga') + '</div>' +
+      // El aviso suave (solo por semanas seguidas) va plegado en una línea para no empujar las fichas de día; el que tiene una señal real, abierto
+      if (sug.soft && !deloadExpanded) html = '<button type="button" class="dl-line" aria-expanded="false" onclick="deloadExpand()">' + uiIcon('info') + ' <span>Podrías descargar esta semana</span><span class="grow"></span>' + uiIcon('chevD', 's') + '</button>';
+      else html = '<div class="dl-title">' + uiIcon('info') + ' ' + (sug.soft ? 'Podrías descargar esta semana' : 'Te sugiero una semana de descarga') + '</div>' +
         '<ul class="dl-why">' + sug.reasons.map(r => '<li>' + escHtml(r) + '</li>').join('') + '</ul>' +
-        '<div class="dl-text">' + escHtml(how) + '</div>' +
-        '<div class="dl-text dl-caveat">No hay un criterio validado sobre cuándo descargar: es una sugerencia a partir de tus datos. Si te encuentras bien, no la necesitas.</div>' +
+        '<div class="dl-text dl-caveat">No hay un criterio validado sobre cuándo descargar: es una sugerencia a partir de tus datos, no una regla. Si te encuentras bien, no la necesitas.</div>' +
+        '<details class="dl-more"><summary>Qué incluye una descarga</summary><div class="dl-text">' + escHtml(how) + '</div></details>' +
         '<div class="dl-btns"><button type="button" class="dl-btn pri" onclick="deloadStart()">Empezar descarga</button><button type="button" class="dl-btn" onclick="deloadSnooze()">Ahora no</button></div>';
     } else if (deloadManualOpen) {
       cls = 'dl-man';

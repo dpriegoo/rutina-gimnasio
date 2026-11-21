@@ -1662,3 +1662,85 @@
   .day-back, .day-compare-btn, .week-summary-btn, .refresh-btn, .day-edit-btn, .log-add, .accept-btn, .undo-btn, .modal-btn, .ed-archive-btn, .exp-btn, .exp-chip, .sum-add-btn, .dl-btn, .sr-go, .sb-next, .rc-btn, .edit-order-btn, .link-btn, .coach-chip, .summary-close, .pg-close, .coach-icon{display:inline-flex; align-items:center; justify-content:center; gap:6px; line-height:1.2; text-align:center;}
   .day-compare-btn, .refresh-btn, .day-edit-btn, .accept-btn, .undo-btn, .ed-archive-btn{display:flex;}
   .ex-bar .day-compare-btn{display:inline-flex;}
+
+  /* RIR real: anotar cuántas te quedaban */
+  .restcard{flex-wrap:wrap;}
+  .rc-rir{flex:1 1 100%; display:flex; flex-wrap:wrap; align-items:center; grid-gap:4px 8px; gap:4px 8px; border-top:1px solid var(--card-border); padding-top:8px;}
+  .rc-rir[hidden]{display:none;}
+  .rc-rir .rir-chips{flex:1 1 150px; min-width:0;}
+  .rc-rir .rir-help-btn{margin:0 -6px 0 0;}
+  .rc-rir.picked .rc-rir-hint{display:none;}
+  .rc-rir-lbl{font-size:14px; font-weight:700;}
+  .rc-opt{font-weight:400; color:var(--muted);}
+  .rc-rir-hint{flex:1 1 100%; font-size:13px; color:var(--muted); line-height:1.35;}
+  .rir-help-btn{-webkit-appearance:none; appearance:none; width:var(--tap); height:var(--tap); margin:-8px -6px -8px 0; border-radius:99px; border:0; background:none; color:var(--blue-text); font-family:inherit; font-size:16px; font-weight:700; display:inline-flex; align-items:center; justify-content:center;}
+  .rir-chips{display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); grid-gap:6px; gap:6px;}
+  .rir-pick{-webkit-appearance:none; appearance:none; min-height:var(--tap); min-width:0; border-radius:12px; border:1px solid var(--card-border); background:var(--icon-bg); color:var(--text); font-family:inherit; font-size:16px; font-weight:700;}
+  .rir-pick[aria-pressed="true"]{background:var(--blue-btn); border-color:var(--blue-btn); color:var(--on-accent);}
+  .rir-tag{-webkit-appearance:none; appearance:none; min-height:var(--tap); padding:0 10px; border-radius:12px; border:1px solid var(--card-border); background:var(--icon-bg); color:var(--text); font-family:inherit; font-size:13px; font-weight:700;}
+  .rir-tag.none{background:none; color:var(--blue-text); border-style:dashed;}
+  .rir-inline{flex:1 1 100%;}
+  .rir-list{margin:8px 0; padding-left:20px; font-size:14px; line-height:1.5;}
+  .rir-help p{font-size:14px; line-height:1.5; margin:10px 0 0;}
+  .rir-mine{color:var(--amber-pale);}
+
+  /* Calentamiento sugerido */
+  .warm-box{border:1px solid var(--card-border); border-radius:12px; background:var(--icon-bg); padding:0 12px;}
+  .warm-toggle{-webkit-appearance:none; appearance:none; display:flex; align-items:center; gap:8px; width:100%; min-height:var(--tap); padding:0; background:none; border:0; color:var(--text); font-family:inherit; font-size:14px; font-weight:600; text-align:left;}
+  .warm-toggle .grow{flex:1;}
+  .warm-toggle{white-space:nowrap;}
+  .warm-toggle .mini-sub{overflow:hidden; text-overflow:ellipsis;}
+  .warm-rows{padding:0 0 10px;}
+  .warm-row{display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:var(--tap); border-top:1px solid var(--card-border);}
+  .warm-txt{font-size:15px; font-weight:700;}
+  .warm-row.done .warm-txt{color:var(--muted);}
+  .warm-ok{color:var(--green); display:inline-flex; padding:0 10px;}
+  .warm-go{-webkit-appearance:none; appearance:none; min-width:76px; min-height:var(--tap); border-radius:12px; border:1px solid var(--card-border); background:var(--card); color:var(--text); font-family:inherit; font-size:14px; font-weight:700;}
+  .warm-go[disabled]{opacity:0.4;}
+
+  /* Calibración */
+  .cal-p{font-size:14px; line-height:1.5; margin:10px 0 0;}
+  .cal-warn{color:var(--amber-pale);}
+  .cal-res{font-size:18px; margin-top:12px;}
+  .cal-stp{margin-top:14px;}
+  .cal-stp .v{font-size:24px;}
+  .cal-big{font-size:36px; font-weight:700; line-height:1.1;}
+
+  /* Panel del plan */
+  .pp-wrap{overflow-x:auto;}
+  .pp-table{width:100%; border-collapse:collapse; font-size:13px;}
+  .pp-table th, .pp-table td{padding:8px 6px; text-align:right; border-top:1px solid var(--card-border); font-variant-numeric:tabular-nums;}
+  .pp-table thead th{border-top:0; color:var(--muted); font-weight:600;}
+  .pp-table tbody th{text-align:left; font-weight:500;}
+  .pp-read{margin:12px 0 0; padding-left:18px; font-size:14px; line-height:1.5;}
+  .pp-read li{margin-top:4px;}
+
+  /* Chequeo diario */
+  .checkin-card{margin:12px 16px 0; padding:12px 14px; border-radius:16px; background:var(--card); border:1px solid var(--card-border);}
+  .checkin-card.ck-none{display:none;}
+  .checkin-card.ck-done{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 14px;}
+  .ck-sum{font-size:13px; color:var(--muted); display:flex; align-items:center; gap:6px;}
+  .ck-head{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+  .ck-head .grow{flex:1;}
+  .ck-title{font-size:15px; font-weight:700;}
+  .ck-opt{font-size:12px; color:var(--muted);}
+  .ck-row{display:flex; align-items:center; gap:10px; margin-top:6px;}
+  .ck-lbl{flex:0 0 64px; font-size:13px; color:var(--muted); font-weight:600;}
+  .ck-chips{flex:1; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); grid-gap:6px; gap:6px;}
+  .ck-chip{-webkit-appearance:none; appearance:none; min-height:var(--tap); border-radius:12px; border:1px solid var(--card-border); background:var(--icon-bg); color:var(--text); font-family:inherit; font-size:13px; font-weight:600;}
+  .ck-chip[aria-pressed="true"]{background:var(--blue-btn); border-color:var(--blue-btn); color:var(--on-accent);}
+  .lbl{display:block; margin:14px 0 6px; font-size:13px; font-weight:600; color:var(--muted);}
+  .cal-p + .rir-chips{margin-top:10px;}
+  .dl-line{-webkit-appearance:none; appearance:none; display:flex; align-items:center; gap:8px; width:100%; min-height:var(--tap); padding:0; background:none; border:0; color:var(--text); font-family:inherit; font-size:15px; font-weight:700; text-align:left;}
+  .dl-line .grow{flex:1;}
+  .deload-card.dl-soft{padding:4px 14px;}
+  .dl-more{margin-top:6px;}
+  .dl-more summary{min-height:var(--tap); display:flex; align-items:center; font-size:13px; font-weight:600; color:var(--blue-text); cursor:pointer; list-style:none;}
+  .dl-more summary::-webkit-details-marker{display:none;}
+  .dl-more .dl-text{margin-top:0;}
+  .checkin-card.ck-line{display:flex; align-items:center; gap:4px; padding:4px 14px;}
+  .ck-line .grow{flex:1;}
+  @media (max-width:359px){
+    /* en pantallas muy estrechas la etiqueta cede su sitio a las casillas (el grupo conserva su nombre accesible) */
+    .rc-rir-lbl{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;}
+  }

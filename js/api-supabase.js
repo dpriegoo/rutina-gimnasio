@@ -51,11 +51,19 @@ function sbUnwrap(res){
   return res.data;
 }
 
+// ¿Existe la columna sets.rir? (supabase/rir.sql). Se detecta al descargar las series y se recuerda; sin ella el RIR queda solo en el dispositivo.
+function rirColumnReady(){ try { return localStorage.getItem('rirColumn') === '1'; } catch (e) { return false; } }
+function rirColumnSet(on){ try { localStorage.setItem('rirColumn', on ? '1' : '0'); } catch (e) {} }
+
+// ¿El error es «esa función no existe» (el SQL aún no se ha ejecutado)?
+function sbMissingFn(e){ return /PGRST202|42883|schema cache|does not exist|Could not find the function/i.test(String(e.code || '') + ' ' + String(e.message || '')); }
+
 function sbToSheetRow(r){
   return {
     'Fecha': r.fecha, 'Perfil': r.profile, 'Día': r.dia, 'Grupo': r.grupo, 'Ejercicio': r.ejercicio,
     'Peso (kg)': r.peso, 'Reps': r.reps, 'Series': r.series, 'Nota': r.nota || '', 'ID': r.id,
-    '1RM (kg)': r.rm == null ? '' : r.rm, 'Variante': r.variante || '', 'Calentamiento': !!r.calentamiento
+    '1RM (kg)': r.rm == null ? '' : r.rm, 'Variante': r.variante || '', 'Calentamiento': !!r.calentamiento,
+    'RIR': r.rir == null ? '' : r.rir
   };
 }
 
@@ -85,6 +93,11 @@ async function sbRequest(p){
           if (rows.length < step) break;
           from += step;
         }
+        // ¿Tiene la tabla la columna rir? (con filas, la clave viene en el resultado aunque sea null; sin filas se sondea)
+        try {
+          if (all.length) rirColumnSet('rir' in all[0]);
+          else { const pr = await sb.from('sets').select('rir').limit(1); rirColumnSet(!pr.error); }
+        } catch (e) {}
         // Volumen de la semana del compañero (un único número; sus series no se descargan)
         try {
           const wk = localDateStr(getWeekStart());
@@ -129,6 +142,24 @@ async function sbRequest(p){
         }).eq('id', String(p.id)));
         return { ok: true };
       }
+      case 'stateGet': {
+        // Estado de la app guardado en el servidor (supabase/estado.sql). Sin las funciones, se avisa y la app sigue en local.
+        const r = await sb.rpc('state_get', { k: String(p.key) });
+        if (r.error) { if (sbMissingFn(r.error)) return { unavailable: true }; sbUnwrap(r); }
+        const row = Array.isArray(r.data) ? r.data[0] : null;
+        return row ? { ok: true, value: row.value, updated_at: row.updated_at } : { ok: true, missing: true };
+      }
+      case 'stateSet': {
+        const r = await sb.rpc('state_set', { k: String(p.key), v: p.value });
+        if (r.error) { if (sbMissingFn(r.error)) return { unavailable: true }; sbUnwrap(r); }
+        return { ok: true, updated_at: r.data };
+      }
+      case 'setRir': {
+        // Anotar el RIR de una serie ya guardada. Sin la columna no hace nada (el valor queda en el dispositivo).
+        if (!rirColumnReady()) return { ok: true, local: true };
+        sbUnwrap(await sb.from('sets').update({ rir: p.rir == null ? null : Number(p.rir) }).eq('id', String(p.id)));
+        return { ok: true };
+      }
       case 'delete':
         sbUnwrap(await sb.from('sets').delete().eq('id', String(p.id)));
         return { ok: true };
@@ -144,14 +175,26 @@ async function sbRequest(p){
       default: {
         if (p.action) return { error: 'unknown_action' };
         const entries = Array.isArray(p) ? p : (p.entries || [p]);
-        const rows = entries.map(e => ({
-          id: String(e.id), profile: profile, fecha: e.fecha, dia: e.dia || null, grupo: e.grupo || null,
-          ejercicio: e.ejercicio, peso: Number(e.peso), reps: Number(e.reps), series: Number(e.series),
-          nota: e.nota || null, rm: sbEpley(e.peso, e.reps), variante: e.variante || null,
-          calentamiento: !!e.calentamiento
-        }));
+        const build = withRir => entries.map(e => {
+          const row = {
+            id: String(e.id), profile: profile, fecha: e.fecha, dia: e.dia || null, grupo: e.grupo || null,
+            ejercicio: e.ejercicio, peso: Number(e.peso), reps: Number(e.reps), series: Number(e.series),
+            nota: e.nota || null, rm: sbEpley(e.peso, e.reps), variante: e.variante || null,
+            calentamiento: !!e.calentamiento
+          };
+          if (withRir) row.rir = (e.rir === null || e.rir === undefined || e.rir === '') ? null : Number(e.rir);
+          return row;
+        });
         const tDb0 = Date.now();
-        if (rows.length) sbUnwrap(await sb.from('sets').upsert(rows, { onConflict: 'id', ignoreDuplicates: true }));
+        const rows = build(rirColumnReady());
+        if (rows.length) {
+          try { sbUnwrap(await sb.from('sets').upsert(rows, { onConflict: 'id', ignoreDuplicates: true })); }
+          catch (err) {
+            // Si la columna rir ya no existe (o nunca existió), se reintenta sin ella: guardar la serie es lo primero
+            if (rirColumnReady() && /rir/i.test(String((err && err.message) || err))) { rirColumnSet(false); sbUnwrap(await sb.from('sets').upsert(build(false), { onConflict: 'id', ignoreDuplicates: true })); }
+            else throw err;
+          }
+        }
         window._sbLast = { sess: tSess, db: Date.now() - tDb0 };
         return { ok: true, count: rows.length, skipped: 0, ms: Date.now() - t0 };
       }
