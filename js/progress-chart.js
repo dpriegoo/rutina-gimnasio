@@ -443,7 +443,7 @@ function renderProgressSheet(){
   sheet.innerHTML = '<div class="pg-grab"></div>' +
     '<div class="pg-shead"><div><h2>' + escHtml(ejercicio) + '</h2>' +
     (days.length ? '<div class="pg-where">' + days.map(d => '<span class="pg-chip">' + escHtml(d) + '</span>').join('') + '</div>' : '') +
-    '</div><button class="pg-close" type="button" id="pgClose" aria-label="Cerrar">✕</button></div>' +
+    '</div><button class="pg-close" type="button" id="pgClose" aria-label="Cerrar">' + uiIcon('x') + '</button></div>' +
     (days.length > 1 ? '<p class="pg-hint">Este ejercicio se hace en varios días: la gráfica los junta todos.</p>' : '') +
     machinesHtml +
     '<div class="pg-stats"><div class="pg-stat"><b>' + pgNum(cur) + '</b><span>' + (timed ? 'Última (s)' : 'Fuerza actual (kg)') + '</span></div>' +

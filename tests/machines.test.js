@@ -32,7 +32,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   // ---------- 2) La tarjeta sugiere según la máquina elegida ----------
   const sel = card.querySelector('.inp-variante');
-  assert(/updateCardHints/.test(sel.getAttribute('onchange')), 'al cambiar de máquina se refrescan las pistas');
+  assert(/onVariantChange|updateCardHints/.test(sel.getAttribute('onchange')), 'al cambiar de máquina se refrescan las pistas (y el plan)');
   w.updateCardHints(card);
   assert(/60/.test(card.querySelector('.inp-peso').placeholder) && !/90/.test(card.querySelector('.inp-peso').placeholder), 'habitual: sugiere 60, no 90: ' + card.querySelector('.inp-peso').placeholder);
   sel.value = SEC; w.updateCardHints(card);

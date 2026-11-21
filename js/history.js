@@ -83,6 +83,20 @@ function populateHistorialDaySelect(){
   if (DAYS.some(d => d.name === prevValue)) daySel.value = prevValue;
 }
 
+// Al abrir Métricas el historial ya enseña lo último que hiciste (en vez de pedirte elegir día y ejercicio antes de ver nada)
+function preloadHistorial(){
+  const daySel = document.getElementById('historialDaySelect'), exSel = document.getElementById('historialExerciseSelect');
+  if (!daySel || !exSel || daySel.value) return;
+  const rows = myRows().filter(r => r['ID'] && !isWarmupRow(r));
+  if (!rows.length) return;
+  rows.sort((a, b) => String(b['Fecha']).localeCompare(String(a['Fecha'])));
+  const last = rows[0];
+  if (!DAYS.some(d => d.name === last['Día'])) return;
+  daySel.value = last['Día'];
+  populateHistorialExerciseSelect();
+  if ([...exSel.options].some(o => o.value === last['Ejercicio'])) exSel.value = last['Ejercicio'];
+}
+
 function onHistorialDayChange(){
   populateHistorialExerciseSelect();
   renderHistorial();
@@ -142,7 +156,7 @@ function renderHistorial(){
               <input class="edit-reps" type="number" inputmode="numeric" value="${r['Reps']}" placeholder="segundos">
               <button class="draft-edit-save" onclick="saveEditHist('${id}')">OK</button>
             </div>
-            <button class="draft-del" type="button" aria-label="Cancelar edición" onclick="cancelEditHist()">✕</button>
+            <button class="draft-del" type="button" aria-label="Cancelar edición" onclick="cancelEditHist()">${uiIcon('x', 's')}</button>
           </div>
         `;
       }
@@ -154,20 +168,20 @@ function renderHistorial(){
             <input class="edit-series" type="number" inputmode="numeric" value="${r['Series']}" placeholder="series">
             <button class="draft-edit-save" onclick="saveEditHist('${id}')">OK</button>
           </div>
-          <button class="draft-del" type="button" aria-label="Cancelar edición" onclick="cancelEditHist()">✕</button>
+          <button class="draft-del" type="button" aria-label="Cancelar edición" onclick="cancelEditHist()">${uiIcon('x', 's')}</button>
         </div>
       `;
     }
     const badges = [
-      isWarmupRow(r) ? '🔥 calentamiento' : '',
-      r['Variante'] ? '🔀 ' + r['Variante'] : '',
-      r['Nota'] ? '📝 ' + r['Nota'] : '',
+      isWarmupRow(r) ? uiIcon('flame', 's') + ' calentamiento' : '',
+      r['Variante'] ? uiIcon('swap', 's') + ' ' + escHtml(r['Variante']) : '',
+      r['Nota'] ? uiIcon('pencil', 's') + ' ' + escHtml(r['Nota']) : '',
     ].filter(Boolean).join(' · ');
     return `
       <div class="draft-item" data-hist-id="${id}">
         <div class="di-text">${r['Ejercicio']}<div class="di-sub">${String(r['Fecha']).slice(0,10)} · ${timed ? r['Reps'] + ' seg' : fmtNum(parseFloat(r['Peso (kg)']), 2) + ' kg · ' + r['Reps'] + ' reps'} · ${r['Series']} series</div>${badges ? `<div class="di-sub" style="color:var(--amber);">${badges}</div>` : ''}</div>
-        <button class="draft-edit" type="button" aria-label="Editar serie" onclick="startEditHist('${id}')">✏️</button>
-        <button class="draft-del" type="button" aria-label="Borrar serie" onclick="deleteHist('${id}')">✕</button>
+        <button class="draft-edit" type="button" aria-label="Editar serie" onclick="startEditHist('${id}')">${uiIcon('pencil', 's')}</button>
+        <button class="draft-del" type="button" aria-label="Borrar serie" onclick="deleteHist('${id}')">${uiIcon('x', 's')}</button>
       </div>
     `;
   }).join('');

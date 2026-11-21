@@ -12,11 +12,11 @@ const COACH_STORE_MAX = 30;                 // mensajes que se recuerdan
 const COACH_STORE_HOURS = 24;               // pasado este tiempo la conversación empieza de cero
 
 const COACH_MENU = [
-  { id: 'week',     icon: '📅', label: 'Planificar lo que queda de semana' },
-  { id: 'today',    icon: '🏋️', label: 'Preguntar por un ejercicio de hoy' },
-  { id: 'exercise', icon: '📈', label: 'Progresión de un ejercicio' },
-  { id: 'overall',  icon: '🎯', label: '¿Voy bien? Revisión general' },
-  { id: 'free',     icon: '✍️', label: 'Otra pregunta' },
+  { id: 'week',     icon: 'clipboard', label: 'Planificar lo que queda de semana' },
+  { id: 'today',    icon: 'dumbbell', label: 'Preguntar por un ejercicio de hoy' },
+  { id: 'exercise', icon: 'chart', label: 'Progresión de un ejercicio' },
+  { id: 'overall',  icon: 'target', label: '¿Voy bien? Revisión general' },
+  { id: 'free',     icon: 'pencil', label: 'Otra pregunta' },
 ];
 
 const COACH_TOOL_LABEL = {
@@ -89,12 +89,6 @@ const COACH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 function coachEnsureUI(){
   if (document.getElementById('coachSheet')) return;
-  const fab = document.createElement('button');
-  fab.id = 'coachFab'; fab.type = 'button'; fab.className = 'coach-fab'; fab.hidden = true;
-  fab.setAttribute('aria-label', 'Preguntar a tu entrenador'); fab.setAttribute('aria-haspopup', 'dialog');
-  fab.innerHTML = COACH_ICON;
-  fab.onclick = coachOpen;
-
   const scrim = document.createElement('div'); scrim.id = 'coachScrim'; scrim.className = 'coach-scrim'; scrim.onclick = coachClose;
 
   const sheet = document.createElement('aside');
@@ -102,14 +96,14 @@ function coachEnsureUI(){
   sheet.setAttribute('role', 'dialog'); sheet.setAttribute('aria-modal', 'true'); sheet.setAttribute('aria-labelledby', 'coachTitle');
   sheet.innerHTML =
     '<header class="coach-head"><div><h2 id="coachTitle">Entrenador</h2><p>Responde con tus datos de IronLog</p></div>' +
-    '<button type="button" class="coach-icon" id="coachNew" aria-label="Nueva conversación">↺</button>' +
-    '<button type="button" class="coach-icon" id="coachClose" aria-label="Cerrar">✕</button></header>' +
+    '<button type="button" class="coach-icon" id="coachNew" aria-label="Nueva conversación">' + uiIcon('refresh') + '</button>' +
+    '<button type="button" class="coach-icon" id="coachClose" aria-label="Cerrar">' + uiIcon('x') + '</button></header>' +
     '<div class="coach-msgs" id="coachMsgs" role="log" aria-live="polite" aria-relevant="additions"></div>' +
     '<div class="coach-chips" id="coachChips"></div>' +
     '<div class="coach-compose"><textarea id="coachInput" rows="1" maxlength="1000" placeholder="Escribe tu pregunta…" aria-label="Tu pregunta"></textarea>' +
-    '<button type="button" class="coach-send" id="coachSend" aria-label="Enviar">➤</button></div>';
+    '<button type="button" class="coach-send" id="coachSend" aria-label="Enviar">' + uiIcon('send') + '</button></div>';
 
-  document.body.appendChild(fab); document.body.appendChild(scrim); document.body.appendChild(sheet);
+  document.body.appendChild(scrim); document.body.appendChild(sheet);
   document.getElementById('coachClose').onclick = coachClose;
   document.getElementById('coachNew').onclick = coachNewConversation;
   document.getElementById('coachSend').onclick = coachSubmitInput;
@@ -117,18 +111,10 @@ function coachEnsureUI(){
   ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); coachSubmitInput(); } });
   ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'; });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheet.classList.contains('on')) coachClose(); });
-  // el botón se aparta mientras se escribe en un campo de la app (para no tapar nada con el teclado abierto)
-  document.addEventListener('focusin', e => {
-    const t = e.target, inSheet = t.closest && t.closest('#coachSheet');
-    document.body.classList.toggle('coach-fab-hide', !inSheet && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
-  });
-  document.addEventListener('focusout', () => document.body.classList.remove('coach-fab-hide'));
 }
 
-function coachSyncFab(){
-  const fab = document.getElementById('coachFab');
-  if (fab) fab.hidden = !(getProfile() && getSessionToken());
-}
+// Ya no hay botón flotante: el entrenador es la pestaña «Entrenador» de la barra inferior (se deja la función por compatibilidad)
+function coachSyncFab(){ const nav = document.getElementById('bottomNav'); if (nav) nav.hidden = !(getProfile() && getSessionToken()); }
 
 function coachInit(){
   coachEnsureUI();
@@ -137,8 +123,23 @@ function coachInit(){
 }
 
 // ---------- Abrir y cerrar ----------
+function coachToggle(){
+  const sheet = document.getElementById('coachSheet');
+  if (sheet && sheet.classList.contains('on')) coachClose(); else coachOpen();
+}
+
+let _coachPrevFocus = null;
+function coachSetTab(on){
+  const cb = document.getElementById('viewBtnCoach'); if (!cb) return;
+  cb.setAttribute('aria-pressed', String(on)); cb.classList.toggle('active', on);
+  if (on) ['Rutina', 'Metricas', 'Editar'].forEach(n => { const b = document.getElementById('viewBtn' + n); if (b) b.classList.remove('active'); });
+  else if (typeof currentViewName === 'function') { const v = currentViewName(); const b = document.getElementById('viewBtn' + v.charAt(0).toUpperCase() + v.slice(1)); if (b) b.classList.add('active'); }
+}
+
 function coachOpen(){
   coachEnsureUI();
+  _coachPrevFocus = document.activeElement;
+  coachSetTab(true);
   if (typeof closeProgressSheet === 'function') closeProgressSheet();
   coachRender();
   coachWarm();                                   // despierta la función de servidor mientras se abre el chat
@@ -156,7 +157,9 @@ function coachClose(){
   sheet.classList.remove('on');
   document.getElementById('coachScrim').classList.remove('on');
   document.body.style.overflow = _coachPrevOverflow;
-  const fab = document.getElementById('coachFab'); if (fab && !fab.hidden) fab.focus({ preventScroll: true });
+  coachSetTab(false);
+  const back = _coachPrevFocus && document.contains(_coachPrevFocus) ? _coachPrevFocus : document.getElementById('viewBtnCoach');
+  if (back && back.focus) back.focus({ preventScroll: true });
 }
 function coachNewConversation(){
   if (coachBusy) return;
@@ -213,7 +216,7 @@ function coachRenderChips(){
   if (!box) return;
   let h = '';
   if (coachStep === 'menu') {
-    h = COACH_MENU.map(m => coachChip(m.icon + ' ' + m.label, "coachMenu('" + m.id + "')")).join('');
+    h = COACH_MENU.map(m => coachChip(uiIcon(m.icon, 's') + ' ' + m.label, "coachMenu('" + m.id + "')")).join('');
   } else if (coachStep === 'week-days') {
     h = '<div class="coach-q">¿Cuántos días más vas a ir esta semana?</div>' +
       [1, 2, 3].map(n => coachChip(n + (n === 1 ? ' día' : ' días'), 'coachWeek(' + n + ')')).join('') +

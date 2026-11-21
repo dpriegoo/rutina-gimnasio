@@ -44,6 +44,7 @@ const EXPORT_LEYENDA = {
     'Una variante/máquina distinta puede mover más o menos peso que la habitual: sus cargas no son comparables directamente con las de la habitual.',
     'La app mide la progresión con la «fuerza estimada» de cada sesión = media de las series de trabajo con peso × reps^0,10 (no es el 1RM).',
     'La «rutina» es la actual: si cambió durante el rango, los registros antiguos conservan el día y el grupo con los que se guardaron.',
+    'En las semanas con «descarga» = true se entrenó menos a propósito (2 series por ejercicio con la carga de siempre y un RIR más): un volumen más bajo ahí no es una caída de rendimiento.',
     'Los datos son solo del perfil indicado en «meta».',
   ],
 };
@@ -75,7 +76,7 @@ function exportCollect(o){
     w._d[exportDay(r)] = true; w._e[r['Ejercicio']] = true;
     w.series += exportNum(r['Series']) || 0; w.volumen_kg += rowVolume(r);
   });
-  const semanal = Object.keys(weeks).sort().map(k => { const w = weeks[k]; return { semana_desde: k, dias_entrenados: Object.keys(w._d).length, series: w.series, volumen_kg: Math.round(w.volumen_kg), ejercicios_distintos: Object.keys(w._e).length }; });
+  const semanal = Object.keys(weeks).sort().map(k => { const w = weeks[k]; return { semana_desde: k, dias_entrenados: Object.keys(w._d).length, series: w.series, volumen_kg: Math.round(w.volumen_kg), ejercicios_distintos: Object.keys(w._e).length, descarga: typeof deloadWeekHas === 'function' && deloadWeekHas(parseLocalDate(k)) }; });
 
   const peso = o.body ? (window._weightHistory || []).filter(w => inRange(String(w.fecha).slice(0, 10)))
     .map(w => ({ fecha: String(w.fecha).slice(0, 10), peso_kg: exportNum(w.peso) })).sort((a, b) => a.fecha.localeCompare(b.fecha)) : [];
@@ -137,7 +138,7 @@ function exportMarkdown(d){
     exportMdTable(['Día', 'Nombre del día', 'Grupo', 'Ejercicio', 'Series · reps', 'Tipo', 'Máquina habitual', 'Alternativas'],
       d.rutina.map(x => [x.dia, x.nombre_del_dia, x.grupo, x.ejercicio, x.series_reps, x.tipo, x.maquina_habitual, x.alternativas.join(' | ')])));
   L.push('', '## Resumen semanal (solo series de trabajo)', '');
-  L.push(d.semanal.length ? exportMdTable(['Semana desde (lunes)', 'Días entrenados', 'Series', 'Volumen (kg)', 'Ejercicios distintos'], d.semanal.map(w => [w.semana_desde, w.dias_entrenados, w.series, w.volumen_kg, w.ejercicios_distintos])) : '_Sin series de trabajo en el rango._');
+  L.push(d.semanal.length ? exportMdTable(['Semana desde (lunes)', 'Días entrenados', 'Series', 'Volumen (kg)', 'Ejercicios distintos', 'Descarga'], d.semanal.map(w => [w.semana_desde, w.dias_entrenados, w.series, w.volumen_kg, w.ejercicios_distintos, w.descarga ? 'sí' : ''])) : '_Sin series de trabajo en el rango._');
   L.push('', '## Series', '', '```csv', exportCsvRows(EXPORT_COLS, d.series, false), '```');
   if (m.incluye_peso_corporal) L.push('', '## Peso corporal', '', d.peso_corporal.length ? '```csv\n' + exportCsvRows(EXPORT_WEIGHT_COLS, d.peso_corporal, false) + '\n```' : '_Sin registros de peso corporal en el rango._');
   return L.join('\n') + '\n';

@@ -74,7 +74,7 @@ const COACH_TOOLS = [
       const all = myRows().filter(r => !isWarmupRow(r));
       const rutina = DAYS.map((d, i) => {
         const names = dayExerciseNames(d), counts = names.map(n => weeklySeriesCount(d.name, n));
-        const done = counts.filter(c => c >= 3).length, any = counts.filter(c => c > 0).length;
+        const done = counts.filter(c => c >= weeklyTarget()).length, any = counts.filter(c => c > 0).length;
         const last = all.filter(r => r['Día'] === d.name).map(r => String(r['Fecha']).slice(0, 10)).sort().pop() || null;
         const grupos = []; d.groups.forEach(g => { if (grupos.indexOf(g.label) < 0) grupos.push(g.label); });
         return {
@@ -92,6 +92,7 @@ const COACH_TOOLS = [
         usuario: getProfile(), hoy: today, dia_semana_hoy: COACH_WEEKDAYS[now.getDay()],
         semana_desde: localDateStr(ws), dias_hasta_el_domingo: (7 - ((now.getDay() + 6) % 7) - 1),
         dias_entrenados_esta_semana: trained.length, detalle_dias_entrenados: trained,
+        semana_de_descarga: (typeof deloadActive === 'function' && deloadActive()) ? 'activa hasta el ' + deloadCurrent().end + ' (2 series por ejercicio, misma carga, un RIR más)' : ((typeof deloadSuggestion === 'function' && deloadSuggestion()) ? 'la app la sugiere: ' + deloadSuggestion().reasons.join(' ') : 'no'),
         semana_de_descanso_activa: (typeof isRestWeek === 'function') ? !!isRestWeek(getProfile()) : false,
         dia_abierto_en_la_app: abierto, ejercicio_visible_en_la_app: visible,
         rutina: rutina,

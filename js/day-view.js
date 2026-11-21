@@ -92,11 +92,11 @@ function updateCardHints(cardEl){
     if (!lastWeek) {
       // ¿hay marcas de otra máquina? entonces se dice, para que no parezca que no hay datos
       const other = v !== '' || lastWeekBestMark(diaForCount, exName) ? lastWeekBestMark(diaForCount, exName) : null;
-      beatEl.textContent = other ? '🎯 Sin marcas de la semana pasada en esta máquina' : '';
+      beatEl.innerHTML = other ? uiIcon('target', 's') + ' Sin marcas de la semana pasada en esta máquina' : '';
     } else if (lastWeek.timed) {
-      beatEl.textContent = '🎯 Supera: ' + lastWeek.reps + 's (semana pasada' + (v ? ', ' + v : '') + ')';
+      beatEl.innerHTML = uiIcon('target', 's') + ' Supera: ' + lastWeek.reps + 's (semana pasada' + (v ? ', ' + escHtml(v) : '') + ')';
     } else {
-      beatEl.textContent = '🎯 Supera: ' + fmtNum(lastWeek.peso, 2) + ' kg × ' + lastWeek.reps + ' (semana pasada' + (v ? ', ' + v : '') + ')';
+      beatEl.innerHTML = uiIcon('target', 's') + ' Supera: ' + fmtNum(lastWeek.peso, 2) + ' kg × ' + lastWeek.reps + ' (semana pasada' + (v ? ', ' + escHtml(v) : '') + ')';
     }
   }
 
@@ -120,25 +120,35 @@ function updateCardHighlights(){
   document.querySelectorAll('#main .card[data-exercise]').forEach(cardEl => {
     const exName = cardEl.getAttribute('data-exercise');
     const diaForCount = cardEl.getAttribute('data-borrow-dia') || day.name;
-    const count = weeklySeriesCount(diaForCount, exName);
+    const count = weeklySeriesCount(diaForCount, exName), target = weeklyTarget();
     const wasDone = cardEl.classList.contains('done');
-    cardEl.classList.toggle('done', count >= 3);
+    cardEl.classList.toggle('done', count >= target);
     // Pulso verde al completar las 3 series (no en la primera pintada de una tarjeta ya completa)
-    if (cardEl.dataset.init && !wasDone && count >= 3) {
+    if (cardEl.dataset.init && !wasDone && count >= target) {
       cardEl.classList.add('just-done');
       setTimeout(() => cardEl.classList.remove('just-done'), 900);
     }
     cardEl.dataset.init = '1';
     const prog = cardEl.querySelector('.series-progress');
-    if (prog) prog.textContent = count + '/3 esta semana';
+    if (prog) prog.textContent = count + '/' + target + ' esta semana';
 
     updateCardHints(cardEl);
-
     renderCardProgress(cardEl);
+    if (typeof renderMachineBar === 'function') { renderMachineBar(cardEl); renderPlan(cardEl); updateDetailChip(cardEl); }
   });
   renderStrip();
+  if (typeof renderSessionBar === 'function') { renderSessionBar(); maybeShowSessionDone(); }
 }
  // logId -> {ids, count}, para poder deshacer el último guardado
+
+// El cambio de fuerza (▲ +6,1 %) también se ve en la cabecera del detalle plegado
+function updateDetailChip(cardEl){
+  const chip = cardEl.querySelector('.detail-chip'), delta = cardEl.querySelector('.pg-delta');
+  if (!chip) return;
+  if (!delta) { chip.hidden = true; return; }
+  chip.hidden = false; chip.textContent = delta.textContent.trim();
+  chip.classList.toggle('dn', /dn|down|neg/.test(delta.className));
+}
 
 function allTimeBestBeforeNow(dia, ejercicio, variante){
   const profile = getProfile();
@@ -170,7 +180,7 @@ function openExerciseVideo(exerciseName){
 function isDayComplete(day){
   const exerciseNames = effectiveDayGroups(day).flatMap(g => g.exercises.map(ex => ex.name));
   return exerciseNames.length > 0 && exerciseNames.every(
-    name => weeklySeriesCount(day.name, name) >= 3
+    name => weeklySeriesCount(day.name, name) >= weeklyTarget()
   );
 }
 
@@ -234,51 +244,68 @@ function buildCardHTML(ex, dia, grupo, logId, extraBadgeHtml){
   const zone = ZONE_META[ICON_TO_ZONE[ex.icon]] || ZONE_META.libre;
   const alts = ex.alts || [];
   const feel = Feel.summaryHTML(ex, logId);
+  const spec = prescriptionSpec(ex);
+  const rangeTxt = spec.rango[0] + (spec.rango[1] !== spec.rango[0] ? '–' + spec.rango[1] : '') + (spec.timed ? ' s' : '');
   return `
     <div class="card-head">
-      <button class="icon-box" type="button" onclick="openExerciseVideo('${jsArg(ex.name)}')" title="Ver vídeo de cómo hacerlo">${ICONS[ex.icon] || ''}<span class="play-badge">▶</span></button>
+      <button class="icon-box" type="button" onclick="openExerciseVideo('${jsArg(ex.name)}')" title="Ver vídeo de cómo hacerlo">${ICONS[ex.icon] || ''}<span class="play-badge">${uiIcon('play', 's')}</span></button>
       <div class="card-headtext">
-        <div class="exname">${escHtml(ex.name)}<span class="zone-badge" style="background:${zone.color}" title="${zone.label}">${zone.icon}</span>${extraBadgeHtml || ''}<span class="done-badge">✓ hecho</span></div>
-        <div class="card-sub"><span class="grouptag">${escHtml(grupo)}</span><span class="sets">${escHtml(ex.sets)}</span><span class="series-progress"></span></div>
+        <div class="exname">${escHtml(ex.name)}<span class="zone-badge" style="background:${zone.color}" title="${zone.label}" role="img" aria-label="${zone.label}">${uiIcon(zone.ic, 's')}</span>${extraBadgeHtml || ''}<span class="done-badge">${uiIcon('check', 's')} hecho</span></div>
+        <div class="card-sub"><span class="grouptag">${escHtml(grupo)}</span><span class="sets">${weeklyTarget()} · ${rangeTxt}</span><span class="cat-badge ${spec.cat}" title="${escHtml(RX_CATS[spec.cat].hint)}">${spec.catLabel}</span><span class="series-progress"></span></div>
       </div>
     </div>
     <div class="card-body">
-      <button class="pg" type="button" onclick="openProgressSheet('${jsArg(ex.name)}')" aria-label="Ver progresión de ${escHtml(ex.name)}"></button>
-      <div class="beat-last-week"></div>
-      <div class="log-title">Registrar serie</div>
-      <div class="log-form open" id="${logId}">
-        <div class="log-form-main">
-          ${isTimedExercise(ex.name)
-            ? `<input class="inp-reps" type="number" inputmode="numeric" placeholder="Segundos">`
-            : `<input class="inp-peso" type="text" inputmode="decimal" placeholder="Peso kg">
-               <input class="inp-reps" type="number" inputmode="numeric" placeholder="Reps">`}
-          <button class="log-add" onclick="addPendingRow('${logId}')">+ Añadir</button>
-        </div>
-        <button class="log-adv-toggle" type="button" onclick="toggleAdvanced('${logId}')">⚙️ Variante / calentamiento / nota</button>
-        <div class="log-advanced" id="adv-${logId}">
-          <select class="inp-variante" onchange="updateCardHints(this.closest('.card'))" aria-label="Máquina o variante">
-            <option value="">Variante: ${escHtml(ex.primary || 'la habitual')} (la habitual)</option>
-            ${alts.map(a => `<option value="${escHtml(a)}">Variante: ${escHtml(a)}</option>`).join('')}
-          </select>
-          <label class="inp-warmup-label"><input type="checkbox" class="inp-calentamiento"> 🔥 Es calentamiento (no cuenta para el objetivo semanal ni el progreso)</label>
-          <input class="inp-nota" type="text" placeholder="Nota opcional">
-        </div>
+      <div class="machine-bar">
+        <div class="mb-txt"><span class="mb-label">Máquina o material</span><span class="mb-name">${escHtml(ex.primary || 'La habitual')}</span></div>
+        ${alts.length ? `<button type="button" class="mb-swap" aria-expanded="false" aria-controls="alt-${logId}" onclick="toggleAlt('${logId}')">${uiIcon('swap')} Cambiar</button>` : ''}
       </div>
-      <div class="pending-wrap" id="pendingWrap-${logId}" data-dia="${escHtml(dia)}" data-grupo="${escHtml(grupo)}" data-ejercicio="${escHtml(ex.name)}"></div>
-      <div class="card-info">
-        <div class="card-info-text">
-          ${(ex.primary || alts.length) ? `<div class="machine">
-            ${ex.primary ? `<div class="machine-row"><span class="tag primary">USA</span><span class="txt">${escHtml(ex.primary)}</span></div>` : ''}
-            ${alts.length ? `<div class="machine-row"><span class="tag alt">SI OCUPADA</span></div>
-            <div class="alt-list">${alts.map(escHtml).join(' &nbsp;·&nbsp; ')}</div>` : ''}
-          </div>` : ''}
-          ${feel.row}
+      ${alts.length ? `<div class="alt-picker" id="alt-${logId}">
+        <button type="button" class="alt-opt on" data-v="" aria-pressed="true" onclick="useMachine('${logId}', this.dataset.v)"><span>${escHtml(ex.primary || 'La habitual')} <span class="mini-sub">(habitual)</span></span></button>
+        ${alts.map(a => `<button type="button" class="alt-opt" data-v="${escHtml(a)}" aria-pressed="false" onclick="useMachine('${logId}', this.dataset.v)"><span>${escHtml(a)}</span></button>`).join('')}
+        <div class="alt-note">Cambia la máquina con la que registras. El plan y las marcas se calculan con el historial de esa máquina.</div>
+      </div>` : ''}
+      <div class="plan" data-log="${logId}"></div>
+      <details class="detail-box">
+        <summary>${uiIcon('chevD')}<span class="grow">Progreso, técnica y registro manual</span><span class="detail-chip" hidden></span></summary>
+        <div class="detail-body">
+          <button class="pg" type="button" onclick="openProgressSheet('${jsArg(ex.name)}')" aria-label="Ver progresión de ${escHtml(ex.name)}"></button>
+          <div class="beat-last-week"></div>
+          <div class="log-title">Registro manual</div>
+          <div class="log-form open" id="${logId}">
+            <div class="log-form-main">
+              ${isTimedExercise(ex.name)
+                ? `<input class="inp-reps" type="number" inputmode="numeric" placeholder="Segundos">`
+                : `<input class="inp-peso" type="text" inputmode="decimal" placeholder="Peso kg">
+                   <input class="inp-reps" type="number" inputmode="numeric" placeholder="Reps">`}
+              <button class="log-add" onclick="addPendingRow('${logId}')">+ Añadir</button>
+            </div>
+            <button class="log-adv-toggle" type="button" onclick="toggleAdvanced('${logId}')">${uiIcon('sliders', 's')} Variante / calentamiento / nota</button>
+            <div class="log-advanced" id="adv-${logId}">
+              <select class="inp-variante" onchange="onVariantChange(this)" aria-label="Máquina o variante">
+                <option value="">Variante: ${escHtml(ex.primary || 'la habitual')} (la habitual)</option>
+                ${alts.map(a => `<option value="${escHtml(a)}">Variante: ${escHtml(a)}</option>`).join('')}
+              </select>
+              <label class="inp-warmup-label"><input type="checkbox" class="inp-calentamiento"> ${uiIcon('flame', 's')} Es calentamiento (no cuenta para el objetivo semanal ni el progreso)</label>
+              <input class="inp-nota" type="text" placeholder="Nota opcional">
+            </div>
+          </div>
+          <div class="pending-wrap" id="pendingWrap-${logId}" data-dia="${escHtml(dia)}" data-grupo="${escHtml(grupo)}" data-ejercicio="${escHtml(ex.name)}"></div>
+          <div class="card-info">
+            <div class="card-info-text">
+              ${(ex.primary || alts.length) ? `<div class="machine">
+                ${ex.primary ? `<div class="machine-row"><span class="tag primary">USA</span><span class="txt">${escHtml(ex.primary)}</span></div>` : ''}
+                ${alts.length ? `<div class="machine-row"><span class="tag alt">SI OCUPADA</span></div>
+                <div class="alt-list">${alts.map(escHtml).join(' &nbsp;·&nbsp; ')}</div>` : ''}
+              </div>` : ''}
+              ${feel.row}
+            </div>
+            ${feel.mini}
+          </div>
+          ${ex.howTo ? `<div class="howto"><b>Cómo hacerlo:</b> ${escHtml(ex.howTo)}</div>` : ''}
+          ${feel.more}
         </div>
-        ${feel.mini}
-      </div>
-      ${ex.howTo ? `<div class="howto"><b>Cómo hacerlo:</b> ${escHtml(ex.howTo)}</div>` : ''}
+      </details>
     </div>
-    ${feel.more}
   `;
 }
 
@@ -291,6 +318,7 @@ function renderDay(){
 
   document.getElementById('dayTitle').textContent = day.name.split('·')[0].trim() + ' · ' + (day.name.split('·')[1] || '').trim();
   document.getElementById('dayScreen').style.setProperty('--c', dayColorVar(currentDay));
+  document.getElementById('dayScreen').classList.toggle('deload-on', deloadActive());
 
   document.getElementById('dayCompareBtn').onclick = () => showDayComparison(currentDay);
 
@@ -301,7 +329,7 @@ function renderDay(){
     notice.className = 'priority-banner';
     notice.style.marginLeft = '0';
     notice.style.marginRight = '0';
-    notice.innerHTML = '🔄 Esta semana este día es de <b>' + activeOverride.toGroupLabel + '</b> en vez de ' + activeOverride.fromGroupLabel + '. <button class="rest-week-toggle" onclick="revertWeekOverride()">Deshacer</button>';
+    notice.innerHTML = uiIcon('refresh', 's') + ' Esta semana este día es de <b>' + activeOverride.toGroupLabel + '</b> en vez de ' + activeOverride.fromGroupLabel + '. <button class="rest-week-toggle" onclick="revertWeekOverride()">Deshacer</button>';
     extras.appendChild(notice);
   }
 
@@ -313,6 +341,7 @@ function renderDay(){
       card.className = 'card';
       card.setAttribute('data-exercise', ex.name);
       card.style.setProperty('--i', main.children.length);   // orden de la animación de entrada
+      card._ex = ex;
       card.innerHTML = buildCardHTML(ex, day.name, g.label, logId, '');
       main.appendChild(card);
       renderPendingWrap(logId);
@@ -328,8 +357,9 @@ function renderDay(){
     card.setAttribute('data-borrow-dia', ex.originalDayName);
     card.style.setProperty('--i', main.children.length);
     const badge = `<span class="borrow-badge" title="Pendiente de ${ex.originalDayLabel}">de ${ex.originalDayLabel}</span>`;
-    card.innerHTML = buildCardHTML(ex, ex.originalDayName, ex.grupo, logId, badge) +
-      `<button class="borrow-remove" onclick="removeBorrowedExercise('${day.name.replace(/'/g,"\\'")}', ${bIdx})" title="Quitar" aria-label="Quitar ejercicio de este día">✕</button>`;
+    card._ex = findExerciseObjInDay(ex.name, ex.originalDayName) || ex;
+    card.innerHTML = buildCardHTML(card._ex, ex.originalDayName, ex.grupo, logId, badge) +
+      `<button class="borrow-remove" onclick="removeBorrowedExercise('${day.name.replace(/'/g,"\\'")}', ${bIdx})" title="Quitar" aria-label="Quitar ejercicio de este día">${uiIcon('x', 's')}</button>`;
     main.appendChild(card);
     renderPendingWrap(logId);
   });

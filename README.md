@@ -29,15 +29,19 @@ No hay build ni framework: el navegador carga los archivos tal cual.
 | `js/progress-chart.js` | Gráficas de progresión por ejercicio: fuerza estimada, tendencia, volumen y avisos de estancamiento. |
 | `js/coach-tools.js` | Entrenador IA: las herramientas que Gemini puede llamar sobre los datos del usuario (semana, rutina, progresión, carga muscular…). |
 | `js/coach.js` | Entrenador IA: bucle con Gemini (pregunta → herramientas → respuesta), prompt de sistema y errores. |
-| `js/coach-ui.js` | Entrenador IA: botón flotante, hoja de chat y menú guiado. |
+| `js/coach-ui.js` | Entrenador IA: hoja de chat y menú guiado; se abre desde la pestaña «Entrenador» de la barra inferior. |
 | `supabase/` | Función de servidor `coach` (guarda la clave de Gemini), su SQL de límite diario y cómo desplegarla (ver `supabase/README.md`). |
+| `js/ui-icons.js` | Iconos SVG propios (sin emojis) y logotipo: `uiIcon('nombre')`, `uiLogo(ancho)`, `hydrateIcons()`. |
+| `js/prescription.js` | Prescripción serie a serie: categoría de fatiga, rango, descanso y RIR por ejercicio (tabla editable) y plan de hoy con doble progresión. |
+| `js/deload.js` | Semana de descarga: estado, efectos y propuesta de cuándo hacerla a partir de tus datos (con el motivo). |
+| `js/training.js` | Modo entreno: plan por series con un toque, cambio de máquina, descanso, barra de sesión y cierre de sesión. |
 | `js/export.js` | Exportar datos: tarjeta al final de Métricas que exporta los registros de un rango de fechas (md para Claude, csv o json). |
 | `js/day-view.js` | Tarjetas de ejercicio (carrusel horizontal), ejercicios prestados y resaltados. |
 | `js/motion.js` | Bloqueo de zoom y animación de entrada a la app (barra con discos). Se omite con "reducir movimiento". |
 | `js/day-picker.js` | Pantalla inicial "¿Qué día entrenas?", tira de progreso del día y desplazamiento del carrusel. |
 | `js/editor.js` | Pestaña Editar. |
 | `js/progress.js` | Descarga de progreso y refrescos automáticos. |
-| `js/navigation.js` | Cambio de vista (Rutina / Métricas / Editar). |
+| `js/navigation.js` | Cambio de vista (Rutina / Métricas / Editar) desde la barra inferior. |
 | `js/main.js` | Arranque + comprobación de versión. **Siempre el último.** |
 | `tools/stamp.js` | Sella las URLs con un hash para esquivar la caché. |
 | `tests/` | Pruebas (Node, sin navegador). |
@@ -73,6 +77,9 @@ versión con la que se cargó y, si no coinciden, se recarga una vez sola.
 - `tests/smoke.test.js`: arranca la página real en jsdom (con y sin sesión), elige día, recorre el carrusel, abre la hoja de progresión y navega entre vistas.
 - `tests/style.test.js`: contraste, tamaño mínimo de texto, escalas de tipografía/radios/colores, campos a 16 px, zoom bloqueado y que las animaciones respeten "reducir movimiento".
 - `tests/coach.test.js`, `tests/coach-edge.test.js`: entrenador IA (ver su sección).
+- `tests/prescription.test.js`: especificación por ejercicio y plan de hoy (doble progresión, máquinas, calentamientos, tiempo).
+- `tests/deload.test.js`: semana de descarga (estado, plan, umbral de completo, avisos, exportación y propuesta con datos que la disparan y datos que no).
+- `tests/training.test.js`: modo entreno, descanso, sesión, navegación, comparaciones justas, Métricas por secciones y editor.
 - `tests/export.test.js`: exportación (rango, formatos, ida y vuelta, tarjeta, datos frescos).
 - `tests/machines.test.js`: "Últ", "Supera" y marca personal por máquina (sin 🏆 falsos ni récords bloqueados por otra máquina).
 - `tests/coherence.test.js`: formato de números y misma métrica en hoja de ejercicio, Resumen e índice de fuerza.
@@ -126,3 +133,15 @@ Tarjeta **Exportar datos** al final de la pestaña Métricas: se elige un rango 
 - **Salida:** *Descargar*, *Compartir* (menú del sistema, solo si el navegador lo permite) y *Copiar* (para pegar en el chat).
 - **Origen de los datos:** la caché local, que se vuelve a leer de la base de datos al abrir Métricas si tiene más de 1 minuto (`exportFetchFresh`) y cada 2 minutos. El archivo dice de cuándo son (`window._lastSyncAt`) y si hay registros pendientes de sincronizar.
 - **Pruebas:** `tests/export.test.js` incluye un viaje de ida y vuelta (notas con comas, comillas y saltos de línea salen intactas).
+
+## Rediseño de uso (v2)
+- **Navegación:** barra inferior (Rutina · Métricas · Entrenador · Editar) al alcance del pulgar; el entrenador es una pestaña, ya no hay botón flotante que tape controles. Dentro de un día la barra inferior se sustituye por la **barra de sesión** (tiempo, ejercicios completos y «Siguiente»). Cabecera con marca (logotipo + «IronLog») y avatar; pantalla de acceso con marca.
+- **Tarjeta de ejercicio:** arriba, lo que se usa en cada serie (máquina con «Cambiar» y el **plan de hoy**); la gráfica, la técnica y el registro manual van en un detalle plegable. «Cambiar» elige la máquina con la que se registra (el plan y las marcas salen del historial de esa máquina).
+- **Plan serie a serie** (`prescription.js`, `training.js`): cada serie con repeticiones objetivo y RIR (S1/S2/S3), un toque en **Hecha** (guarda por el flujo de siempre: pendiente → aceptar → cola; hay «Deshacer última»), pasos de ±carga y ±repeticiones, y temporizador de descanso según la categoría. En pantallas bajas el plan va primero y su explicación se pliega tras el botón «i».
+- **Prescripción:** `categoria_fatiga` (pesado · accesorio · core), `descanso_seg` [mín, máx], `esquema_rir` [S1, S2, S3] y `rango_reps` por ejercicio. Los valores por defecto salen de la tabla `RX_TABLE` y de las categorías `RX_CATS`; el editor solo guarda lo que se aparta de ellos (así, si se ajusta la tabla, los ejercicios sin tocar la siguen). **Qué respalda la literatura cada valor y qué es criterio práctico: `docs/evidencia-prescripcion.md`.** Por defecto: pesados RIR 2 / 1 / 1 (nunca al fallo: dejar 1–3 repeticiones en reserva está respaldado; llevar al fallo solo la última serie, no), accesorios 1 / 1 / 0 (la última puede llegar al fallo técnico), core 1 / 1 / 0. RIR 0 = fallo técnico (última repetición con técnica limpia). El RIR se estima con error (de media ~1 repetición, y mucho más por encima de 12), de ahí el aviso en rangos altos. Peso muerto rumano 2 / 2 / 1 y los avisos de barra libre y espalda son criterio de prudencia, no un dato.
+- **Doble progresión** (`rxPlan`): lee tu historial de ese ejercicio **y esa máquina**, ignora la sesión de hoy y los calentamientos (también una primera serie mucho más ligera, que suele ser un calentamiento anotado como trabajo). Tope del rango en las 3 series → sube carga y vuelve al mínimo; con plan previo mide lo conseguido contra lo previsto; sin plan previo supone que las series anteriores estaban cerca del fallo y reparte restando el RIR de cada serie (si la serie 1 no llegaría al mínimo, baja la carga).
+- **Semana de descarga** (`deload.js`): 7 días con **2 series por ejercicio** (el umbral de «completo» pasa de 3 a 2), la **carga de siempre** y **un RIR más**; el plan no sube carga ni se guarda mientras tanto, las sesiones de una descarga no cuentan para el plan de después, no hay avisos de prioridad ni comparaciones de volumen, y la exportación marca esas semanas. Se activa desde la tarjeta del selector de día. La app **propone** cuándo hacerla con señales de tus datos (rendimiento a la baja, plan incumplido, semanas seguidas), siempre con el motivo; **no hay criterio validado sobre cuándo descargar** (ver `docs/evidencia-prescripcion.md`) y los umbrales son constantes editables de `deload.js`.
+- **Cierre de sesión:** al completar el último ejercicio de un día tras registrar algo, resumen con duración, series, volumen (comparado solo si la semana pasada completaste ese día), marcas nuevas, series dentro del plan y siguiente día pendiente. Una vez por día y semana.
+- **Comparaciones justas:** el resumen semanal compara con la semana pasada **hasta el mismo día**; la comparativa de un día a medias, con **los mismos ejercicios** de la semana pasada. En curso solo se destaca la subida (nunca alarma roja); con el día completo, la comparación de siempre.
+- **Métricas por secciones:** Resumen · Cuerpo · Ejercicios · Datos (se recuerda la última). Las gráficas con menos de 4 puntos (3 semanas en el índice de fuerza) muestran «Aún pocos datos» en vez de una curva inventada; el historial se abre ya con lo último que hiciste; la altura se pone una vez y luego solo se muestra.
+- **Editar:** tocar la fila edita; las flechas solo aparecen en el modo «Ordenar ejercicios»; el editor incluye categoría, descanso y RIR por serie, y enseña el rango efectivo.

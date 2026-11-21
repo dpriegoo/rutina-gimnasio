@@ -178,10 +178,12 @@ const J = x => JSON.parse(JSON.stringify(x));       // normaliza objetos que vie
   assert(J(w.coachResultJson({ x: 'a'.repeat(20000) })).error, 'un resultado enorme se sustituye por un aviso');
 
   // ---------- 7) Interfaz ----------
-  const fab = d.getElementById('coachFab');
-  assert(fab && !fab.hidden && /entrenador/i.test(fab.getAttribute('aria-label')), 'botón flotante visible con sesión');
+  const tab = d.getElementById('viewBtnCoach');
+  assert(!d.getElementById('coachFab'), 'ya no hay botón flotante');
+  assert(tab && !d.getElementById('bottomNav').hidden && /entrenador/i.test(tab.textContent) && tab.getAttribute('aria-pressed') === 'false', 'pestaña «Entrenador» visible con sesión');
   w.coachNewConversation();
-  w.coachOpen();
+  tab.focus(); w.coachToggle();                  // lo que hace la pestaña al pulsarla
+  assert.strictEqual(tab.getAttribute('aria-pressed'), 'true', 'la pestaña queda marcada mientras el chat está abierto');
   const sheet = d.getElementById('coachSheet');
   assert(sheet.classList.contains('on') && sheet.getAttribute('role') === 'dialog' && sheet.getAttribute('aria-modal') === 'true');
   assert(/David/.test(d.getElementById('coachMsgs').textContent) && /¿Sobre qué quieres hablar\?/.test(d.getElementById('coachMsgs').textContent));
@@ -238,7 +240,8 @@ const J = x => JSON.parse(JSON.stringify(x));       // normaliza objetos que vie
 
   // 7d) cerrar, Escape, foco, nueva conversación y cierre de sesión
   d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-  assert(!sheet.classList.contains('on'), 'Escape cierra'); assert.strictEqual(d.activeElement, fab, 'el foco vuelve al botón');
+  assert(!sheet.classList.contains('on'), 'Escape cierra'); assert.strictEqual(d.activeElement, tab, 'el foco vuelve a la pestaña'); assert.strictEqual(tab.getAttribute('aria-pressed'), 'false');
+  w.setView('metricas'); w.coachToggle(); assert(sheet.classList.contains('on')); w.setView('rutina'); assert(!sheet.classList.contains('on'), 'cambiar de pestaña cierra el chat'); assert.strictEqual(d.getElementById('viewBtnRutina').getAttribute('aria-pressed'), 'true');
   w.coachOpen(); w.coachNewConversation();
   assert.strictEqual(d.querySelectorAll('.cm-user').length, 0); assert.strictEqual(J(w.eval('coachContents')).length, 0);
   assert.strictEqual(JSON.parse(w.localStorage.getItem('coachChat_David')).msgs.length, 0);
@@ -363,9 +366,9 @@ const J = x => JSON.parse(JSON.stringify(x));       // normaliza objetos que vie
   w.coachClose(); w.coachOpen(); await sleep(30); assert.strictEqual(fcalls.length, 1, 'y no más de una vez cada 4 minutos');
   w.coachClose(); w.fetch = realFetch; w.eval('COACH_STREAM = false');
 
-  // ---------- 9) Sin sesión no hay botón ----------
+  // ---------- 9) Sin sesión no hay barra inferior ----------
   const r2 = await boot(path.join(__dirname, '..', 'index.html'), { logged: false });
-  assert(r2.w.document.getElementById('coachFab').hidden, 'sin sesión el botón no aparece');
+  assert(r2.w.document.getElementById('bottomNav').hidden, 'sin sesión no aparece la barra inferior');
   r2.w.close(); r.w.close();
   console.log('OK entrenador: herramientas, bucle con Gemini, errores, límites e interfaz');
   process.exit(0);

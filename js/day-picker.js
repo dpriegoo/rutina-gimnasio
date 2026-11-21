@@ -45,7 +45,7 @@ function suggestedDayIdx(){
   return -1;
 }
 
-function exState(n){ return n >= 3 ? 'done' : (n > 0 ? 'warn' : 'none'); }
+function exState(n){ return n >= weeklyTarget() ? 'done' : (n > 0 ? 'warn' : 'none'); }
 
 // Reinicia una animación de entrada (clase en el contenedor) y la retira al terminar,
 // para que los refrescos posteriores no la repitan.
@@ -63,7 +63,7 @@ function playPickerIntro(){ playIntroClass(document.getElementById('dayPicker'),
 function dayTileData(d, i, sug){
   const names = dayExerciseNames(d);
   const counts = names.map(n => weeklySeriesCount(d.name, n));
-  const done = counts.filter(c => c >= 3).length;
+  const done = counts.filter(c => c >= weeklyTarget()).length;
   const any = counts.filter(c => c > 0).length;
   const status = done === names.length && names.length > 0 ? 'Completo' : (any ? 'Empezado · ' + done + '/' + names.length : 'Pendiente');
   return {
@@ -77,6 +77,7 @@ function dayTileData(d, i, sug){
 function renderDayPicker(){
   const grid = document.getElementById('dpGrid');
   if (!grid) return;
+  if (typeof renderDeloadCard === 'function') renderDeloadCard();
   const sug = suggestedDayIdx();
   const sig = DAYS.map(d => d.name).join('|');
 
@@ -172,6 +173,7 @@ function openDayAnimated(i, tile){
 }
 
 function showDayPicker(){
+  if (typeof restSkip === 'function') restSkip();
   if (typeof closeProgressSheet === 'function') closeProgressSheet();
   if (typeof Feel !== 'undefined') Feel.closeAll();
   dayScreenOpen = false;

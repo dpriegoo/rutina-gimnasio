@@ -211,6 +211,7 @@ function isWeekOverrideInvalid(override){
 function maybeShowRebalanceModal(){
   const profile = getProfile();
   if (!profile) return;
+  if (typeof deloadActive === 'function' && deloadActive()) return;   // en descarga no se propone reequilibrar
   const weekKey = localDateStr(getWeekStart());
   const seenKey = 'rebalanceSeen_' + profile + '_' + weekKey;
 
@@ -347,9 +348,10 @@ function renderPriorityBanner(){
   if (!el) return;
   const profile = getProfile();
   if (!profile) { el.style.display = 'none'; return; }
+  if (typeof deloadActive === 'function' && deloadActive()) { el.style.display = 'none'; return; }   // en descarga se entrena menos a propósito: sin avisos de prioridad
 
   if (isRestWeek(profile)) {
-    el.innerHTML = '🛌 Semana marcada como descanso — sin avisos de prioridad muscular. <button class="rest-week-toggle" onclick="toggleRestWeek()">Desactivar</button>';
+    el.innerHTML = uiIcon('info', 's') + ' Semana marcada como descanso — sin avisos de prioridad muscular. <button class="rest-week-toggle" onclick="toggleRestWeek()">Desactivar</button>';
     el.style.display = 'block';
     return;
   }
@@ -360,7 +362,7 @@ function renderPriorityBanner(){
     const days = daysCoveringGroup(g);
     return '<b>' + g + '</b>' + (days.length ? ' (' + days.join(' o ') + ')' : '');
   });
-  el.innerHTML = '⚠️ La semana pasada no entrenaste: ' + parts.join(', ') + '. Priorízalo esta semana.'
+  el.innerHTML = uiIcon('info', 's') + ' La semana pasada no entrenaste: ' + parts.join(', ') + '. Priorízalo esta semana.'
     + ' <button class="rest-week-toggle" onclick="toggleRestWeek()">¿Semana de descanso?</button>';
   el.style.display = 'block';
 }
@@ -420,10 +422,10 @@ function pendingFromPartialDays(){
     const exerciseEntries = effectiveDayGroups(day).flatMap(g => g.exercises.map(ex => ({ name: ex.name, grupo: g.label })));
     const counts = exerciseEntries.map(e => weeklySeriesCount(day.name, e.name));
     const anyStarted = counts.some(c => c > 0);
-    const allDone = counts.every(c => c >= 3);
+    const allDone = counts.every(c => c >= weeklyTarget());
     if (anyStarted && !allDone) {
       const missing = exerciseEntries
-        .filter((e, i) => counts[i] < 3)
+        .filter((e, i) => counts[i] < weeklyTarget())
         .map((e, mi) => ({
           name: e.name,
           grupo: e.grupo,

@@ -157,8 +157,8 @@ const ICON_TO_ZONE = {
 };
 
 const ZONE_META = {
-  libre:   { label: 'Zona de peso libre', icon: '🏋️', color: 'rgba(63,124,240,0.28)' },
-  maquina: { label: 'Zona de máquinas',   icon: '⚙️', color: 'rgba(242,169,59,0.28)' },
-  polea:   { label: 'Zona de poleas',     icon: '🔗', color: 'rgba(76,175,125,0.28)' },
-  suelo:   { label: 'Zona de suelo',      icon: '🧘', color: 'rgba(167,139,250,0.28)' },
+  libre:   { label: 'Zona de peso libre', icon: '', ic: 'zoneLibre', color: 'rgba(63,124,240,0.28)' },
+  maquina: { label: 'Zona de máquinas',   icon: '', ic: 'zoneMaquina', color: 'rgba(242,169,59,0.28)' },
+  polea:   { label: 'Zona de poleas',     icon: '', ic: 'zonePolea', color: 'rgba(76,175,125,0.28)' },
+  suelo:   { label: 'Zona de suelo',      icon: '', ic: 'zoneSuelo', color: 'rgba(167,139,250,0.28)' },
 };

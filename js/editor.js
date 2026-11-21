@@ -50,6 +50,65 @@ function onEditorDayChange(){
   onEditorGroupChange();
 }
 
+// ---- Prescripción serie a serie (categoría de fatiga, descanso y RIR de cada serie) ----
+function fillRirOptions(){
+  [1, 2, 3].forEach(i => {
+    const sel = $id('exEditRir' + i);
+    if (sel.options.length) return;
+    sel.innerHTML = [0, 1, 2, 3, 4].map(n => `<option value="${n}">${n === 0 ? 'Fallo (0)' : 'RIR ' + n}</option>`).join('');
+  });
+}
+
+function setEditorRx(spec){
+  fillRirOptions();
+  $id('exEditCat').value = spec.cat;
+  $id('exEditRestMin').value = spec.descanso[0]; $id('exEditRestMax').value = spec.descanso[1];
+  [0, 1, 2].forEach(i => { $id('exEditRir' + (i + 1)).value = String(spec.rir[i]); });
+  updateEditorRxHint();
+}
+
+// Valores por defecto del ejercicio que se está editando (su fila de la tabla o, si no está, los de su categoría)
+function editorBaseSpec(){
+  return prescriptionSpec({ name: $id('exEditName').value, sets: '3 · ' + ($id('exEditReps').value || '8-10'), timed: $id('exEditTimed').value === '1' }, '');
+}
+function editorCatDefaults(cat){
+  const base = editorBaseSpec();
+  return cat === base.cat ? { descanso: base.descanso, rir: base.rir } : RX_CATS[cat];
+}
+
+function updateEditorRxHint(){
+  const cat = $id('exEditCat').value, c = RX_CATS[cat];
+  if (!c) { $id('exEditRxHint').textContent = ''; return; }
+  const dflt = editorCatDefaults(cat);
+  $id('exEditRxHint').textContent = 'Por defecto en «' + c.label + '»: RIR ' + dflt.rir.join(' / ') + ' y descanso ' + rxFmtRestRange({ descanso: dflt.descanso }) + '. Son rangos prácticos, no una verdad exacta: cámbialos si otros te sientan mejor. RIR 0 = fallo técnico (la última repetición con técnica limpia).';
+}
+
+// Al cambiar de categoría se cargan los valores por defecto de esa categoría (o, si vuelves a la original, los de este ejercicio)
+function onEditorCatChange(){
+  const cat = $id('exEditCat').value; if (!RX_CATS[cat]) return;
+  const dflt = editorCatDefaults(cat);
+  $id('exEditRestMin').value = dflt.descanso[0]; $id('exEditRestMax').value = dflt.descanso[1];
+  [0, 1, 2].forEach(i => { $id('exEditRir' + (i + 1)).value = String(dflt.rir[i]); });
+  updateEditorRxHint();
+}
+
+// Lo que el editor guarda de la prescripción: solo lo que se aparta de los valores por defecto (así, si ajustamos la tabla, tus ejercicios sin tocar siguen la tabla)
+function readEditorRx(name, sets, timed){
+  const cat = $id('exEditCat').value;
+  const rest = [Math.round(Number($id('exEditRestMin').value)), Math.round(Number($id('exEditRestMax').value))];
+  const rir = [1, 2, 3].map(i => Number($id('exEditRir' + i).value));
+  if (!(rest[0] >= 15 && rest[1] >= rest[0] && rest[1] <= 600)) return { error: 'El descanso debe estar entre 15 y 600 segundos, con el mínimo menor o igual que el máximo.' };
+  if (rir.some(n => !(n >= 0 && n <= 5))) return { error: 'El RIR de cada serie va de 0 a 5.' };
+  const base = prescriptionSpec({ name: name, sets: sets, timed: timed }, '');
+  const catDefaults = cat === base.cat ? { descanso: base.descanso, rir: base.rir } : RX_CATS[cat];
+  const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+  return {
+    categoria_fatiga: cat !== base.cat ? cat : null,
+    descanso_seg: same(rest, catDefaults.descanso) ? null : rest,
+    esquema_rir: same(rir, catDefaults.rir) ? null : rir,
+  };
+}
+
 function fillEditor(dayIdx, ex, groupLabel){
   $id('exEditDay').innerHTML = ROUTINE.days.map((d, i) => `<option value="${i}">${escHtml(d.name)}</option>`).join('');
   $id('exEditDay').value = String(dayIdx);
@@ -60,13 +119,16 @@ function fillEditor(dayIdx, ex, groupLabel){
   $id('exEditName').value = ex ? ex.name : '';
   $id('exEditTimed').value = ex && ex.timed ? '1' : '0';
   const parts = ex && ex.sets ? String(ex.sets).split('·') : [];
-  $id('exEditReps').value = parts.length > 1 ? parts[1].trim() : '';
+  // El rango que se enseña es el efectivo (el de tu tabla si tu rutina seguía con el antiguo): al guardar queda ya en tu rutina
+  const sp = ex ? prescriptionSpec(ex) : null;
+  $id('exEditReps').value = sp ? (sp.rango[0] === sp.rango[1] ? String(sp.rango[0]) : sp.rango[0] + '-' + sp.rango[1]) + (sp.timed ? ' seg' : '') : (parts.length > 1 ? parts[1].trim() : '');
   $id('exEditIcon').value = ex && ICONS[ex.icon] ? ex.icon : 'dumbbells';
   $id('exEditPrimary').value = ex ? (ex.primary || '') : '';
   $id('exEditAlts').value = ex ? (ex.alts || []).join('\n') : '';
   $id('exEditHowTo').value = ex ? (ex.howTo || '') : '';
   $id('exEditCanonical').value = ex && ex.canonical ? ex.canonical : 'Bíceps';
   $id('exEditError').textContent = '';
+  setEditorRx(ex ? prescriptionSpec(ex) : { cat: 'accesorio', descanso: RX_CATS.accesorio.descanso, rir: RX_CATS.accesorio.rir });
   updateEditorIconPreview();
   onEditorGroupChange();
 }
@@ -134,6 +196,8 @@ function saveExerciseEditor(){
     howTo: cleanText($id('exEditHowTo').value, 400),
   };
   if (!ICONS[fields.icon]) return err('Elige un icono.');
+  const rx = readEditorRx(name, fields.sets, timed);
+  if (rx.error) return err(rx.error);
 
   const newR = cloneJson(ROUTINE);
   const srcDay = newR.days[srcIdx], tgtDay = newR.days[tgtIdx];
@@ -158,6 +222,9 @@ function saveExerciseEditor(){
   const feelKey = $id('exEditFeel').value;
   if (feelKey && FEEL_PROFILES[feelKey]) ex.feel = feelKey; else delete ex.feel;
   if (timed) ex.timed = true; else delete ex.timed;
+  // Prescripción: solo se guarda lo que difiere de los valores por defecto; al tocar el texto de repeticiones, el rango sale de ahí
+  delete ex.rango_reps;
+  ['categoria_fatiga', 'descanso_seg', 'esquema_rir'].forEach(k => { if (rx[k] === null) delete ex[k]; else ex[k] = rx[k]; });
   if (groupLabel === 'Brazos') ex.canonical = $id('exEditCanonical').value; else delete ex.canonical;
 
   let moved = false;
@@ -270,11 +337,16 @@ function saveDayRename(){
 }
 
 // ---- Pantalla "Editar" ----
+let editOrdering = false;
+function toggleEditOrdering(){ editOrdering = !editOrdering; renderEditView(); }
+
 function renderEditView(){
   const el = document.getElementById('editViewBody');
   if (!el || !ROUTINE) return;
+  el.classList.toggle('ordering', editOrdering);
   const archived = [];
-  let html = '<div class="edit-intro">Aquí gestionas tus días y ejercicios: toca un ejercicio para editarlo, cambiarlo de grupo o de día, o archivarlo. Los cambios se ven al momento en la pestaña Rutina.</div>';
+  let html = '<div class="edit-intro">Toca un ejercicio para editarlo, cambiarlo de día o archivarlo. Los cambios se ven al momento en la pestaña Rutina.</div>' +
+    '<div style="padding:0 16px; margin-top:10px;"><button type="button" class="edit-order-btn" aria-pressed="' + editOrdering + '" onclick="toggleEditOrdering()">' + (editOrdering ? 'Listo' : 'Ordenar ejercicios') + '</button></div>';
   ROUTINE.days.forEach((day, di) => {
     html += `<div class="edit-day" style="--c:${dayColorVar(di)}">
       <div class="edit-day-head">
@@ -292,19 +364,19 @@ function renderEditView(){
         html += `<div class="edit-ex-row">
           <div class="edit-ex-main" onclick="openExerciseEditor(${di}, '${jsArg(e.id)}')">
             <div class="edit-ex-name">${escHtml(e.name)}</div>
-            <div class="edit-ex-sub">${escHtml(e.sets)}${e.timed ? ' · por tiempo' : ''}</div>
+            <div class="edit-ex-sub">${(() => { const sp = prescriptionSpec(e); return escHtml(sp.series + ' · ' + sp.rango[0] + (sp.rango[1] !== sp.rango[0] ? '–' + sp.rango[1] : '') + (sp.timed ? ' s' : '') + ' · ' + sp.catLabel); })()}</div>
           </div>
-          <button class="edit-arrow" ${i === 0 ? 'disabled' : ''} onclick="moveExerciseInGroup(${di}, '${jsArg(e.id)}', -1)" aria-label="Subir">▲</button>
-          <button class="edit-arrow" ${i === active.length - 1 ? 'disabled' : ''} onclick="moveExerciseInGroup(${di}, '${jsArg(e.id)}', 1)" aria-label="Bajar">▼</button>
-          <button class="edit-mini-btn" onclick="openExerciseEditor(${di}, '${jsArg(e.id)}')" aria-label="Editar">✏️</button>
+          <button class="edit-arrow" ${i === 0 ? 'disabled' : ''} onclick="moveExerciseInGroup(${di}, '${jsArg(e.id)}', -1)" aria-label="Subir ${escHtml(e.name)}">${uiIcon('chevU')}</button>
+          <button class="edit-arrow" ${i === active.length - 1 ? 'disabled' : ''} onclick="moveExerciseInGroup(${di}, '${jsArg(e.id)}', 1)" aria-label="Bajar ${escHtml(e.name)}">${uiIcon('chevD')}</button>
+          <span class="edit-chev" aria-hidden="true">${uiIcon('chevR')}</span>
         </div>`;
       });
     });
     if (!any) html += '<div class="draft-empty">Este día no tiene ejercicios activos.</div>';
-    html += `<button class="day-edit-btn" onclick="openNewExercise(${di})">＋ Añadir ejercicio a este día</button></div>`;
+    html += `<button class="day-edit-btn" onclick="openNewExercise(${di})">${uiIcon('plus', 's')} Añadir ejercicio a este día</button></div>`;
   });
 
-  html += `<div class="edit-day"><div class="edit-day-head"><div class="edit-day-name">🗄️ Archivados</div></div>`;
+  html += `<div class="edit-day"><div class="edit-day-head"><div class="edit-day-name">Archivados</div></div>`;
   if (archived.length === 0) {
     html += '<div class="draft-empty">No hay ejercicios archivados. Si archivas uno, seguirá contando en tus métricas y podrás restaurarlo aquí.</div>';
   } else {

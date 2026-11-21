@@ -115,7 +115,7 @@ function updateSyncBadge(){
   const profile = getProfile();
   const n = getOutbox().filter(e => !profile || e.perfil === profile).length;
   if (n === 0) { el.style.display = 'none'; return; }
-  el.textContent = (flushing ? '🔄 Sincronizando ' : '⏳ Sin sincronizar: ') + n;
+  el.textContent = (flushing ? 'Sincronizando ' : 'Sin sincronizar: ') + n;
   el.style.display = 'inline-block';
 }
 
@@ -288,7 +288,7 @@ function renderPendingWrap(logId){
   if (rows.length === 0) {
     const undo = lastAcceptedByLogId[logId];
     wrap.innerHTML = undo
-      ? `<button class="undo-btn" onclick="undoLastAccept('${logId}')">↩️ Deshacer último guardado (${undo.count} ${undo.count > 1 ? 'series' : 'serie'})</button>`
+      ? `<button class="undo-btn" onclick="undoLastAccept('${logId}')">${uiIcon('undo', 's')} Deshacer último guardado (${undo.count} ${undo.count > 1 ? 'series' : 'serie'})</button>`
       : '';
     return;
   }
@@ -297,9 +297,9 @@ function renderPendingWrap(logId){
     <div class="pending-list">
       ${rows.map((r, i) => {
         const badges = [
-          r.calentamiento ? '🔥 calentamiento' : '',
-          r.variante ? '🔀 ' + r.variante : '',
-          r.nota ? '📝 ' + r.nota : '',
+          r.calentamiento ? uiIcon('flame', 's') + ' calentamiento' : '',
+          r.variante ? uiIcon('swap', 's') + ' ' + escHtml(r.variante) : '',
+          r.nota ? uiIcon('pencil', 's') + ' ' + escHtml(r.nota) : '',
         ].filter(Boolean).join(' · ');
         return `
         <div class="pending-row">
@@ -307,11 +307,11 @@ function renderPendingWrap(logId){
             <span>Serie ${i + 1}: ${timed ? r.reps + ' seg' : fmtNum(parseFloat(r.peso), 2) + ' kg × ' + r.reps + ' reps'}</span>
             ${badges ? `<div class="pending-row-badges">${badges}</div>` : ''}
           </div>
-          <button class="pending-del" type="button" aria-label="Quitar serie ${i + 1}" onclick="removePendingRow('${logId}', ${i})" ${saving ? 'disabled' : ''}>✕</button>
+          <button class="pending-del" type="button" aria-label="Quitar serie ${i + 1}" onclick="removePendingRow('${logId}', ${i})" ${saving ? 'disabled' : ''}>${uiIcon('x', 's')}</button>
         </div>
       `;
       }).join('')}
     </div>
-    <button class="accept-btn" onclick="acceptPending('${logId}')" ${saving ? 'disabled' : ''}>${saving ? '⏳ Guardando…' : '✅ Aceptar (' + rows.length + (rows.length > 1 ? ' series)' : ' serie)')}</button>
+    <button class="accept-btn" onclick="acceptPending('${logId}')" ${saving ? 'disabled' : ''}>${saving ? 'Guardando…' : uiIcon('check', 's') + ' Aceptar (' + rows.length + (rows.length > 1 ? ' series)' : ' serie)')}</button>
   `;
 }

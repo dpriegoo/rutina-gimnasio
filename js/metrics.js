@@ -13,9 +13,34 @@ let progressChartInstance = null;
 
 let volumeChartInstance = null;
 
+// ---- Secciones de Métricas (Resumen · Cuerpo · Ejercicios · Datos): una pantalla por tema en vez de un scroll de 5 pantallas ----
+const MT_SECTIONS = ['resumen', 'cuerpo', 'ejercicios', 'datos'];
+function metricsSectionSaved(){
+  let s = 'resumen';
+  try { s = localStorage.getItem('mtSection') || 'resumen'; } catch (e) {}
+  return MT_SECTIONS.indexOf(s) >= 0 ? s : 'resumen';
+}
+function setMetricsSection(sec){
+  if (MT_SECTIONS.indexOf(sec) < 0) sec = 'resumen';
+  try { localStorage.setItem('mtSection', sec); } catch (e) {}
+  document.querySelectorAll('#metricasView [data-msec]').forEach(el => el.classList.toggle('mt-hidden', el.getAttribute('data-msec') !== sec));
+  MT_SECTIONS.forEach(n => {
+    const b = document.getElementById('mtTab' + n.charAt(0).toUpperCase() + n.slice(1)); if (!b) return;
+    b.classList.toggle('on', n === sec); b.setAttribute('aria-pressed', String(n === sec));
+  });
+  // Chart.js mide mal un lienzo mientras está oculto: al enseñarlo se reajusta
+  [progressChartInstance, volumeChartInstance, strengthIndexChartInstance, typeof weightChartInstance !== 'undefined' ? weightChartInstance : null]
+    .forEach(c => { try { if (c) c.resize(); } catch (e) {} });
+}
+
+// Con muy pocos puntos una curva suavizada inventa formas que no existen: se avisa en lugar de dibujarla
+const CHART_MIN_POINTS = 4;
+function chartWrapOf(ctx){ return ctx && ctx.parentElement; }
+function chartShow(ctx, show){ const w = chartWrapOf(ctx); if (w) w.style.display = show ? '' : 'none'; }
+
 async function loadMetrics(force){
   const btn = document.getElementById('refreshBtn');
-  btn.textContent = '⏳ Cargando…';
+  btn.textContent = 'Cargando…';
   try {
     const data = await fetchSheetData();
     if (data && data.error === 'unauthorized') { handleUnauthorized(); return; }
@@ -25,6 +50,7 @@ async function loadMetrics(force){
     applyOutboxToCache();
     renderHeatmap();
     populateExerciseSelect();
+    preloadHistorial();
     renderHistorial();
     renderProgressChart();
     renderVolumeChart();
@@ -33,9 +59,9 @@ async function loadMetrics(force){
     updateCardHighlights();
     loadBodyStats();
     maybeShowRebalanceModal();
-    btn.textContent = '🔄 Actualizar datos';
+    btn.innerHTML = uiIcon('refresh') + ' Actualizar datos';
   } catch (err) {
-    btn.textContent = '⚠️ No se pudo cargar — reintentar';
+    btn.textContent = 'No se pudo cargar: reintentar';
   }
 }
 
@@ -117,15 +143,22 @@ function renderProgressChart(){
   if (progressChartInstance) { progressChartInstance.destroy(); progressChartInstance = null; }
 
   if (!window.Chart) {
-    subEl.textContent = '⚠️ No se pudo cargar la librería de gráficos (revisa tu conexión y recarga).';
+    subEl.textContent = 'No se pudo cargar la librería de gráficos (revisa tu conexión y recarga).';
     return;
   }
   if (!exercise || labels.length === 0) {
     subEl.textContent = rows.length === 0
       ? 'Aún no hay registros para tu perfil.'
       : 'No hay registros de "' + exercise + '" todavía.';
+    chartShow(ctx, false);
     return;
   }
+  if (labels.length < CHART_MIN_POINTS) {
+    subEl.textContent = 'Aún pocos datos: llevas ' + labels.length + (labels.length === 1 ? ' sesión' : ' sesiones') + ' de este ejercicio. Con ' + CHART_MIN_POINTS + ' o más verás la evolución.';
+    chartShow(ctx, false);
+    return;
+  }
+  chartShow(ctx, true);
 
   const common = {
     responsive: true,
@@ -184,7 +217,7 @@ function renderVolumeChart(){
   if (volumeChartInstance) { volumeChartInstance.destroy(); volumeChartInstance = null; }
 
   if (!window.Chart) {
-    subEl.textContent = '⚠️ No se pudo cargar la librería de gráficos (revisa tu conexión y recarga).';
+    subEl.textContent = 'No se pudo cargar la librería de gráficos (revisa tu conexión y recarga).';
     return;
   }
   if (labels.length === 0) {
@@ -255,14 +288,16 @@ function renderStrengthIndexChart(){
   const ctx = document.getElementById('strengthIndexChart');
   if (strengthIndexChartInstance) { strengthIndexChartInstance.destroy(); strengthIndexChartInstance = null; }
   if (!subEl || !ctx) return;
-  if (!window.Chart) { subEl.textContent = '⚠️ No se pudo cargar la librería de gráficos.'; return; }
+  if (!window.Chart) { subEl.textContent = 'No se pudo cargar la librería de gráficos.'; return; }
   if (!profile) return;
 
   const { labels, values } = computeStrengthIndexByWeek(profile);
-  if (labels.length < 2) {
-    subEl.textContent = 'Necesitas un par de semanas con registros para ver la tendencia de fondo.';
+  if (labels.length < 3) {
+    subEl.textContent = 'Aún pocos datos: necesitas al menos 3 semanas con registros para ver la tendencia de fondo (llevas ' + labels.length + ').';
+    chartShow(ctx, false);
     return;
   }
+  chartShow(ctx, true);
   subEl.textContent = '100% = tu primera sesión registrada de cada ejercicio (fuerza estimada: media de tus series de trabajo, sin calentamientos). Por encima de 100%, vas a más de media.';
 
   strengthIndexChartInstance = new Chart(ctx, {

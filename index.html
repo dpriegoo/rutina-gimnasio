@@ -16,29 +16,25 @@
 <title>IronLog · Rutina de fuerza</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link rel="stylesheet" href="styles.css?v=cb42a934">
+<link rel="stylesheet" href="styles.css?v=4e2de17f">
 </head>
 <body>
 
 <div class="profile-screen" id="profileScreen">
-  <div class="profile-title">Inicia sesión para entrar</div>
+  <div class="login-mark" data-ic="logo" data-w="168"></div>
+  <div class="login-name">IronLog</div>
+  <div class="login-tag">Tu rutina de fuerza, serie a serie.</div>
   <div id="googleSignInBtn"></div>
   <div id="loginStatus" style="color:var(--muted); font-size:13px; display:none;">Iniciando sesión…</div>
   <div id="loginError" style="color:var(--red); font-size:13px; display:none; max-width:260px; text-align:center;"></div>
+  <div class="login-note">Acceso solo para cuentas autorizadas.</div>
 </div>
 
 <header>
-  <h1>Rutina de fuerza</h1>
-  <p>5 días · máquinas Technogym — Fitness Park</p>
-  <div class="profile-indicator" id="profileIndicator" role="button" tabindex="0" onclick="showProfileScreen()"></div>
-  <span class="sync-badge" id="syncBadge" role="button" tabindex="0" onclick="flushAttempt = 0; flushOutbox();" style="display:none;margin-left:14px;"></span>
+  <div class="brand"><span data-ic="logo" data-w="34"></span><span class="brand-name">IronLog</span></div>
+  <span class="sync-badge" id="syncBadge" role="button" tabindex="0" onclick="flushAttempt = 0; flushOutbox();" style="display:none;"></span>
+  <button type="button" class="avatar-btn" id="profileIndicator" onclick="showProfileScreen()" aria-label="Cuenta: cambiar o cerrar sesión"></button>
 </header>
-
-<div class="viewtoggle">
-  <button type="button" id="viewBtnRutina" class="active" aria-pressed="true" onclick="setView('rutina')">🏋️ Rutina</button>
-  <button type="button" id="viewBtnMetricas" aria-pressed="false" onclick="setView('metricas')">📈 Métricas</button>
-  <button type="button" id="viewBtnEditar" aria-pressed="false" onclick="setView('editar')">✏️ Editar</button>
-</div>
 
 <div id="rutinaView">
 
@@ -49,41 +45,50 @@
     <div class="dp-date" id="dpDate"></div>
   </div>
   <div class="priority-banner" id="priorityBanner" style="display:none;"></div>
+  <div class="deload-card dl-none" id="deloadCard"></div>
   <div class="dp-grid" id="dpGrid"></div>
-  <div class="dp-foot"><button type="button" class="week-summary-btn" onclick="showWeekSummary()">📋 Resumen de la semana</button></div>
+  <div class="dp-foot"><button type="button" class="week-summary-btn" onclick="showWeekSummary()"><span data-ic="clipboard"></span> Resumen de la semana</button></div>
+  <details class="info">
+    <summary>Guía rápida: RIR, descanso y progresión</summary>
+    <p><b>RIR</b> son las repeticiones que te quedan «en el depósito». <b>RIR 2</b>: terminas dejando 2. <b>Fallo técnico</b> (RIR 0): hasta la última repetición con técnica limpia, sin rebotes. Calcular el RIR es difícil: de media se subestima en cerca de 1 repetición, y el error es mucho mayor por encima de 12 repeticiones.</p>
+    <p><b>Pesados</b> (básicos multiarticulares): RIR 2 / 1 / 1 y 2:30-3:30 de descanso; no llegan al fallo. <b>Accesorios</b>: RIR 1 / 1 / 0 y 1:30-2:00. <b>Core</b>: 1:00-1:30. Lo que respalda la evidencia es dejar entre 1 y 3 repeticiones en reserva (casi la misma hipertrofia que al fallo y menos fatiga). No hay estudios que respalden llevar al fallo solo la última serie, ni sobre el core.</p>
+    <p><b>Doble progresión:</b> cuando llegas al tope de repeticiones en las 3 series, la app te sube la carga y vuelves al mínimo del rango. Progresar por carga o por repeticiones da resultados parecidos; los valores se pueden ajustar en Editar.</p>
+    <p><b>Progreso:</b> la app lo mide con la fuerza estimada de cada sesión (la media de tus series de trabajo, peso × repeticiones^0,10) y no con el 1RM, el peso máximo para una sola repetición, que nadie hace a diario y solo se puede estimar.</p>
+  </details>
+
 </div>
 
 <!-- Día abierto: tira de progreso + carrusel de ejercicios -->
 <div id="dayScreen" style="display:none;">
   <div class="daytabs-row">
-    <button type="button" class="day-back" onclick="showDayPicker()" aria-label="Volver a elegir día">‹ Días</button>
+    <button type="button" class="day-back" onclick="showDayPicker()" aria-label="Volver a elegir día"><span data-ic="chevL"></span> Días</button>
     <div class="day-title" id="dayTitle"></div>
-    <button type="button" class="week-summary-btn" onclick="showWeekSummary()">📋 Resumen</button>
+    <button type="button" class="week-summary-btn day-ic" onclick="showWeekSummary()" aria-label="Resumen de la semana"><span data-ic="clipboard"></span></button>
+    <button type="button" class="week-summary-btn day-ic" onclick="coachOpen()" aria-label="Preguntar al entrenador"><span data-ic="chat"></span></button>
   </div>
   <div class="ex-strip" id="exStrip" role="tablist" aria-label="Ejercicios del día"></div>
   <div class="ex-bar">
     <div class="ex-pos" id="exPos"></div>
-    <button class="day-compare-btn" id="dayCompareBtn" type="button">📊 Vs. semana pasada</button>
+    <button class="day-compare-btn" id="dayCompareBtn" type="button"><span data-ic="compare"></span> Vs. semana pasada</button>
   </div>
   <div id="dayExtras"></div>
 
   <main id="main" class="rail"></main>
 
-  <div class="qrtip" style="display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px;">
-    <span>🏋️ Peso libre</span>
-    <span>⚙️ Máquinas</span>
-    <span>🔗 Poleas</span>
-    <span>🧘 Suelo</span>
-  </div>
 </div>
 
 </div>
 
 <div id="metricasView" style="display:none;">
-  <button type="button" class="refresh-btn" onclick="loadMetrics(true)" id="refreshBtn">🔄 Actualizar datos</button>
-  <div class="metric-sub" id="syncTimingText" style="margin:6px 16px 0;"></div>
+  <button type="button" class="refresh-btn" onclick="loadMetrics(true)" id="refreshBtn"><span data-ic="refresh"></span> Actualizar datos</button>
+  <div class="mt-subnav" role="group" aria-label="Secciones de métricas">
+    <button type="button" id="mtTabResumen" class="on" aria-pressed="true" onclick="setMetricsSection('resumen')">Resumen</button>
+    <button type="button" id="mtTabCuerpo" aria-pressed="false" onclick="setMetricsSection('cuerpo')">Cuerpo</button>
+    <button type="button" id="mtTabEjercicios" aria-pressed="false" onclick="setMetricsSection('ejercicios')">Ejercicios</button>
+    <button type="button" id="mtTabDatos" aria-pressed="false" onclick="setMetricsSection('datos')">Datos</button>
+  </div>
 
-  <div class="metric-card">
+  <div class="metric-card" data-msec="resumen">
     <div class="metric-title">Carga muscular esta semana</div>
     <div class="metric-sub">Comparado con tu propio promedio histórico de cada zona (o, si aún no hay histórico, con lo más trabajado esta semana)</div>
     <div class="muscle-view-toggle">
@@ -106,27 +111,31 @@
     </div>
   </div>
 
-  <div class="metric-card">
-    <div class="metric-title">Mi peso y altura</div>
-    <div class="metric-sub">El peso corporal se registra por sesión — la tendencia (no el número suelto) es lo que aporta valor</div>
-    <div style="display:flex; gap:8px; margin-bottom:10px;">
-      <input class="metric-select" id="heightInput" type="text" inputmode="decimal" placeholder="Altura (cm)" style="margin-bottom:0;">
-      <button type="button" class="log-add" onclick="saveHeightValue()">Guardar</button>
-    </div>
+  <div class="metric-card" data-msec="cuerpo">
+    <div class="metric-title">Mi peso</div>
+    <div class="metric-sub">El peso corporal se registra por sesión: la tendencia (no el número suelto) es lo que aporta valor</div>
     <div style="display:flex; gap:8px;">
-      <input class="metric-select" id="weightInput" type="text" inputmode="decimal" placeholder="Peso de hoy (kg)" style="margin-bottom:0;">
+      <input class="metric-select" id="weightInput" type="text" inputmode="decimal" placeholder="Peso de hoy (kg)" aria-label="Peso de hoy en kilos" style="margin-bottom:0;">
       <button type="button" class="log-add" onclick="saveWeightValue()">Registrar</button>
     </div>
     <div id="weightTrendText" class="metric-sub" style="margin-top:10px; margin-bottom:0;"></div>
+    <div class="height-row" id="heightRow">
+      <span id="heightText">Altura: sin indicar</span>
+      <button type="button" class="link-btn" id="heightToggle" onclick="toggleHeightEdit()">Cambiar</button>
+    </div>
+    <div id="heightEdit" style="display:none; gap:8px; margin-top:8px;">
+      <input class="metric-select" id="heightInput" type="text" inputmode="decimal" placeholder="Altura (cm)" aria-label="Altura en centímetros" style="margin-bottom:0;">
+      <button type="button" class="log-add" onclick="saveHeightValue()">Guardar</button>
+    </div>
   </div>
 
-  <div class="metric-card">
+  <div class="metric-card" data-msec="cuerpo">
     <div class="metric-title">Peso corporal</div>
     <div class="metric-sub" id="weightChartSub">Puntos: peso de cada día · línea gruesa: media móvil de 7 días (la tendencia real)</div>
     <div class="chart-wrap"><canvas id="weightChart" role="img" aria-label="Gráfica de peso corporal y volumen de entrenamiento"></canvas></div>
   </div>
 
-  <div class="metric-card">
+  <div class="metric-card" data-msec="resumen">
     <div class="metric-title">Constancia</div>
     <div class="metric-sub" id="heatmapSub">Últimos ~3 meses</div>
     <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmapGrid"></div></div>
@@ -141,7 +150,7 @@
     </div>
   </div>
 
-  <div class="metric-card">
+  <div class="metric-card" data-msec="ejercicios">
     <div class="metric-title">Historial reciente</div>
     <div class="metric-sub">Elige primero el día y luego el ejercicio para ver y corregir sus últimos registros</div>
     <select class="metric-select" id="historialDaySelect" onchange="onHistorialDayChange()"></select>
@@ -149,26 +158,31 @@
     <div id="historialList"></div>
   </div>
 
-  <div class="metric-card">
+  <div class="metric-card" data-msec="ejercicios">
     <div class="metric-title">Progresión del ejercicio</div>
     <div class="metric-sub" id="progressSub">Elige un ejercicio para ver su evolución</div>
     <select class="metric-select" id="exerciseSelect" onchange="renderProgressChart()"></select>
     <div class="chart-wrap"><canvas id="progressChart" role="img" aria-label="Gráfica de progresión del ejercicio elegido"></canvas></div>
   </div>
 
-  <div class="metric-card">
+  <div class="metric-card" data-msec="resumen">
     <div class="metric-title">Volumen semanal total</div>
     <div class="metric-sub" id="volumeSub">Peso × reps × series sumado por semana — el mejor indicador de progreso para ganar músculo</div>
     <div class="chart-wrap"><canvas id="volumeChart" role="img" aria-label="Gráfica de volumen semanal"></canvas></div>
   </div>
 
-  <div class="metric-card">
+  <div class="metric-card" data-msec="resumen">
     <div class="metric-title">Índice de fuerza</div>
     <div class="metric-sub" id="strengthIndexSub">Tendencia de fondo: promedio de tu 1RM estimado en todos los ejercicios, respecto a tu primera marca de cada uno</div>
     <div class="chart-wrap"><canvas id="strengthIndexChart" role="img" aria-label="Gráfica del índice de fuerza"></canvas></div>
   </div>
 
-  <div class="metric-card" id="exportCard">
+  <div class="metric-card" data-msec="datos">
+    <div class="metric-title">Sincronización</div>
+    <div class="metric-sub" id="syncTimingText" style="margin-bottom:0;"></div>
+  </div>
+
+  <div class="metric-card" id="exportCard" data-msec="datos">
     <div class="metric-title">Exportar datos</div>
     <div class="metric-sub">Guarda tus registros de un rango de fechas en un archivo para pasárselo a Claude y hacerle preguntas sobre tu rutina. El formato «Para Claude» lleva dentro la explicación de las columnas y tu rutina.</div>
     <div class="exp-presets" role="group" aria-label="Rangos rápidos">
@@ -193,9 +207,9 @@
     <div class="exp-preview" id="expPreview" aria-live="polite"></div>
     <div class="exp-error" id="expError" role="alert"></div>
     <div class="exp-actions">
-      <button type="button" class="exp-btn primary" id="expDownload" onclick="exportDownload()">⬇️ Descargar</button>
-      <button type="button" class="exp-btn" id="expShare" onclick="exportShare()" hidden>📤 Compartir</button>
-      <button type="button" class="exp-btn" id="expCopy" onclick="exportCopy()">📋 Copiar</button>
+      <button type="button" class="exp-btn primary" id="expDownload" onclick="exportDownload()"><span data-ic="download"></span> Descargar</button>
+      <button type="button" class="exp-btn" id="expShare" onclick="exportShare()" hidden><span data-ic="share"></span> Compartir</button>
+      <button type="button" class="exp-btn" id="expCopy" onclick="exportCopy()"><span data-ic="copy"></span> Copiar</button>
     </div>
   </div>
 </div>
@@ -204,20 +218,11 @@
   <div id="editViewBody"></div>
 </div>
 
-<div style="padding:0 16px;">
-<details class="info">
-  <summary>RIR, descanso y 1RM — recordatorio rápido</summary>
-  <p><b>RIR 3–2:</b> trabaja con un peso que te deje 2–3 repeticiones en reserva antes del fallo muscular en cada serie.</p>
-  <p><b>Descanso:</b> lo ideal es no encadenar más de 3 días seguidos de entreno. Si entrenas los 5 días seguidos, descansa el fin de semana completo.</p>
-  <p><b>Progresión:</b> empieza cada ejercicio por el rango de repeticiones más bajo indicado; cuando te recuperes bien, añade una serie antes de subir al rango más alto.</p>
-  <p><b>1RM (repetición máxima):</b> es el peso más pesado que podrías levantar haciendo <b>una sola repetición</b> con buena técnica. Nadie hace series de 1 rep en el día a día, así que se <b>estima</b> a partir de tus series normales: si haces 60 kg × 8 reps, tu 1RM estimado ronda los 76 kg. Sirve para comparar tu fuerza real de una semana a otra aunque cambies el número de repeticiones — por ejemplo, subir de 60×6 a 62×8 no es solo "2 kg más", es una mejora bastante mayor de fuerza real, y el 1RM te lo muestra con un solo número en vez de tener que hacer la cuenta tú. En las gráficas de la app (la hoja de cada ejercicio, "Progresión del ejercicio" en Métricas y las mejoras del Resumen) no se usa el 1RM de una sola serie, sino la <b>fuerza estimada</b>: la media de todas tus series de trabajo, que da menos peso a las repeticiones que la fórmula de Epley y detecta mejor si realmente progresas. Por eso esas cifras no coinciden con el 1RM de las marcas personales.</p>
-</details>
-</div>
 
 <div class="summary-screen" id="summaryScreen" role="dialog" aria-modal="true" aria-labelledby="summaryTitle">
   <div class="summary-header">
     <h2 id="summaryTitle">Resumen de la semana</h2>
-    <button type="button" class="summary-close" onclick="hideWeekSummary()" aria-label="Cerrar resumen">✕</button>
+    <button type="button" class="summary-close" onclick="hideWeekSummary()" aria-label="Cerrar resumen"><span data-ic="x"></span></button>
   </div>
   <div class="summary-body" id="summaryBody"></div>
 </div>
@@ -225,14 +230,14 @@
 <div class="summary-screen" id="dayCompareScreen" role="dialog" aria-modal="true" aria-labelledby="dayCompareTitle">
   <div class="summary-header">
     <h2 id="dayCompareTitle">Comparativa</h2>
-    <button type="button" class="summary-close" onclick="hideDayComparison()" aria-label="Cerrar comparativa">✕</button>
+    <button type="button" class="summary-close" onclick="hideDayComparison()" aria-label="Cerrar comparativa"><span data-ic="x"></span></button>
   </div>
   <div class="summary-body" id="dayCompareBody"></div>
 </div>
 
 <div class="modal-backdrop" id="rebalanceModal" role="dialog" aria-modal="true" aria-labelledby="rebalanceTitle">
   <div class="modal-card">
-    <div class="modal-title" id="rebalanceTitle">⚖️ Reequilibrar la semana</div>
+    <div class="modal-title" id="rebalanceTitle">Reequilibrar la semana</div>
     <div class="modal-text" id="rebalanceText"></div>
     <div class="modal-btn-row">
       <button type="button" class="modal-btn secondary" onclick="declineRebalance()">No, gracias</button>
@@ -252,6 +257,19 @@
     <div class="ed-field"><label for="exEditTimed">Tipo</label>
       <select id="exEditTimed"><option value="0">Peso y repeticiones</option><option value="1">Por tiempo (segundos)</option></select></div>
     <div class="ed-field"><label for="exEditReps">Repeticiones o tiempo objetivo (siempre 3 series)</label><input id="exEditReps" type="text" maxlength="30" placeholder="8-10  ·  30 seg"></div>
+    <div class="ed-section">Prescripción serie a serie <span class="ed-tag">evidencia parcial</span></div>
+    <div class="ed-field"><label for="exEditCat">Categoría de fatiga</label>
+      <select id="exEditCat" onchange="onEditorCatChange()"><option value="pesado">Pesado: básico multiarticular</option><option value="accesorio">Accesorio: aislamiento o máquina ligera</option><option value="core">Core o isométrico</option></select></div>
+    <div class="ed-row2">
+      <div class="ed-field"><label for="exEditRestMin">Descanso mínimo (s)</label><input id="exEditRestMin" type="number" inputmode="numeric" min="15" max="600"></div>
+      <div class="ed-field"><label for="exEditRestMax">Descanso máximo (s)</label><input id="exEditRestMax" type="number" inputmode="numeric" min="15" max="600"></div>
+    </div>
+    <div class="ed-row3">
+      <div class="ed-field"><label for="exEditRir1">RIR serie 1</label><select id="exEditRir1"></select></div>
+      <div class="ed-field"><label for="exEditRir2">RIR serie 2</label><select id="exEditRir2"></select></div>
+      <div class="ed-field"><label for="exEditRir3">RIR serie 3</label><select id="exEditRir3"></select></div>
+    </div>
+    <div class="edit-hint" id="exEditRxHint"></div>
     <div class="ed-field"><label for="exEditIcon">Icono</label>
       <div class="ed-icon-row"><div class="icon-box" id="exEditIconPreview"></div><select id="exEditIcon" onchange="updateEditorIconPreview()"></select></div></div>
     <div class="ed-field"><label for="exEditFeel">Músculo y animación (qué se muestra en "Siente")</label>
@@ -264,7 +282,7 @@
       <button type="button" class="modal-btn secondary" onclick="closeExerciseEditor()">Cancelar</button>
       <button type="button" class="modal-btn primary" onclick="saveExerciseEditor()">Guardar</button>
     </div>
-    <button type="button" class="ed-archive-btn" id="exEditArchiveBtn" onclick="archiveExerciseFromEditor()">🗄️ Archivar este ejercicio</button>
+    <button type="button" class="ed-archive-btn" id="exEditArchiveBtn" onclick="archiveExerciseFromEditor()">Archivar este ejercicio</button>
   </div>
 </div>
 
@@ -281,40 +299,76 @@
   </div>
 </div>
 
+<div class="restcard" id="restCard" role="timer" aria-live="off" hidden>
+  <div class="rc-ring"><svg viewBox="0 0 60 60" aria-hidden="true"><circle class="rc-track" cx="30" cy="30" r="26"/><circle class="rc-prog" id="rcProg" cx="30" cy="30" r="26" pathLength="100"/></svg><span id="rcTime">0:00</span></div>
+  <div class="rc-text"><div class="rc-title" id="rcTitle">Descanso</div><div class="rc-sub" id="rcSub"></div></div>
+  <div class="rc-btns">
+    <button type="button" class="rc-btn" onclick="restAdjust(-15)" aria-label="Quitar 15 segundos">−15</button>
+    <button type="button" class="rc-btn" onclick="restAdjust(15)" aria-label="Añadir 15 segundos">+15</button>
+    <button type="button" class="rc-btn rc-skip" onclick="restSkip()">Saltar</button>
+  </div>
+</div>
+
+<div class="sessionbar" id="sessionBar">
+  <div class="sb-time"><span data-ic="timer"></span><span id="sbTime">--:--</span></div>
+  <div class="sb-prog" id="sbProg"></div>
+  <button type="button" class="sb-next" id="sbNext" onclick="sessionNext()">Siguiente</button>
+</div>
+
+<div class="sessdone" id="sessDone" role="dialog" aria-modal="true" aria-labelledby="sdTitle" style="display:none;">
+  <div class="sd-card" id="sdCard" tabindex="-1">
+    <div class="sd-check" data-ic="check"></div>
+    <h2 class="sd-title" id="sdTitle">Sesión completada</h2>
+    <div class="sd-sub" id="sdSub"></div>
+    <div id="sdBody"></div>
+  </div>
+</div>
+
+<nav class="bottomnav" id="bottomNav" aria-label="Navegación principal">
+  <button type="button" id="viewBtnRutina" class="active" aria-pressed="true" onclick="setView('rutina')"><span class="bn-pill" data-ic="dumbbell"></span><span class="bn-label">Rutina</span></button>
+  <button type="button" id="viewBtnMetricas" aria-pressed="false" onclick="setView('metricas')"><span class="bn-pill" data-ic="chart"></span><span class="bn-label">Métricas</span></button>
+  <button type="button" id="viewBtnCoach" aria-pressed="false" aria-haspopup="dialog" onclick="coachToggle()"><span class="bn-pill" data-ic="chat"></span><span class="bn-label">Entrenador</span></button>
+  <button type="button" id="viewBtnEditar" aria-pressed="false" onclick="setView('editar')"><span class="bn-pill" data-ic="pencil"></span><span class="bn-label">Editar</span></button>
+</nav>
+
 <div class="toast" id="toast" role="status" aria-live="polite">Guardado ✓</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
-<script>window.IRONLOG_BUILD = '91736359'; // lo escribe tools/stamp.js</script>
+<script>window.IRONLOG_BUILD = '80b6d2a0'; // lo escribe tools/stamp.js</script>
 <script src="js/motion.js?v=7298014a"></script>
 <script src="js/config.js?v=4d929179"></script>
+<script src="js/ui-icons.js?v=bcc3f18b"></script>
 <script src="js/utils.js?v=3734d2d1"></script>
 <script src="js/icons.js?v=91462c98"></script>
 <script src="js/routine-default.js?v=7400eda4"></script>
 <script src="js/api-supabase.js?v=c23ddc13"></script>
 <script src="js/api.js?v=684a8597"></script>
-<script src="js/auth.js?v=c6dba7c8"></script>
+<script src="js/auth.js?v=25c0501e"></script>
 <script src="js/routine.js?v=f17fbe87"></script>
-<script src="js/outbox.js?v=d25ef082"></script>
+<script src="js/outbox.js?v=9b013bbe"></script>
 <script src="js/body-svg.js?v=3fc81c63"></script>
-<script src="js/muscles.js?v=f1f6c335"></script>
-<script src="js/planning.js?v=a26b757d"></script>
-<script src="js/body.js?v=181d9edb"></script>
-<script src="js/history.js?v=d785551b"></script>
-<script src="js/metrics.js?v=3b97934d"></script>
-<script src="js/summary.js?v=ecd544d1"></script>
-<script src="js/export.js?v=19164744"></script>
+<script src="js/muscles.js?v=6f3b7688"></script>
+<script src="js/planning.js?v=5e449824"></script>
+<script src="js/body.js?v=a784bc90"></script>
+<script src="js/history.js?v=4c11d7b3"></script>
+<script src="js/metrics.js?v=3fc6e695"></script>
+<script src="js/summary.js?v=1f827f4d"></script>
+<script src="js/prescription.js?v=30edaa1f"></script>
+<script src="js/deload.js?v=232262ef"></script>
+<script src="js/training.js?v=85aca9d2"></script>
+<script src="js/export.js?v=2c1c0a3d"></script>
 <script src="js/feel-data.js?v=72b2bdef"></script>
 <script src="js/feel-anim.js?v=254a5b63"></script>
 <script src="js/feel.js?v=e98b2186"></script>
-<script src="js/progress-chart.js?v=df609753"></script>
-<script src="js/day-view.js?v=e4630ea2"></script>
-<script src="js/day-picker.js?v=e38f86cf"></script>
-<script src="js/coach-tools.js?v=53e7c999"></script>
+<script src="js/progress-chart.js?v=a38785d4"></script>
+<script src="js/day-view.js?v=119775f3"></script>
+<script src="js/day-picker.js?v=06010b97"></script>
+<script src="js/coach-tools.js?v=907afa22"></script>
 <script src="js/coach.js?v=79e01680"></script>
-<script src="js/coach-ui.js?v=20016e0c"></script>
-<script src="js/editor.js?v=178be335"></script>
+<script src="js/coach-ui.js?v=6eaadc4a"></script>
+<script src="js/editor.js?v=8950581e"></script>
 <script src="js/progress.js?v=4497a730"></script>
-<script src="js/navigation.js?v=acad0202"></script>
+<script src="js/navigation.js?v=e3b94915"></script>
 <script src="js/main.js?v=c038782c"></script>
 
 </body>

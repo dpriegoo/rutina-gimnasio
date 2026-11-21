@@ -31,7 +31,7 @@ assert.deepStrictEqual(tiny, [], 'hay texto por debajo de 11 px: ' + tiny.join('
 assert(/html input:not\(\[type=checkbox\]\)[^{]*\{[^}]*font-size:\s*16px/.test(css), 'los campos deben ir a 16 px');
 assert(/#main\.rail \.log-form-main input\{[^}]*font-size:\s*16px/.test(css), 'los campos de registro deben ir a 16 px');
 assert(/--tap:\s*44px/.test(css), 'falta --tap: 44px');
-assert(/\.viewtoggle button[^{]*\{[^}]*min-height:\s*var\(--tap\)/.test(css), 'las pestañas principales deben medir 44 px');
+assert(/\.bottomnav button[^{]*\{[^}]*min-height:\s*var\(--tap\)/.test(css), 'las pestañas de la barra inferior deben medir 44 px');
 
 // 4) Zoom bloqueado (decisión de diseño)
 const vp = html.match(/<meta name="viewport" content="([^"]+)"/)[1];
@@ -63,5 +63,14 @@ assert(radii.size <= 8, 'demasiados radios de borde distintos (' + radii.size + 
 // 7) Colores: casi nada de literales fuera de las variables
 let lits = 0; css.split('\n').forEach(l => { if (!/--[\w-]+\s*:\s*#/.test(l)) lits += (l.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length; });
 assert(lits <= 12, 'demasiados colores literales fuera de variables (' + lits + ')');
+
+// 8) Tarjeta de exportar a prueba de Safari de iOS (WebKit): rejillas (no flex con gap), campos de fecha con aspecto neutro y botones sin estilo nativo
+const rule = sel => { const m = css.match(new RegExp('\\n\\s*' + sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}')); return m ? m[1] : ''; };
+assert(/display:\s*grid/.test(rule('.exp-actions')) && /display:\s*grid/.test(rule('.exp-presets')) && /display:\s*grid/.test(rule('.exp-range')), 'los botones, atajos y fechas de exportar usan rejillas');
+assert(/minmax\(0,\s*1fr\)/.test(rule('.exp-range')) && /minmax\(0,\s*1fr\)/.test(rule('.exp-actions')), 'columnas que pueden encogerse (si no, un campo ancho empuja al vecino)');
+assert(/-webkit-appearance:\s*none/.test(rule('.exp-date')) && /\.exp-date,[^{]*\{(?=[^}]*min-width:\s*0)(?=[^}]*max-width:\s*100%)/.test(css), 'los campos de fecha no se salen de su columna en iOS');
+['.exp-btn', '.exp-chip'].forEach(k => assert(/-webkit-appearance:\s*none/.test(rule(k)), k + ' sin estilo nativo de iOS'));
+assert(/\n\s*body\{padding-bottom:\s*calc\(var\(--nav-h\)/.test(css) && /body\.in-day\{padding-bottom:\s*calc\(var\(--sess-h\)/.test(css), 'hueco al final de cada pantalla para la barra inferior (y para la barra de sesión dentro de un día)');
+assert(!/coach-fab/.test(css), 'ya no hay botón flotante que tape controles');
 
 console.log('OK style: contraste, tamaños mínimos, campos 16 px, zoom bloqueado y movimiento reducido');

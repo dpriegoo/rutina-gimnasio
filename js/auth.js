@@ -140,6 +140,8 @@ function showProfileScreen(){
 function updateProfileIndicator(){
   const p = getProfile();
   const el = document.getElementById('profileIndicator');
-  el.textContent = p ? ('👤 ' + p + ' · cerrar sesión') : '';
+  el.textContent = p ? p.charAt(0).toUpperCase() : '';
+  el.setAttribute('aria-label', p ? 'Cuenta de ' + p + ': cambiar o cerrar sesión' : 'Cuenta');
+  el.style.display = p ? '' : 'none';
   updateSyncBadge();
 }

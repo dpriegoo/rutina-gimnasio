@@ -14,7 +14,7 @@ const get = expr => new vm.Script(expr).runInContext(ctx);
 const near = (a, b, msg) => assert(Math.abs(a - b) < 1e-6, (msg || '') + ' (' + a + ' vs ' + b + ')');
 const S = (w, r) => w * Math.pow(r, 0.10);   // fuerza de una serie
 
-run('utils.js');
+run('utils.js'); run('ui-icons.js');
 get("function getProfile(){ return 'David'; } function isTimedExercise(n){ return n === 'Plancha'; }");
 run('progress-chart.js');
 

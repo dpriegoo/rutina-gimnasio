@@ -19,6 +19,7 @@ async function loadBodyStats(){
     window._weightHistory = Array.isArray(weightsRes) ? weightsRes : [];
     onServerInfo(heightRes);
     if (window._height) document.getElementById('heightInput').value = window._height;
+    renderHeightRow();
     renderWeightTrend();
     renderWeightChart();
   } catch (e) {}
@@ -83,13 +84,20 @@ function renderWeightChart(){
 
   const weights = window._weightHistory || [];
   if (!window.Chart) {
-    subEl.textContent = '⚠️ No se pudo cargar la librería de gráficos.';
+    subEl.textContent = 'No se pudo cargar la librería de gráficos.';
     return;
   }
   if (weights.length === 0) {
     subEl.textContent = 'Registra algún peso para ver la gráfica.';
+    if (typeof chartShow === 'function') chartShow(ctx, false);
     return;
   }
+  if (weights.length < 4) {
+    subEl.textContent = 'Aún pocos datos: llevas ' + weights.length + (weights.length === 1 ? ' registro' : ' registros') + ' de peso. Con 4 o más verás la tendencia (la media de 7 días).';
+    if (typeof chartShow === 'function') chartShow(ctx, false);
+    return;
+  }
+  if (typeof chartShow === 'function') chartShow(ctx, true);
 
   const sorted = weights.slice().sort((a,b) => a.fecha.localeCompare(b.fecha));
   const labels = sorted.map(w => w.fecha.slice(5));
@@ -172,9 +180,26 @@ function renderWeightTrend(){
     text += ' (' + (delta >= 0 ? '+' : '') + fmtNum(delta, 1) + ' kg vs. hace una semana)';
   }
   if (dias !== null && dias >= 3) {
-    text += '<br><span style="color:var(--amber);">⚠️ Han pasado ' + dias + ' días desde tu último peso — te iría bien registrar uno hoy.</span>';
+    text += '<br><span style="color:var(--amber);">Han pasado ' + dias + ' días desde tu último peso — te iría bien registrar uno hoy.</span>';
   }
   el.innerHTML = text;
+}
+
+// La altura se pone una vez: después solo se muestra, con «Cambiar»
+function renderHeightRow(){
+  const txt = document.getElementById('heightText'), edit = document.getElementById('heightEdit'), btn = document.getElementById('heightToggle');
+  if (!txt || !edit) return;
+  const h = window._height;
+  txt.textContent = h ? 'Altura: ' + fmtNum(parseFloat(h), 0) + ' cm' : 'Altura: sin indicar';
+  edit.classList.toggle('open', !h);
+  if (btn) { btn.textContent = h ? 'Cambiar' : ''; btn.hidden = !h; btn.setAttribute('aria-expanded', String(!h)); }
+}
+function toggleHeightEdit(){
+  const edit = document.getElementById('heightEdit'), btn = document.getElementById('heightToggle');
+  if (!edit) return;
+  const open = edit.classList.toggle('open');
+  if (btn) btn.setAttribute('aria-expanded', String(open));
+  if (open) { const i = document.getElementById('heightInput'); if (i) i.focus({ preventScroll: true }); }
 }
 
 async function saveHeightValue(){
@@ -183,6 +208,7 @@ async function saveHeightValue(){
   const data = await postToSheetChecked({ action: 'saveHeight', altura: val });
   if (data && data.ok) {
     window._height = val;
+    renderHeightRow();
     showToast('Altura guardada ✓');
   } else if (!data.unauthorized) {
     showToast('No se pudo guardar la altura, revisa tu conexión');

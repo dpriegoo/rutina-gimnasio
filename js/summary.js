@@ -19,12 +19,24 @@ function weeklyVolumeForProfile(profile, weekStart){
     .reduce((sum, r) => sum + rowVolume(r), 0);
 }
 
-function dayVolumeForWeek(profile, dia, weekStart){
+// Volumen de la semana de weekStart solo hasta el día nº maxDays (1 = lunes ... 7 = domingo): para comparar "hasta el mismo punto"
+function weeklyVolumeUntil(profile, weekStart, maxDays){
+  const end = new Date(weekStart); end.setDate(end.getDate() + maxDays);
+  return (window._progressCache || [])
+    .filter(r => (r['Perfil'] || '') === profile && !isWarmupRow(r))
+    .filter(r => { const f = parseLocalDate(r['Fecha']); return f >= weekStart && f < end; })
+    .reduce((sum, r) => sum + rowVolume(r), 0);
+}
+// Día de la semana de hoy como 1..7 (lunes = 1)
+function todayDowCount(){ return ((new Date().getDay() + 6) % 7) + 1; }
+
+// names (opcional): solo esos ejercicios, para comparar un día a medias con los mismos ejercicios de la semana pasada
+function dayVolumeForWeek(profile, dia, weekStart, names){
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 7);
   const cache = window._progressCache || [];
   return cache
-    .filter(r => (r['Perfil'] || '') === profile && r['Día'] === dia && !isWarmupRow(r))
+    .filter(r => (r['Perfil'] || '') === profile && r['Día'] === dia && !isWarmupRow(r) && (!names || names.indexOf(r['Ejercicio']) >= 0))
     .filter(r => { const f = parseLocalDate(r['Fecha']); return f >= weekStart && f < weekEnd; })
     .reduce((sum, r) => sum + rowVolume(r), 0);
 }
@@ -94,23 +106,31 @@ function renderDayComparison(dayIdx){
   document.getElementById('dayCompareTitle').textContent = day.name.split('·')[0].trim() + ': esta semana vs. la pasada';
   document.getElementById('dayCompareScreen').style.setProperty('--c', dayColorVar(dayIdx));   // el color del día, como en la pantalla del día
 
+  const exerciseEntries0 = effectiveDayGroups(day).flatMap(g => g.exercises.map(ex => ex.name));
+  const doneNames = exerciseEntries0.filter(n => weeklySeriesCount(day.name, n) > 0);
+  const inProgress = exerciseEntries0.some(n => weeklySeriesCount(day.name, n) < weeklyTarget());
   const volThis = Math.round(dayVolumeForWeek(profile, day.name, thisWeekStart));
-  const volLast = Math.round(dayVolumeForWeek(profile, day.name, lastWeekStart));
+  // A mitad de día se compara con los MISMOS ejercicios de la semana pasada (si no, un día a medias siempre parece un bajón)
+  const volLast = Math.round(dayVolumeForWeek(profile, day.name, lastWeekStart, inProgress ? doneNames : null));
   let volDeltaHtml;
-  if (volLast > 0) {
+  if (volLast > 0 && volThis > 0) {
     const pct = Math.round(((volThis - volLast) / volLast) * 100);
-    const cls = pct > 0 ? 'up' : (pct < 0 ? 'down' : 'flat');
+    // Con el día completo el color es el de siempre; en curso solo se destaca la subida (nunca una alarma roja)
+    const cls = inProgress ? (pct >= 3 ? 'up' : 'flat') : (pct > 0 ? 'up' : (pct < 0 ? 'down' : 'flat'));
     const arrow = pct > 0 ? '▲' : (pct < 0 ? '▼' : '·');
-    volDeltaHtml = `<div class="sum-delta ${cls}">${arrow} ${pct > 0 ? '+' : ''}${fmtNum(pct, 0)} % vs. semana pasada (${fmtNum(volLast, 0)} kg)</div>`;
+    volDeltaHtml = `<div class="sum-delta ${cls}">${arrow} ${pct > 0 ? '+' : ''}${fmtNum(pct, 0)} % ${inProgress ? 'vs. los mismos ejercicios de la semana pasada' : 'vs. semana pasada'} (${fmtNum(volLast, 0)} kg)</div>`;
   } else {
-    volDeltaHtml = `<div class="sum-delta flat">Sin datos de la semana pasada para comparar</div>`;
+    volDeltaHtml = `<div class="sum-delta flat">${volThis > 0 ? 'Sin datos de la semana pasada para comparar' : 'Aún no has registrado nada de este día esta semana'}</div>`;
   }
+  if (deloadActive()) volDeltaHtml = '<div class="sum-delta flat">Semana de descarga: el volumen baja a propósito</div>';
+  const progressChip = inProgress ? `<div class="cmp-wait" style="margin-top:6px;">Día en curso · ${exerciseEntries0.filter(n => weeklySeriesCount(day.name, n) >= weeklyTarget()).length} de ${exerciseEntries0.length} ejercicios completos</div>` : '';
 
   const exerciseEntries = effectiveDayGroups(day).flatMap(g => g.exercises.map(ex => ({ name: ex.name, timed: isTimedExercise(ex.name) })));
   const rowsHtml = exerciseEntries.map(e => {
     const thisMark = pgWeekValue(e.name, thisWeekStart, day.name);
     const lastMark = pgWeekValue(e.name, lastWeekStart, day.name);
-    const thisTxt = !thisMark ? (pgWeekHasAny(e.name, thisWeekStart, day.name) ? 'Solo en otra máquina' : 'Sin registrar') : (e.timed ? thisMark.reps + 's' : fmtNum(thisMark.peso, 2) + 'kg × ' + thisMark.reps);
+    const thisTxt = !thisMark ? (pgWeekHasAny(e.name, thisWeekStart, day.name) ? 'Solo en otra máquina' : 'Pendiente') : (e.timed ? thisMark.reps + 's' : fmtNum(thisMark.peso, 2) + 'kg × ' + thisMark.reps);
+    const pendingThis = !thisMark && !pgWeekHasAny(e.name, thisWeekStart, day.name);
     const lastTxt = !lastMark ? (pgWeekHasAny(e.name, lastWeekStart, day.name) ? 'Solo en otra máquina' : 'Sin datos') : (e.timed ? lastMark.reps + 's' : fmtNum(lastMark.peso, 2) + 'kg × ' + lastMark.reps);
 
     let deltaHtml = '';
@@ -130,7 +150,7 @@ function renderDayComparison(dayIdx){
 
     const variantMismatch = thisMark && lastMark && (thisMark.variante || '') !== (lastMark.variante || '');
     const mismatchHtml = variantMismatch
-      ? `<div style="font-size:11px; color:var(--amber); text-align:right;">⚠️ variante distinta (${escHtml(lastMark.variante || 'la habitual')} → ${escHtml(thisMark.variante || 'la habitual')}), la comparación no es del todo justa</div>`
+      ? `<div style="font-size:11px; color:var(--amber); text-align:right;">variante distinta (${escHtml(lastMark.variante || 'la habitual')} → ${escHtml(thisMark.variante || 'la habitual')}), la comparación no es del todo justa</div>`
       : '';
 
     return `
@@ -138,7 +158,7 @@ function renderDayComparison(dayIdx){
         <div><b>${e.name}</b></div>
         <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted);">
           <span>Pasada: ${lastTxt}</span>
-          <span>Esta semana: ${thisTxt}</span>
+          <span${pendingThis ? ' class="cmp-wait"' : ''}>Esta semana: ${thisTxt}</span>
         </div>
         ${deltaHtml ? `<div style="text-align:right;">${deltaHtml}</div>` : ''}
         ${mismatchHtml}
@@ -150,7 +170,7 @@ function renderDayComparison(dayIdx){
     <div class="sum-card">
       <div class="sum-title">Volumen total del día</div>
       <div class="sum-big">${fmtNum(volThis, 0)} kg</div>
-      ${volDeltaHtml}
+      ${volDeltaHtml}${progressChip}
     </div>
     <div class="sum-card">
       <div class="sum-title">Por ejercicio</div>
@@ -179,15 +199,19 @@ function renderWeekSummary(){
   // Volumen esta semana vs semana pasada
   const volThis = Math.round(weeklyVolumeForProfile(profile, getWeekStart()));
   const volLast = Math.round(weeklyVolumeForProfile(profile, getWeekStartOffset(-1)));
+  // La semana está en curso: se compara con la semana pasada HASTA EL MISMO DÍA (si no, miércoles siempre parece un desplome)
+  const volLastSame = Math.round(weeklyVolumeUntil(profile, getWeekStartOffset(-1), todayDowCount()));
   let deltaHtml = '';
-  if (volLast > 0) {
-    const pct = Math.round(((volThis - volLast) / volLast) * 100);
-    const cls = pct > 0 ? 'up' : (pct < 0 ? 'down' : 'flat');
+  if (volLastSame > 0) {
+    const pct = Math.round(((volThis - volLastSame) / volLastSame) * 100);
+    const cls = pct >= 3 ? 'up' : 'flat';
     const arrow = pct > 0 ? '▲' : (pct < 0 ? '▼' : '·');
-    deltaHtml = `<div class="sum-delta ${cls}">${arrow} ${pct > 0 ? '+' : ''}${fmtNum(pct, 0)} % vs. semana pasada (${fmtNum(volLast, 0)} kg)</div>`;
+    deltaHtml = `<div class="sum-delta ${cls}">${arrow} ${pct > 0 ? '+' : ''}${fmtNum(pct, 0)} % vs. el mismo punto de la semana pasada (${fmtNum(volLastSame, 0)} kg)</div><div class="cmp-wait" style="margin-top:6px;">Semana en curso · la pasada entera sumó ${fmtNum(volLast, 0)} kg</div>`;
   } else {
     deltaHtml = `<div class="sum-delta flat">Sin datos de la semana pasada para comparar</div>`;
   }
+
+  if (deloadActive()) deltaHtml = '<div class="sum-delta flat">Semana de descarga: el volumen baja a propósito (' + DELOAD_SERIES + ' series por ejercicio)</div>';
 
   // Mejoras de la semana
   const improvements = weeklyImprovements(profile);
@@ -218,31 +242,24 @@ function renderWeekSummary(){
 
   // Ejercicios pendientes de días empezados pero no completados
   const pending = pendingFromPartialDays();
+  const anySame = pending.some(p => p.missing.some(m => m.recommendedDay && m.recommendedDay.sameExercise));
   const pendingHtml = pending.length === 0 ? '' : `
     <div class="sum-card">
-      <div class="sum-title">⚠️ Ejercicios pendientes de esta semana</div>
-      <div class="metric-sub" style="margin-bottom:10px;">Días que empezaste pero no terminaste — te sugiero dónde encajarlos, y puedes registrarlos aquí mismo</div>
+      <div class="sum-title">Ejercicios pendientes</div>
+      <div class="metric-sub" style="margin-bottom:6px;">De días que empezaste y no terminaste. Te propongo dónde encajarlos.</div>
       ${pending.map(p => `
-        <div style="margin-bottom:10px;">
-          <div style="font-size:13px; font-weight:700; color:${dayColorVar(p.dayIdx)}; margin-bottom:4px;">${p.dayLabel}</div>
+        <div style="margin-bottom:6px;">
+          <div style="font-size:13px; font-weight:700; color:${dayColorVar(p.dayIdx)}; margin:6px 0 2px;">${p.dayLabel}</div>
           ${p.missing.map(m => `
-            <div style="padding:8px 0; border-bottom:1px solid var(--card-border);">
-              <div style="display:flex; justify-content:space-between; align-items:center; font-size:13.5px;">
-                <span>${m.name}</span>
-                <span class="sum-improve-delta" style="color:var(--blue);">${m.recommendedDay ? '→ ' + m.recommendedDay.dayLabel : 'la semana que viene'}</span>
-              </div>
-              ${m.recommendedDay ? `
-                <div class="metric-sub" style="margin-top:4px; margin-bottom:6px; text-align:left;">
-                  ${m.recommendedDay.sameExercise
-                    ? 'No queda otro día con ese músculo suelto, así que tocaría repetir este mismo ejercicio en la sesión de ' + m.recommendedDay.dayLabel + '. No es lo ideal (mejor repartido que junto), pero si no hay otro hueco esta semana, añádelo igualmente.'
-                    : 'Aprovecha esa sesión (trabaja el mismo músculo, sin repetir este ejercicio).'}
-                </div>
-                <button class="accept-btn" onclick="addBorrowedExercise('${m.recommendedDay.dayName.replace(/'/g,"\\'")}','${m.name.replace(/'/g,"\\'")}','${m.grupo.replace(/'/g,"\\'")}','${m.originalDayName.replace(/'/g,"\\'")}')">+ Añadir a ${m.recommendedDay.dayLabel}</button>
-              ` : ''}
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:4px 0; border-bottom:1px solid var(--card-border);">
+              <div style="min-width:0;"><div style="font-size:14px;">${m.name}</div>
+                <div class="metric-sub" style="margin:0;">${m.recommendedDay ? (m.recommendedDay.sameExercise ? 'Repetir en ' + m.recommendedDay.dayLabel : 'Encaja en ' + m.recommendedDay.dayLabel) : 'La semana que viene'}</div></div>
+              ${m.recommendedDay ? `<button type="button" class="sum-add-btn" onclick="addBorrowedExercise('${m.recommendedDay.dayName.replace(/'/g,"\\'")}','${m.name.replace(/'/g,"\\'")}','${m.grupo.replace(/'/g,"\\'")}','${m.originalDayName.replace(/'/g,"\\'")}')">Añadir a ${m.recommendedDay.dayLabel}</button>` : ''}
             </div>
           `).join('')}
         </div>
       `).join('')}
+      ${anySame ? '<div class="metric-sub" style="margin:8px 0 0;">«Repetir» significa que no queda otro día con ese músculo suelto: no es lo ideal (mejor repartido que junto), pero sirve si no hay otro hueco.</div>' : ''}
     </div>
   `;
 
@@ -272,8 +289,8 @@ function renderWeekSummary(){
 
     <div class="sum-card" id="geminiCard">
       <div class="sum-title" style="display:flex; justify-content:space-between; align-items:center;">
-        <span>💡 Consejo de la semana</span>
-        <button class="gemini-regen-btn" onclick="regenerateAdvice()" title="Regenerar consejo" aria-label="Regenerar consejo">✨</button>
+        <span>Consejo de la semana</span>
+        <button class="gemini-regen-btn" onclick="regenerateAdvice()" title="Regenerar consejo" aria-label="Regenerar consejo">${uiIcon('refresh')}</button>
       </div>
       <div id="geminiAdviceText" class="metric-empty" style="padding:8px 0; text-align:left;">Generando consejo…</div>
     </div>

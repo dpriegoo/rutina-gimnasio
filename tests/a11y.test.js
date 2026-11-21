@@ -23,7 +23,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   doc.querySelectorAll('canvas').forEach(c => assert(c.getAttribute('aria-label') && c.getAttribute('role') === 'img', 'cada gráfica necesita role=img y aria-label: ' + c.id));
   doc.querySelectorAll('svg[id^=muscleSvg]').forEach(c => assert(c.getAttribute('aria-label'), 'los mapas musculares necesitan aria-label'));
   assert.strictEqual(doc.getElementById('toast').getAttribute('role'), 'status', 'el aviso de guardado debe anunciarse');
-  ['profileIndicator', 'syncBadge'].forEach(id => { const e = doc.getElementById(id); assert(e.getAttribute('role') === 'button' && e.getAttribute('tabindex') === '0', id + ' debe ser operable con teclado'); });
+  ['profileIndicator', 'syncBadge'].forEach(id => { const e = doc.getElementById(id); assert(e.tagName === 'BUTTON' || (e.getAttribute('role') === 'button' && e.getAttribute('tabindex') === '0'), id + ' debe ser operable con teclado'); });
 
   // ---------- 2) Página en marcha ----------
   const r = await boot(path.join(root, 'index.html'), { logged: true });
