@@ -110,6 +110,8 @@ versión con la que se cargó y, si no coinciden, se recarga una vez sola.
 - `tests/feel.test.js` comprueba que todos los ejercicios tienen ficha y que las animaciones se pintan sin errores.
 
 ## Convenciones de interfaz (para no perder la coherencia)
+- **Botones con icono:** deben estar en la lista de `display:inline-flex; align-items:center; justify-content:center` del final de `styles.css` (si no, el icono se queda más alto que el texto). Un botón nuevo con icono se añade a esa lista.
+- **Selectores numéricos (`.stp`):** la unidad va en la etiqueta («Peso (kg)»), nunca dentro del valor, y el valor tiene `min-width:0`: con decimales (112,5) o tres cifras (120 s) el `+` no puede salirse. Probado a 320, 375, 390, 402 y 430 px.
 - **Números**: siempre con `fmtNum()`/`fmtKg()` de `utils.js` (coma decimal y punto de millar, también en los de 4 cifras; `toLocaleString` no lo hace). En gráficas, `callback: v => fmtNum(v, 0)` en los ejes.
 - **Colores**: variables de `styles.css` (`--blue-btn` para fondos con texto blanco, `--blue-text` para texto azul, `--red`, `--heat1…4`, `--d1…--d5` por día). En Chart.js y SVG, `chartTheme()` / `themeColor()` leen esas variables; no pongas hexadecimales sueltos.
 - **Escalas**: texto 11-12-13-14-15-16-18-20-22-24-28-36 px (nada por debajo de 11; campos a 16), radios 4-8-12-16-20 y pastilla (99). `tests/style.test.js` pone un tope.

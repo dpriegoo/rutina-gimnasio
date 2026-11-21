@@ -59,6 +59,9 @@ const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
 
   // ---------- 3) Steppers y una serie con un toque ----------
   w.planStep(logId, 'peso', 1); assert(/37,5/.test(text(card.querySelector('.sr.act .stp'))), 'peso +2,5 kg'); w.planStep(logId, 'peso', -1);
+  assert(/^Peso \(kg\)/.test(text(card.querySelector('.sr.act .sr-peso'))) && !/kg/.test(card.querySelector('.sr.act .sr-peso .v').textContent), 'la unidad va en la etiqueta y el número queda solo en el valor');
+  assert(card.querySelector('.sr.act .sr-edit .sr-go') && card.querySelector('.sr.act .sr-edit .sr-peso') && card.querySelectorAll('.sr.act .stp').length === 2, '«Hecha» comparte fila con las repeticiones');
+  w.planStep(logId, 'peso', 1); for (let i = 0; i < 40; i++) w.planStep(logId, 'peso', 1); assert(/long/.test(card.querySelector('.sr.act .sr-peso .v').className) || card.querySelector('.sr.act .sr-peso .v').textContent.length < 6, 'pesos largos: letra algo menor'); w.planStep(logId, 'peso', -1);
   w.planStep(logId, 'reps', -1); assert(card.querySelector('.sr.act .sr-edit').textContent.indexOf('5') >= 0, 'reps -1');
   assert.strictEqual(d.activeElement && d.activeElement.getAttribute('data-f'), 'reps-', 'el foco se conserva en el botón que pulsaste'); w.planStep(logId, 'reps', 1);
   w.planStep(logId, 'peso', -1);   // 32,5

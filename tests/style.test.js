@@ -73,4 +73,15 @@ assert(/-webkit-appearance:\s*none/.test(rule('.exp-date')) && /\.exp-date,[^{]*
 assert(/\n\s*body\{padding-bottom:\s*calc\(var\(--nav-h\)/.test(css) && /body\.in-day\{padding-bottom:\s*calc\(var\(--sess-h\)/.test(css), 'hueco al final de cada pantalla para la barra inferior (y para la barra de sesión dentro de un día)');
 assert(!/coach-fab/.test(css), 'ya no hay botón flotante que tape controles');
 
+// 9) Selector de peso y botones con icono (defectos vistos en un iPhone y en escritorio)
+assert(/\.stp \.v\{[^}]*min-width:\s*0/.test(css) && /\.stp \.v\{[^}]*overflow:\s*hidden/.test(css), 'el valor del selector puede encogerse: con decimales el + no se sale del recuadro');
+assert(!/\.stp \.v small/.test(css), 'la unidad va en la etiqueta («Peso (kg)»), no dentro del valor: el número queda centrado');
+const w38 = css.match(/\.stp button\{[^}]*?width:\s*(\d+)px/); assert(w38 && Number(w38[1]) <= 40, 'botones − / + del selector estrechos (caben decimales en 320 px)');
+assert(/\.sr-edit \.sr-peso\{[^}]*grid-column:\s*1 \/ -1/.test(css), 'el peso ocupa toda la fila (las repeticiones comparten fila con «Hecha»)');
+assert(/@media \(max-width:359px\)\{\s*\.sr-edit\{grid-template-columns:\s*minmax\(0,\s*1fr\)/.test(css), 'en pantallas muy estrechas, cada control en su fila');
+const iconBtn = css.match(/\n\s*(\.day-back, \.day-compare-btn[^{]*)\{([^}]*)\}/);
+assert(iconBtn && /display:\s*inline-flex/.test(iconBtn[2]) && /align-items:\s*center/.test(iconBtn[2]) && /justify-content:\s*center/.test(iconBtn[2]), 'botones con icono: icono y texto centrados entre sí y en el botón');
+['.day-compare-btn', '.week-summary-btn', '.exp-btn', '.day-back', '.refresh-btn'].forEach(k => assert(iconBtn[1].indexOf(k) >= 0, k + ' en la lista de botones centrados'));
+assert(/\n\s*button\{font-family:\s*inherit;\}/.test(css), 'los botones heredan la fuente de la app (antes algunos usaban la del sistema)');
+
 console.log('OK style: contraste, tamaños mínimos, campos 16 px, zoom bloqueado y movimiento reducido');

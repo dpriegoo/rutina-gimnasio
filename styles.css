@@ -1560,13 +1560,16 @@
   .sr-sub{font-size:13px; color:var(--muted); margin-top:2px;}
   .rir-chip{display:inline-flex; align-items:center; min-height:24px; padding:0 8px; border-radius:99px; border:1px solid var(--card-border); background:var(--icon-bg); font-size:12px; font-weight:700; color:var(--text);}
   .rir-chip.f{background:var(--warn-bg); border-color:var(--red); color:var(--text);}
-  .sr-edit{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); grid-gap:8px; gap:8px; width:100%;}
+  .sr-edit{display:grid; grid-template-columns:minmax(0, 1.3fr) minmax(0, 1fr); align-items:end; grid-gap:8px; gap:8px; width:100%;}
   .stp{display:flex; align-items:center; background:var(--icon-bg); border:1px solid var(--card-border); border-radius:12px;}
-  .stp button{-webkit-appearance:none; appearance:none; width:var(--tap); min-height:48px; background:none; border:0; color:var(--text); display:flex; align-items:center; justify-content:center;}
-  .stp .v{flex:1; text-align:center; font-size:20px; font-weight:700; font-variant-numeric:tabular-nums;}
-  .stp .v small{font-size:12px; color:var(--muted); font-weight:600; margin-left:2px;}
+  .stp{min-width:0;}
+  .stp button{-webkit-appearance:none; appearance:none; flex:0 0 38px; width:38px; padding:0; min-height:48px; background:none; border:0; color:var(--text); display:flex; align-items:center; justify-content:center;}
+  .stp .v{flex:1 1 0; min-width:0; text-align:center; font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden;}
+  .stp .v.long{font-size:16px;}
+  .sr-edit .sr-peso{grid-column:1 / -1;}
+  @media (max-width:359px){ .sr-edit{grid-template-columns:minmax(0, 1fr);} }   /* pantallas muy estrechas: cada control en su fila */
   .sr-lbl{display:block; font-size:12px; color:var(--muted); font-weight:600; margin-bottom:4px;}
-  .sr-go{-webkit-appearance:none; appearance:none; width:100%; min-height:52px; border-radius:16px; border:0; background:var(--green); color:var(--ink); font-family:inherit; font-size:16px; font-weight:700;}
+  .sr-go{-webkit-appearance:none; appearance:none; width:100%; min-height:48px; border-radius:16px; border:0; background:var(--green); color:var(--ink); font-family:inherit; font-size:16px; font-weight:700;}
   .plan-foot{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;}
   .link-btn{-webkit-appearance:none; appearance:none; background:none; border:0; min-height:var(--tap); padding:0 4px; color:var(--blue-text); font-family:inherit; font-size:14px; font-weight:600; text-decoration:underline;}
   .plan-done{display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:var(--green);}
@@ -1653,3 +1656,9 @@
   .dl-btn.pri{background:var(--blue-btn); border-color:var(--blue-btn); color:var(--on-accent);}
   .dl-on .dl-btns{grid-template-columns:1fr;}
   #dayScreen.deload-on .ex-pos::after{content:" · descarga"; color:var(--amber); font-weight:700;}
+
+  /* Botones con icono: icono y texto centrados entre sí y en el botón (antes el icono quedaba hasta 6 px más alto que el texto) */
+  button{font-family:inherit;}
+  .day-back, .day-compare-btn, .week-summary-btn, .refresh-btn, .day-edit-btn, .log-add, .accept-btn, .undo-btn, .modal-btn, .ed-archive-btn, .exp-btn, .exp-chip, .sum-add-btn, .dl-btn, .sr-go, .sb-next, .rc-btn, .edit-order-btn, .link-btn, .coach-chip, .summary-close, .pg-close, .coach-icon{display:inline-flex; align-items:center; justify-content:center; gap:6px; line-height:1.2; text-align:center;}
+  .day-compare-btn, .refresh-btn, .day-edit-btn, .accept-btn, .undo-btn, .ed-archive-btn{display:flex;}
+  .ex-bar .day-compare-btn{display:inline-flex;}

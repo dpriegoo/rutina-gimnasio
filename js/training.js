@@ -48,10 +48,11 @@ function onVariantChange(sel){
 }
 
 // ---------- Plan serie a serie ----------
-function planStepper(label, kind, logId, valueHtml, aria){
-  return '<div><span class="sr-lbl">' + label + '</span><div class="stp">' +
+function planStepper(label, kind, logId, valueHtml, aria, cls){
+  const long = String(valueHtml).replace(/<[^>]+>/g, '').length >= (kind === 'reps' ? 3 : 6);   // 112,5 o 100 s: letra algo menor para que quepa
+  return '<div' + (cls ? ' class="' + cls + '"' : '') + '><span class="sr-lbl">' + label + '</span><div class="stp">' +
     '<button type="button" data-f="' + kind + '-" aria-label="' + aria + ' menos" onclick="planStep(\'' + logId + '\',\'' + kind + '\',-1)">' + uiIcon('minus') + '</button>' +
-    '<div class="v">' + valueHtml + '</div>' +
+    '<div class="v' + (long ? ' long' : '') + '">' + valueHtml + '</div>' +
     '<button type="button" data-f="' + kind + '+" aria-label="' + aria + ' más" onclick="planStep(\'' + logId + '\',\'' + kind + '\',1)">' + uiIcon('plus') + '</button></div></div>';
 }
 
@@ -86,10 +87,11 @@ function renderPlan(cardEl){
     } else if (i === idx) {
       rows += '<div class="sr act"><span class="sn">' + (i + 1) + '</span><div class="sr-main"><div class="sr-goal">' + goalTxt + '</div>' +
         '<div class="sr-sub">' + chip + (rir !== null ? ' ' + rxRirHelp(rir) : '') + '</div></div>' +
-        '<div class="sr-edit" style="' + (timed ? 'grid-template-columns:1fr;' : '') + '">' +
-        (timed ? '' : planStepper('Peso', 'peso', logId, fmtNum(basePeso, 2) + '<small>kg</small>', 'Peso')) +
-        planStepper(timed ? 'Segundos' : 'Repeticiones', 'reps', logId, String(reps) + (timed ? '<small>s</small>' : ''), timed ? 'Segundos' : 'Repeticiones') +
-        '</div><button type="button" class="sr-go" data-f="go" onclick="planDone(\'' + logId + '\')">Hecha</button></div>';
+        // El peso ocupa toda la fila (con decimales necesita sitio) y las repeticiones comparten fila con «Hecha»
+        '<div class="sr-edit">' +
+        (timed ? '' : planStepper('Peso (kg)', 'peso', logId, fmtNum(basePeso, 2), 'Peso', 'sr-peso')) +
+        planStepper(timed ? 'Segundos' : 'Repeticiones', 'reps', logId, String(reps), timed ? 'Segundos' : 'Repeticiones') +
+        '<button type="button" class="sr-go" data-f="go" onclick="planDone(\'' + logId + '\')">Hecha</button></div></div>';
     } else {
       rows += '<div class="sr"><span class="sn">' + (i + 1) + '</span><div class="sr-main"><div class="sr-goal">' + goalTxt + '</div><div class="sr-sub">' + chip + '</div></div></div>';
     }
