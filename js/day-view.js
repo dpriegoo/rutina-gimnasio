@@ -137,6 +137,7 @@ function updateCardHighlights(){
     if (typeof renderMachineBar === 'function') { renderMachineBar(cardEl); renderPlan(cardEl); updateDetailChip(cardEl); }
   });
   renderStrip();
+  if (typeof renderHyOrder === 'function') renderHyOrder();
   if (typeof renderSessionBar === 'function') { renderSessionBar(); maybeShowSessionDone(); }
 }
  // logId -> {ids, count}, para poder deshacer el último guardado
@@ -332,6 +333,10 @@ function renderDay(){
     notice.innerHTML = uiIcon('refresh', 's') + ' Esta semana este día es de <b>' + activeOverride.toGroupLabel + '</b> en vez de ' + activeOverride.fromGroupLabel + '. <button class="rest-week-toggle" onclick="revertWeekOverride()">Deshacer</button>';
     extras.appendChild(notice);
   }
+  // Orden sugerido (lo rellena hypertrophy.js; el orden real lo deciden las máquinas libres)
+  const order = document.createElement('div');
+  order.id = 'hyOrder'; order.className = 'hy-order'; order.hidden = true;
+  extras.appendChild(order);
 
   // Cada ejercicio es una tarjeta del carrusel (el grupo muscular va como etiqueta dentro de la tarjeta)
   effectiveDayGroups(day).forEach(g => {
@@ -343,6 +348,7 @@ function renderDay(){
       card.style.setProperty('--i', main.children.length);   // orden de la animación de entrada
       card._ex = ex;
       card.innerHTML = buildCardHTML(ex, day.name, g.label, logId, '');
+      if (typeof hyApplyBlock === 'function') hyApplyBlock(card);   // bloque de variante por estancamiento: queda elegida
       main.appendChild(card);
       renderPendingWrap(logId);
     });

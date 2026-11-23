@@ -20,6 +20,12 @@ function renderMachineBar(cardEl){
   const name = cardEl.querySelector('.mb-name');
   if (name) name.textContent = v || ex.primary || 'La habitual';
   cardEl.querySelectorAll('.alt-opt').forEach(b => { const on = (b.getAttribute('data-v') || '') === v; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+  // Bloque de variante (por estancamiento): se dice hasta cuándo y se puede volver a la habitual
+  const plan = cardEl.querySelector('.plan'), bar = cardEl.querySelector('.machine-bar');
+  let note = cardEl.querySelector('.mb-block');
+  const html = plan && typeof hyBlockNoteHtml === 'function' ? hyBlockNoteHtml(plan.dataset.log, ex.name, v) : '';
+  if (!html) { if (note) note.remove(); }
+  else if (bar) { if (!note) { bar.insertAdjacentHTML('afterend', html); } else note.outerHTML = html; }
 }
 
 function toggleAlt(logId){
@@ -52,8 +58,25 @@ function planStepper(label, kind, logId, valueHtml, aria, cls){
   const long = String(valueHtml).replace(/<[^>]+>/g, '').length >= (kind === 'reps' ? 3 : 6);   // 112,5 o 100 s: letra algo menor para que quepa
   return '<div' + (cls ? ' class="' + cls + '"' : '') + '><span class="sr-lbl">' + label + '</span><div class="stp">' +
     '<button type="button" data-f="' + kind + '-" aria-label="' + aria + ' menos" onclick="planStep(\'' + logId + '\',\'' + kind + '\',-1)">' + uiIcon('minus') + '</button>' +
-    '<div class="v' + (long ? ' long' : '') + '">' + valueHtml + '</div>' +
+    (kind === 'peso'
+      // El peso también se puede escribir: los botones suben o bajan un paso fijo, que no siempre es lo que quieres
+      ? '<input class="v' + (long ? ' long' : '') + '" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-f="peso" aria-label="' + aria + ' en kg" value="' + valueHtml + '" onfocus="this.select()" oninput="planPesoInput(\'' + logId + '\', this.value)" onchange="planPesoCommit(\'' + logId + '\', this)" onkeydown="if(event.key===\'Enter\'){this.blur();}">'
+      : '<div class="v' + (long ? ' long' : '') + '">' + valueHtml + '</div>') +
     '<button type="button" data-f="' + kind + '+" aria-label="' + aria + ' más" onclick="planStep(\'' + logId + '\',\'' + kind + '\',1)">' + uiIcon('plus') + '</button></div></div>';
+}
+
+// Ajuste en vivo: si hoy una serie no salió como estaba prevista, las que faltan se recalculan (solo con series de hoy en esta máquina)
+function planLiveCtx(plan, done, idx, complete, v, peso, step){
+  const nPlan = plan.sets.length, hoyS = localDateStr();
+  const todaySets = done.filter(d => d.fecha === hoyS && (d.variante || '') === (v || ''));
+  const live = (!complete && todaySets.length && todaySets.length === done.length) ? rxLive(plan, todaySets, idx, peso, step) : null;
+  const goalFor = i => (live && i >= idx && i < nPlan) ? live.reps[i - idx] : plan.sets[Math.min(i, nPlan - 1)].reps;
+  return { live: live, goalFor: goalFor };
+}
+function planLiveHtml(logId, live){
+  if (!live) return '';
+  return '<div class="sr-live">' + uiIcon('info', 's') + '<span>' + escHtml(live.motivo) + '</span>' +
+    (live.sugPeso != null ? '<button type="button" class="link-btn sr-sug" onclick="planUseSug(\'' + logId + '\', ' + live.sugPeso + ')">Usar ' + fmtNum(live.sugPeso, 2) + ' kg</button>' : '') + '</div>';
 }
 
 function renderPlan(cardEl){
@@ -71,11 +94,12 @@ function renderPlan(cardEl){
   const lastAny = lastSessionValue(ex.name);
   const basePeso = st.peso !== undefined ? st.peso : (done.length ? done[done.length - 1].peso : (plan.peso != null ? plan.peso : (lastAny ? Number(lastAny.peso) : 20)));
   const target = plan.sets[Math.min(idx, nPlan - 1)];
-  const reps = st.reps[idx] !== undefined ? st.reps[idx] : target.reps;
-  st.cur = { peso: basePeso, reps: reps, step: step, idx: idx };
+  const hoyS = localDateStr();
+  const { live, goalFor } = planLiveCtx(plan, done, idx, complete, v, basePeso, step);
+  const reps = st.reps[idx] !== undefined ? st.reps[idx] : goalFor(idx);
+  st.cur = { peso: basePeso, reps: reps, step: step, idx: idx, goal: goalFor(idx), sug: live ? live.sugPeso : null };
 
   // Calentamiento sugerido (solo pesados, antes de la primera serie de trabajo): se apunta como calentamiento y no cuenta para nada
-  const hoyS = localDateStr();
   const warm = (done.length === 0 && !timed) ? rxWarmup(ex, spec, basePeso, step) : [];
   const warmToday = myRows().filter(r => isWarmupRow(r) && r['Día'] === dia && r['Ejercicio'] === ex.name && String(r['Fecha']).slice(0, 10) === hoyS).length;
   let warmHtml = '';
@@ -92,7 +116,7 @@ function renderPlan(cardEl){
   for (let i = 0; i < nRows; i++) {
     const t = plan.sets[Math.min(i, nPlan - 1)], rir = i < nPlan ? t.rir : null;
     const chip = rir === null ? '' : '<span class="rir-chip' + (rir === 0 ? ' f' : '') + '">' + rxRirLabel(rir) + '</span>';
-    const goalTxt = 'Serie ' + (i + 1) + (i >= nPlan ? ' extra' : '') + ' · ' + t.reps + ' ' + unit;
+    const goalTxt = 'Serie ' + (i + 1) + (i >= nPlan ? ' extra' : '') + ' · ' + goalFor(i) + ' ' + unit;
     if (i < idx) {
       const d = done[i], tgt = i < nPlan ? t.reps : null;
       const sub = 'Serie ' + (i + 1) + (tgt !== null ? ' · objetivo ' + tgt : '') + (d.variante ? ' · ' + escHtml(d.variante) : '');
@@ -101,7 +125,8 @@ function renderPlan(cardEl){
       rows += '<div class="sr done"><span class="sn">' + uiIcon('check') + '</span><div class="sr-main"><div class="sr-goal">' + (timed ? d.reps + ' s' : fmtNum(d.peso, 2) + ' kg × ' + d.reps) + '</div><div class="sr-sub">' + sub + '</div></div>' + rirBtn + inl + '</div>';
     } else if (i === idx) {
       rows += '<div class="sr act"><span class="sn">' + (i + 1) + '</span><div class="sr-main"><div class="sr-goal">' + goalTxt + '</div>' +
-        '<div class="sr-sub">' + chip + (rir !== null ? ' ' + rxRirHelp(rir) : '') + '</div></div>' +
+        '<div class="sr-sub">' + chip + (rir !== null ? ' ' + rxRirHelp(rir) : '') + '</div>' +
+        '<div class="sr-live-slot">' + planLiveHtml(logId, live) + '</div>' + planRirAskHtml(logId, done, idx, hoyS) + '</div>' +
         // El peso ocupa toda la fila (con decimales necesita sitio) y las repeticiones comparten fila con «Hecha»
         '<div class="sr-edit">' +
         (timed ? '' : planStepper('Peso (kg)', 'peso', logId, fmtNum(basePeso, 2), 'Peso', 'sr-peso')) +
@@ -116,13 +141,34 @@ function renderPlan(cardEl){
   const head = '<div class="plan-head"><div class="plan-title">' + (plan.peso != null || done.length ? 'Plan de hoy' + (plan.peso != null && !timed ? ' · ' + fmtNum(plan.peso, 2) + ' kg' : '') : 'Plan de hoy') + '</div>' +
     '<span class="grow"></span>' + (undo ? '<button type="button" class="link-btn" onclick="undoLastAccept(\'' + logId + '\')">Deshacer última</button>' : '') +
     '<button type="button" class="plan-info" aria-expanded="' + whyOpen + '" aria-label="¿Por qué este plan?" onclick="planToggleWhy(\'' + logId + '\')">' + uiIcon('info') + '</button></div>';
-  const why = '<div class="plan-why">' + escHtml(plan.motivo) + '</div>' + (spec.nota ? '<div class="plan-note">' + escHtml(spec.nota) + '</div>' : '') + (spec.notaReps ? '<div class="plan-note">' + escHtml(spec.notaReps) + '</div>' : '');
+  const microOn = plan.micro > 0 ? '<div class="plan-why">Salto pequeño en esta máquina: ' + fmtNum(plan.micro, 2) + ' kg. <button type="button" class="link-btn" onclick="hyMicroSet(\'' + logId + '\', null)">Cambiar</button></div>' : '';
+  const why = '<div class="plan-why">' + escHtml(plan.motivo) + '</div>' + microOn + (spec.nota ? '<div class="plan-note">' + escHtml(spec.nota) + '</div>' : '') + (spec.notaReps ? '<div class="plan-note">' + escHtml(spec.notaReps) + '</div>' : '') +
+    (spec.notaRom ? '<div class="plan-rom"><b>Recorrido:</b> ' + escHtml(spec.notaRom) + '</div>' : '');
+  // Antes de empezar el ejercicio: estancamiento (con su acción) y pregunta del salto pequeño
+  const pre = done.length ? '' : ((typeof hyStallHtml === 'function' ? hyStallHtml(logId, ex, v) : '') + (plan.microAsk && !timed && typeof hyMicroAskHtml === 'function' ? hyMicroAskHtml(logId, plan, step) : ''));
   const foot = complete
     ? '<div class="plan-done">' + uiIcon('check') + ' Ejercicio completo</div><div class="plan-foot"><span class="mini-sub">Descanso recomendado ' + rxFmtRestRange(spec) + '</span><button type="button" class="link-btn" onclick="planExtra(\'' + logId + '\')">Añadir serie extra</button></div>'
     : '<div class="plan-foot"><span class="mini-sub">' + uiIcon('timer', 's') + ' Descanso recomendado ' + rxFmtRestRange(spec) + '</span></div>';
-  box.innerHTML = head + why + warmHtml + rows + foot;
+  box.innerHTML = head + why + pre + warmHtml + rows + foot;
   box.setAttribute('data-complete', complete ? '1' : '0');
   if (st.focus) { const f = box.querySelector('[data-f="' + st.focus + '"]'); st.focus = null; if (f && f.focus) f.focus({ preventScroll: true }); }
+}
+
+// Si la serie anterior de hoy no tiene RIR (y el descanso ya no lo está pidiendo), se pregunta aquí: sin él, el ajuste en vivo va a ciegas
+function planRirAskHtml(logId, done, idx, hoyS){
+  const prev = idx > 0 ? done[idx - 1] : null;
+  if (!prev || prev.fecha !== hoyS || prev.rir !== null || prev.id === undefined || isTimedExercise(trainCard(logId)._ex.name)) return '';
+  const rc = document.getElementById('restCard');
+  if (restState && String(restState.setId) === String(prev.id) && rc && !rc.hidden) return '';
+  return '<div class="sr-rirask"><span class="sr-lbl">¿Cuántas te quedaban en la serie ' + idx + '? <button type="button" class="rir-help-btn" onclick="rirHelpOpen()" aria-label="Cómo saber cuántas te quedaban">?</button></span>' +
+    '<div class="rir-chips" role="group" aria-label="Repeticiones que te quedaban en la serie ' + idx + '">' + RIR_CHIPS.map(n => '<button type="button" class="rir-pick" onclick="rirInlinePick(\'' + logId + '\', \'' + jsArg(String(prev.id)) + '\', ' + n + ')">' + (n === 3 ? '3+' : n) + '</button>').join('') + '</div></div>';
+}
+
+// Acepta el peso que propone el ajuste en vivo (las repeticiones se recalculan con él)
+function planUseSug(logId, peso){
+  const st = trainSt(logId); if (!st.cur) return;
+  st.peso = peso; delete st.reps[st.cur.idx]; st.focus = 'go';
+  renderPlan(trainCard(logId));
 }
 
 function planStep(logId, kind, dir){
@@ -132,6 +178,34 @@ function planStep(logId, kind, dir){
   else st.reps[cur.idx] = Math.max(0, cur.reps + dir * (isTimedExercise(trainCard(logId)._ex.name) ? 5 : 1));
   st.focus = kind + (dir > 0 ? '+' : '-');
   renderPlan(trainCard(logId));
+}
+
+// Peso escrito a mano: se guarda mientras escribes (sin repintar, para no perder el foco) y se formatea al salir del campo
+function planParsePeso(s){
+  const t = String(s).trim().replace(/\s|kg/gi, '').replace(',', '.');
+  if (!/^\d*\.?\d*$/.test(t) || t === '' || t === '.') return null;
+  return Math.round(Number(t) * 100) / 100;
+}
+function planPesoInput(logId, s){
+  const st = trainSt(logId); if (!st.cur) return;
+  const n = planParsePeso(s);
+  if (n !== null) { st.peso = n; st.cur.peso = n; }
+}
+// Sin repintar la tarjeta: si el campo se cierra al pulsar «Hecha» o +/−, ese toque no se pierde
+function planPesoCommit(logId, el){
+  const st = trainSt(logId); if (!st.cur || !el) return;
+  el.value = fmtNum(st.cur.peso, 2);
+  el.classList.toggle('long', el.value.length >= 6);
+  // Objetivos recalculados con el peso nuevo, retocando solo los textos (sin repintar la tarjeta)
+  const card = trainCard(logId), box = card && card.querySelector('.plan'); if (!box) return;
+  const ex = card._ex, v = cardVariant(card), plan = rxPlan(ex, v), done = rxWeekSets(trainDia(card), ex.name), idx = st.cur.idx, nPlan = plan.sets.length;
+  if (isTimedExercise(ex.name)) return;
+  const { live, goalFor } = planLiveCtx(plan, done, idx, idx >= nPlan && !st.extra, v, st.cur.peso, st.cur.step);
+  st.cur.goal = goalFor(idx); st.cur.sug = live ? live.sugPeso : null;
+  if (st.reps[idx] === undefined) { st.cur.reps = st.cur.goal; const rv = box.querySelector('.sr.act div.v'); if (rv) rv.textContent = String(st.cur.reps); }
+  box.querySelectorAll('.sr').forEach((row, i) => { if (i < idx) return; const g = row.querySelector('.sr-goal'); if (g) g.textContent = 'Serie ' + (i + 1) + (i >= nPlan ? ' extra' : '') + ' · ' + goalFor(i) + ' reps'; });
+  const slot = box.querySelector('.sr.act .sr-live-slot'), html = planLiveHtml(logId, live);
+  if (slot && slot.innerHTML !== html) slot.innerHTML = html;
 }
 
 // En pantallas bajas la explicación del plan se pliega para que "Hecha" quede a la vista sin hacer scroll
@@ -177,9 +251,12 @@ function planDone(logId){
   sessionEnsureStart();
   const logged = quickLogSet(logId, { peso: timed ? 0 : cur.peso, reps: cur.reps, variante: v });
   const nextIdx = cur.idx + 1, nPlan = plan.sets.length;
-  if (nextIdx < nPlan) restStart(rxRestSeconds(plan.spec), 'Siguiente: serie ' + (nextIdx + 1) + ' · ' + plan.sets[nextIdx].reps + (timed ? ' s' : ' reps') + ' · ' + rxRirLabel(plan.sets[nextIdx].rir), logged.id);
+  renderPlan(card);   // primero: así el objetivo de la siguiente ya viene ajustado a la serie que acabas de hacer
+  const nx = st.cur && st.cur.idx === nextIdx ? st.cur : null;
+  const nxTxt = nx && nx.sug != null ? 'mejor con ' + fmtNum(nx.sug, 2) + ' kg (mira la tarjeta)' : (nx ? nx.goal : plan.sets[nextIdx] && plan.sets[nextIdx].reps) + (timed ? ' s' : ' reps');
+  if (nextIdx < nPlan) restStart(rxRestSeconds(plan.spec), 'Siguiente: serie ' + (nextIdx + 1) + ' · ' + nxTxt + ' · ' + rxRirLabel(plan.sets[nextIdx].rir), logged.id);
   else restStart(rxRestSeconds(plan.spec), nextIdx === nPlan ? 'Ejercicio completo. Respira antes del siguiente.' : 'Serie extra hecha.', logged.id);
-  renderPlan(card);
+  st.focus = 'go'; renderPlan(card);   // con el descanso ya abierto, el RIR se pide allí y no también en la tarjeta
 }
 
 // ---------- Descanso ----------
@@ -208,7 +285,13 @@ function restFinish(){
   const card = restEl('restCard'); if (!card) return;
   card.classList.add('fin'); restEl('rcTitle').textContent = '¡A por la siguiente!';
   try { if (navigator.vibrate) navigator.vibrate([160, 80, 160]); } catch (e) {}
-  restHideTimer = setTimeout(restSkip, 7000);
+  // Si falta el RIR de la serie, el aviso se queda hasta que lo anotes o lo cierres: sin él, el ajuste de las siguientes va a ciegas
+  if (!restState || !restState.setId || restState.rir !== null) restHideTimer = setTimeout(restSkip, 7000);
+}
+// Tras anotar el RIR con el descanso ya terminado, el aviso se va solo
+function restRirPicked(){
+  const card = restEl('restCard');
+  if (card && card.classList.contains('fin')) { clearTimeout(restHideTimer); restHideTimer = setTimeout(restSkip, 2500); }
 }
 function restAdjust(delta){
   if (!restState) return;
@@ -218,8 +301,11 @@ function restAdjust(delta){
   restTick();
 }
 function restSkip(){
+  const pendingRir = restState && restState.setId && restState.rir === null;
   clearInterval(restInterval); restInterval = null; clearTimeout(restHideTimer); restState = null;
   const card = restEl('restCard'); if (card) { card.hidden = true; card.classList.remove('fin'); }
+  // Se cerró sin anotar el RIR: la tarjeta del ejercicio lo pregunta en la serie siguiente
+  if (pendingRir && typeof dayScreenOpen !== 'undefined' && dayScreenOpen) document.querySelectorAll('#main .card[data-exercise]').forEach(c => renderPlan(c));
 }
 
 // ---------- Duración estimada ----------
@@ -265,6 +351,10 @@ function sessionNext(){
   const cards = exerciseCards(); let t = -1;
   for (let i = currentExIdx + 1; i < cards.length; i++) if (!cards[i].classList.contains('done')) { t = i; break; }
   if (t < 0) for (let i = 0; i < cards.length; i++) if (!cards[i].classList.contains('done')) { t = i; break; }
+  // Entre los pendientes que vienen después, primero el de más prioridad (pesado, o de un músculo corto de series). Solo hacia
+  // delante: si te saltaste uno porque la máquina estaba ocupada, no te devuelve a él hasta dar la vuelta.
+  const ahead = typeof hyOrder === 'function' ? hyOrder().filter(x => x.i > currentExIdx) : [];
+  if (ahead.length) t = ahead[0].i;
   if (t >= 0) goToExercise(t);
 }
 
@@ -308,7 +398,10 @@ function sessionStats(day){
   let next = -1;
   for (let k = 1; k < DAYS.length; k++) { const i = (currentDay + k) % DAYS.length; if (!isDayComplete(DAYS[i])) { next = i; break; } }
   const start = sessionStartGet();
-  return { sets: sets, volume: vol(thisW), lastVolume: vol(lastW), lastComplete: lastComplete, records: records, planned: planned, met: met, next: next, durationMs: start ? Date.now() - start : null, exercises: names.length };
+  // Series de hoy con el RIR anotado (sin las de tiempo): cuantas más, más fino el ajuste en vivo y la próxima sesión
+  const hoyRows = rows.filter(r => String(r['Fecha']).slice(0, 10) === localDateStr() && !isTimedExercise(r['Ejercicio']));
+  const rirKnown = hoyRows.filter(r => (typeof rowRir === 'function' ? rowRir(r) : null) !== null).length;
+  return { sets: sets, volume: vol(thisW), lastVolume: vol(lastW), lastComplete: lastComplete, records: records, planned: planned, met: met, next: next, durationMs: start ? Date.now() - start : null, exercises: names.length, rirKnown: rirKnown, rirTotal: hoyRows.length };
 }
 
 function sessionDoneHtml(day, s){
@@ -326,7 +419,8 @@ function sessionDoneHtml(day, s){
     '<div class="sd-stat"><b>' + (s.planned ? s.met + ' de ' + s.planned : '—') + '</b><span>Series dentro del plan</span></div>';
   const recs = s.records.slice(0, 4).map(r => '<div class="sd-li">' + uiIcon('trophy') + '<div><b>' + escHtml(r.name) + '</b><br><span class="mini-sub">Nueva mejor marca: 1RM estimado ' + fmtNum(r.rm, 1) + ' kg</span></div></div>').join('');
   const nextTxt = s.next >= 0 ? 'Siguiente día pendiente: <b>' + escHtml(DAYS[s.next].name.split('·')[0].trim()) + '</b>' + (DAYS[s.next].name.split('·')[1] ? ' · ' + escHtml(DAYS[s.next].name.split('·')[1].trim()) : '') : 'Has completado todos los días de la semana.';
-  return '<div class="sd-grid">' + stats + '</div>' + (recs ? '<div style="margin-top:14px">' + recs + '</div>' : '') +
+  const rirTxt = s.rirTotal ? '<div class="sd-rir mini-sub">RIR anotado en ' + s.rirKnown + ' de ' + s.rirTotal + ' series de hoy' + (s.rirKnown < s.rirTotal ? '. Con el RIR de cada serie el plan se ajusta mejor (hoy y la próxima vez).' : '. Así el plan se ajusta con datos reales.') + '</div>' : '';
+  return '<div class="sd-grid">' + stats + '</div>' + rirTxt + (recs ? '<div style="margin-top:14px">' + recs + '</div>' : '') +
     '<div class="sd-li" style="border-top:1px solid var(--card-border);margin-top:6px"><span>' + nextTxt + '</span></div>' +
     '<div class="sd-btns"><button type="button" class="pri" onclick="hideSessionDone(true)">Listo</button><button type="button" onclick="hideSessionDone(false); showWeekSummary()">Ver el resumen de la semana</button></div>';
 }

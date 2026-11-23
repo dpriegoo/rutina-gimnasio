@@ -4,7 +4,7 @@
   "description": "Pruebas y herramientas de IronLog (la app en sí no necesita instalar nada)",
   "scripts": {
     "stamp": "node tools/stamp.js",
-    "test": "node tests/adapter.test.js && node tests/smoke.test.js && node tests/feel.test.js && node tests/progress-chart.test.js && node tests/style.test.js && node tests/coherence.test.js && node tests/a11y.test.js && node tests/machines.test.js && node tests/coach.test.js && node --no-warnings tests/coach-edge.test.js && node tests/export.test.js && node tests/prescription.test.js && node tests/training.test.js && node tests/deload.test.js && node tests/rir-adapter.test.js && node tests/rir.test.js",
+    "test": "node tests/adapter.test.js && node tests/smoke.test.js && node tests/feel.test.js && node tests/progress-chart.test.js && node tests/style.test.js && node tests/coherence.test.js && node tests/a11y.test.js && node tests/machines.test.js && node tests/coach.test.js && node --no-warnings tests/coach-edge.test.js && node tests/export.test.js && node tests/prescription.test.js && node tests/training.test.js && node tests/hypertrophy.test.js && node tests/deload.test.js && node tests/rir-adapter.test.js && node tests/rir.test.js",
     "bundle:coach": "node tools/bundle-coach.js"
   },
   "devDependencies": {

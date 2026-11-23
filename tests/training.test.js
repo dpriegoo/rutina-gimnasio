@@ -58,10 +58,20 @@ const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
   assert(/más de 12 repeticiones/.test(text(cardOf('Elevaciones laterales sentado').querySelector('.plan'))), 'rangos altos: aviso de que el RIR se estima peor'); w.planToggleWhy(lat.querySelector('.log-form').id);
 
   // ---------- 3) Steppers y una serie con un toque ----------
-  w.planStep(logId, 'peso', 1); assert(/37,5/.test(text(card.querySelector('.sr.act .stp'))), 'peso +2,5 kg'); w.planStep(logId, 'peso', -1);
-  assert(/^Peso \(kg\)/.test(text(card.querySelector('.sr.act .sr-peso'))) && !/kg/.test(card.querySelector('.sr.act .sr-peso .v').textContent), 'la unidad va en la etiqueta y el número queda solo en el valor');
+  const pesoInp = () => card.querySelector('.sr.act .sr-peso input.v');
+  w.planStep(logId, 'peso', 1); assert.strictEqual(pesoInp().value, '37,5', 'peso +2,5 kg'); w.planStep(logId, 'peso', -1);
+  assert(/^Peso \(kg\)/.test(text(card.querySelector('.sr.act .sr-peso'))) && !/kg/.test(pesoInp().value), 'la unidad va en la etiqueta y el número queda solo en el valor');
   assert(card.querySelector('.sr.act .sr-edit .sr-go') && card.querySelector('.sr.act .sr-edit .sr-peso') && card.querySelectorAll('.sr.act .stp').length === 2, '«Hecha» comparte fila con las repeticiones');
-  w.planStep(logId, 'peso', 1); for (let i = 0; i < 40; i++) w.planStep(logId, 'peso', 1); assert(/long/.test(card.querySelector('.sr.act .sr-peso .v').className) || card.querySelector('.sr.act .sr-peso .v').textContent.length < 6, 'pesos largos: letra algo menor'); w.planStep(logId, 'peso', -1);
+  w.planStep(logId, 'peso', 1); for (let i = 0; i < 40; i++) w.planStep(logId, 'peso', 1); assert(/long/.test(pesoInp().className) || pesoInp().value.length < 6, 'pesos largos: letra algo menor'); w.planStep(logId, 'peso', -1);
+  // El peso también se escribe con el teclado (coma o punto); lo que no es un número no cambia nada
+  assert(/planPesoInput/.test(pesoInp().getAttribute('oninput')) && /planPesoCommit/.test(pesoInp().getAttribute('onchange')) && pesoInp().getAttribute('inputmode') === 'decimal', 'el campo de peso es editable con teclado numérico');
+  { const typed = (s) => { const el = pesoInp(); el.value = s; w.planPesoInput(logId, s); w.planPesoCommit(logId, el); return el; };   // los manejadores en línea no se ejecutan en este jsdom
+    const before = w.eval('trainState')[logId].cur.peso;
+    let el = typed('33,75'); assert.strictEqual(w.eval('trainState')[logId].cur.peso, 33.75, 'peso escrito a mano con coma'); assert.strictEqual(el.value, '33,75');
+    el = typed('41.2'); assert.strictEqual(w.eval('trainState')[logId].cur.peso, 41.2, 'peso escrito con punto'); assert.strictEqual(el.value, '41,2', 'se muestra con coma');
+    el = typed('abc'); assert.strictEqual(w.eval('trainState')[logId].cur.peso, 41.2, 'texto no numérico: no cambia el peso'); assert.strictEqual(el.value, '41,2', 'y vuelve al último valor válido');
+    w.planStep(logId, 'peso', 1); assert(Math.abs(w.eval('trainState')[logId].cur.peso - 43.7) < 1e-9, 'los botones siguen sumando desde lo escrito');
+    typed(String(before).replace('.', ',')); assert.strictEqual(w.eval('trainState')[logId].cur.peso, before); }
   w.planStep(logId, 'reps', -1); assert(card.querySelector('.sr.act .sr-edit').textContent.indexOf('5') >= 0, 'reps -1');
   assert.strictEqual(d.activeElement && d.activeElement.getAttribute('data-f'), 'reps-', 'el foco se conserva en el botón que pulsaste'); w.planStep(logId, 'reps', 1);
   w.planStep(logId, 'peso', -1);   // 32,5
@@ -90,6 +100,38 @@ const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
   // deshacer
   w.planStep(logId, 'reps', 1); await w.eval('planDone')(logId); await sleep(30); assert.strictEqual(w.weeklySeriesCount(DIA, EX), 4);
   await w.undoLastAccept(logId); await sleep(30); assert.strictEqual(w.weeklySeriesCount(DIA, EX), 3, 'deshacer quita la última');
+
+  // ---------- 3b) Ajuste en vivo de las series que faltan ----------
+  { const pl = w.rxPlan(cardOf(EX)._ex, ''), S = (peso, reps, rir) => ({ peso: peso, reps: reps, rir: rir === undefined ? null : rir });
+    assert.strictEqual(w.rxLive(pl, [S(35, 6)], 1, 35, 2.5), null, 'si la serie sale como estaba prevista, manda el plan');
+    let L = w.rxLive(pl, [S(20, 4)], 1, 20, 2.5);   // plan 35 kg × 6 (RIR 2·1·1, rango 6–8); haces 20 × 4 -> capacidad 6 con 20 kg
+    assert.deepStrictEqual(J(L.reps), [4, 3], 'con 20 kg: 6 − 1 de cansancio − RIR 1 = 4, y 3 en la serie 3');
+    assert.strictEqual(L.sugPeso, 17.5, 'por debajo del rango: baja a 17,5 kg'); assert(/baja a 17,5 kg/.test(L.motivo) && /Anota el RIR/.test(L.motivo));
+    L = w.rxLive(pl, [S(20, 4, 0)], 1, 20, 2.5); assert.deepStrictEqual(J(L.reps), [2, 1], 'con el RIR anotado (0) se usa el tuyo'); assert(!/Anota el RIR/.test(L.motivo));
+    L = w.rxLive(pl, [S(15, 12)], 1, 15, 2.5); assert(L.reps[0] > 8 && L.sugPeso === 17.5 && /sube a 17,5 kg/.test(L.motivo), 'por encima del rango: sube');
+    assert.deepStrictEqual(J(w.rxLive(pl, [S(15, 12)], 1, 17.5, 2.5).reps), [6, 5], 'con el peso sugerido entras en el rango');
+    assert.strictEqual(w.rxLive(Object.assign({}, pl, { descarga: true }), [S(15, 12)], 1, 15, 2.5).sugPeso, null, 'en descarga nunca propone subir');
+    L = w.rxLive(pl, [S(35, 6)], 1, 40, 2.5); assert(L && L.reps[0] < 6 && L.sugPeso === 35, 'si subes el peso en el selector, el objetivo baja con él');
+  }
+  { const EX3 = 'Press superior con mancuernas', c3 = () => cardOf(EX3), id3 = c3().querySelector('.log-form').id, st3 = () => w.eval('trainState')[id3];
+    const spec3 = w.prescriptionSpec(c3()._ex, ''), lo3 = spec3.rango[0];
+    w.planPesoInput(id3, '20'); w.planPesoCommit(id3, c3().querySelector('.sr.act .sr-peso input.v'));
+    while (st3().cur.reps > 4) w.planStep(id3, 'reps', -1);
+    await w.eval('planDone')(id3); await sleep(30);
+    const act = c3().querySelector('.sr.act'), goal = Number((text(act.querySelector('.sr-goal')).match(/· (\d+) reps/) || [])[1]);
+    assert(goal < lo3 && act.querySelector('.sr-live') && /20 kg × 4/.test(text(act.querySelector('.sr-live'))), 'tras 20 × 4 la serie 2 se recalcula (' + goal + ' reps) y explica por qué');
+    assert.strictEqual(Number(text(act.querySelectorAll('.stp')[1].querySelector('.v'))), goal,'las repeticiones del selector siguen el objetivo recalculado');
+    const sug = st3().cur.sug; assert(sug > 0 && sug < 20 && new RegExp('Usar ' + w.fmtNum(sug, 2).replace('.', '\\.') + ' kg').test(text(act)), 'propone bajar el peso con un botón');
+    assert(/mejor con/.test(text(d.getElementById('rcSub'))), 'el descanso avisa de que la siguiente va mejor con otro peso');
+    w.planUseSug(id3, sug); const a2 = c3().querySelector('.sr.act');
+    assert.strictEqual(a2.querySelector('.sr-peso input.v').value, w.fmtNum(sug, 2), 'aplicar la sugerencia pone ese peso');
+    assert(Number((text(a2.querySelector('.sr-goal')).match(/· (\d+) reps/) || [])[1]) >= lo3 && !a2.querySelector('.sr-sug'), 'con el peso sugerido el objetivo vuelve al rango');
+    // escribir otro peso a mano recalcula el objetivo sin repintar la tarjeta
+    const inp = a2.querySelector('.sr-peso input.v'); inp.value = '24'; w.planPesoInput(id3, '24'); w.planPesoCommit(id3, inp);
+    assert(c3().querySelector('.sr.act .sr-peso input.v') === inp, 'no se repinta (el toque en «Hecha» no se pierde)');
+    assert(Number((text(a2.querySelector('.sr-goal')).match(/· (\d+) reps/) || [])[1]) < lo3 && a2.querySelector('.sr-sug'), 'más peso: menos repeticiones y propuesta de bajar');
+    await w.undoLastAccept(id3); await sleep(30); w.eval('delete trainState[' + JSON.stringify(id3) + ']'); w.renderPlan(c3());
+  }
 
   // ---------- 4) Cambio de máquina en un paso ----------
   card = cardOf('Aperturas en máquina'); const logId2 = card.querySelector('.log-form').id;
@@ -153,7 +195,7 @@ const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
   w.setView('metricas');
   assert.strictEqual(w.metricsSectionSaved(), 'resumen', 'por defecto, Resumen');
   const vis = sec => [...d.querySelectorAll('#metricasView [data-msec]')].filter(e => !e.classList.contains('mt-hidden')).map(e => e.getAttribute('data-msec') + ':' + text(e.querySelector('.metric-title')));
-  assert(vis().every(x => x.startsWith('resumen:')) && vis().length === 4, 'Resumen: ' + vis().join(' | '));
+  assert(vis().every(x => x.startsWith('resumen:')) && vis().length === 5 && vis().indexOf('resumen:Series por músculo esta semana') === 1, 'Resumen: ' + vis().join(' | '));
   w.setMetricsSection('cuerpo'); assert.deepStrictEqual(vis(), ['cuerpo:Mi peso', 'cuerpo:Peso corporal']); assert.strictEqual(d.getElementById('mtTabCuerpo').getAttribute('aria-pressed'), 'true'); assert.strictEqual(d.getElementById('mtTabResumen').getAttribute('aria-pressed'), 'false');
   w.setMetricsSection('ejercicios'); assert.deepStrictEqual(vis(), ['ejercicios:¿Te funciona el plan?', 'ejercicios:Calibrar tu RIR', 'ejercicios:Historial reciente', 'ejercicios:Progresión del ejercicio']);
   w.setMetricsSection('datos'); assert.deepStrictEqual(vis(), ['datos:Sincronización', 'datos:Exportar datos']); assert.strictEqual(w.metricsSectionSaved(), 'datos', 'se recuerda la sección');

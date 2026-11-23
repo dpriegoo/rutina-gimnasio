@@ -145,6 +145,7 @@ function renderMuscleLoad(){
       <span class="muscle-zone-status">${load[z].label}</span>
     </div>
   `).join('');
+  if (typeof renderHyVolume === 'function') renderHyVolume();
 }
 
 const ICON_TO_ZONE = {

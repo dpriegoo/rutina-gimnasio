@@ -1548,6 +1548,51 @@
   .plan-title{font-size:16px; font-weight:700;}
   .plan-why{font-size:13px; color:var(--muted); line-height:1.4;}
   .plan-note{font-size:13px; color:var(--amber-pale); line-height:1.4;}
+  .plan-rom{font-size:13px; color:var(--muted); line-height:1.4;}
+  .plan-rom b{color:var(--text); font-weight:600;}
+  /* Estancamiento y salto pequeño: antes de empezar el ejercicio */
+  .plan-stall, .plan-micro{border:1px solid var(--card-border); border-left:3px solid var(--amber); border-radius:12px; background:var(--icon-bg); padding:10px 12px; font-size:13px; line-height:1.4;}
+  .plan-micro{border-left-color:var(--blue-text);}
+  .plan-stall .ps-t{display:flex; align-items:center; gap:6px; color:var(--amber-pale);}
+  .plan-stall .ps-b, .plan-micro .ps-b{color:var(--text); margin-top:4px;}
+  .plan-micro .ps-b{margin-top:0;}
+  .plan-micro .ps-b svg{vertical-align:-2px; color:var(--blue-text);}
+  .ps-btns{display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin-top:8px;}
+  .ps-btns .dl-btn{padding:0 12px; min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .ps-btns .dl-btn.pri{background:var(--blue-btn); border-color:var(--blue-btn); color:var(--on-accent);}
+  .ps-btns .rir-pick{flex:0 0 auto; padding:0 12px; font-size:14px;}
+  /* El RIR de la serie anterior, si no se anotó */
+  .sr-rirask{margin-top:8px;}
+  .sr-rirask .sr-lbl{display:block; margin-bottom:4px;}
+  /* Bloque de variante */
+  .mb-block{display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; margin-top:6px; padding:0 4px; font-size:13px; color:var(--muted);}
+  .mb-block > svg{color:var(--blue-text);}
+  .mb-block .link-btn{padding-left:0;}
+  /* Orden sugerido */
+  .hy-order{margin:4px 0 10px;}
+  .hy-order-t{font-size:12px; color:var(--muted); margin-bottom:6px;}
+  .hy-chips{display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px;}
+  .hy-chips::-webkit-scrollbar{display:none;}
+  .hy-chip{-webkit-appearance:none; appearance:none; flex:0 0 auto; max-width:240px; min-height:36px; padding:0 12px; border-radius:999px; border:1px solid var(--card-border); background:var(--icon-bg); color:var(--text); font-family:inherit; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .hy-chip b{color:var(--blue-text); margin-right:2px;}
+  .hy-order-why{font-size:12px; color:var(--muted); margin-top:6px; line-height:1.4;}
+  /* Series por músculo (Métricas) */
+  .hy-list{display:flex; flex-direction:column; gap:12px; margin-top:12px;}
+  .hy-top{display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:14px;}
+  .hy-name{font-weight:600; min-width:0;}
+  .hy-num{font-size:12px; color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums;}
+  .hy-num b{color:var(--text); font-size:14px;}
+  .hy-bar{position:relative; height:10px; margin-top:6px; border-radius:999px; background:var(--icon-bg); overflow:hidden;}
+  .hy-bar span{position:absolute; top:0; bottom:0; left:0;}
+  .hy-band{background:rgba(76,175,125,0.14); border-left:2px solid var(--green); border-right:2px solid var(--green);}
+  .hy-left{background:var(--blue-dim); border-radius:999px;}
+  .hy-done{background:var(--blue); border-radius:999px;}
+  .hy-bajo .hy-name, .hy-alto .hy-name{color:var(--amber-pale);}
+  .hy-msg{font-size:12px; color:var(--muted); margin-top:4px; line-height:1.4;}
+  .hy-legend{display:flex; flex-wrap:wrap; gap:4px 14px; font-size:12px; color:var(--muted);}
+  .hy-k{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px;}
+  .hy-k.done{background:var(--blue);} .hy-k.left{background:var(--blue-dim);} .hy-k.band{background:rgba(76,175,125,0.35); border:1px solid var(--green);}
+  .sd-rir{margin-top:10px; line-height:1.4;}
   .sr{display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 12px; border-radius:16px; background:var(--bg); border:1px solid var(--card-border);}
   .sr.act{background:var(--sel-bg); border-color:var(--blue);}
   .sr.done{background:var(--icon-bg);}
@@ -1558,6 +1603,10 @@
   .sr-main{flex:1; min-width:0;}
   .sr-goal{font-size:16px; font-weight:700;}
   .sr-sub{font-size:13px; color:var(--muted); margin-top:2px;}
+  .sr-live{display:flex; flex-wrap:wrap; align-items:center; gap:2px 6px; margin-top:6px; font-size:13px; line-height:1.4; color:var(--text);}
+  .sr-live > svg{flex:0 0 auto; color:var(--blue-text);}
+  .sr-live > span{flex:1 1 180px; min-width:0;}
+  .sr-live .sr-sug{padding-left:0;}
   .rir-chip{display:inline-flex; align-items:center; min-height:24px; padding:0 8px; border-radius:99px; border:1px solid var(--card-border); background:var(--icon-bg); font-size:12px; font-weight:700; color:var(--text);}
   .rir-chip.f{background:var(--warn-bg); border-color:var(--red); color:var(--text);}
   .sr-edit{display:grid; grid-template-columns:minmax(0, 1.3fr) minmax(0, 1fr); align-items:end; grid-gap:8px; gap:8px; width:100%;}
@@ -1566,6 +1615,8 @@
   .stp button{-webkit-appearance:none; appearance:none; flex:0 0 38px; width:38px; padding:0; min-height:48px; background:none; border:0; color:var(--text); display:flex; align-items:center; justify-content:center;}
   .stp .v{flex:1 1 0; min-width:0; text-align:center; font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden;}
   .stp .v.long{font-size:16px;}
+  .stp input.v{-webkit-appearance:none; appearance:none; width:100%; min-height:48px; padding:0; margin:0; background:none; border:0; border-radius:8px; color:var(--text); font-family:inherit; line-height:1;}
+  .stp input.v:focus{outline:2px solid var(--blue-text); outline-offset:-2px;}
   .sr-edit .sr-peso{grid-column:1 / -1;}
   @media (max-width:359px){ .sr-edit{grid-template-columns:minmax(0, 1fr);} }   /* pantallas muy estrechas: cada control en su fila */
   .sr-lbl{display:block; font-size:12px; color:var(--muted); font-weight:600; margin-bottom:4px;}
@@ -1579,7 +1630,7 @@
   @media (max-height:740px){
     .plan{order:-1;}
     .plan-info{display:inline-flex;}
-    .plan:not(.show-why) .plan-why, .plan:not(.show-why) .plan-note{display:none;}
+    .plan:not(.show-why) .plan-why, .plan:not(.show-why) .plan-note, .plan:not(.show-why) .plan-rom{display:none;}
   }
   .detail-box{border-top:1px solid var(--card-border); margin-top:2px;}
   .detail-box > summary{list-style:none; display:flex; align-items:center; gap:8px; min-height:var(--tap); font-size:14px; font-weight:600; color:var(--muted); cursor:pointer;}

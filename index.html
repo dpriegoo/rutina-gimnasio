@@ -16,7 +16,7 @@
 <title>IronLog · Rutina de fuerza</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link rel="stylesheet" href="styles.css?v=2e15ed8e">
+<link rel="stylesheet" href="styles.css?v=4a2ebe8d">
 </head>
 <body>
 
@@ -110,6 +110,12 @@
       <span class="muscle-dot" style="background:var(--heat4)"></span>
       <span>Muy alta</span>
     </div>
+  </div>
+
+  <div class="metric-card" data-msec="resumen">
+    <div class="metric-title">Series por músculo esta semana</div>
+    <div class="metric-sub">Series duras hechas y las que quedan en tu rutina. Si un músculo solo ayuda (el tríceps en el press banca), la serie cuenta media. Referencia: 10–20 series por semana; no es un límite exacto, y en el core no hay una cifra clara.</div>
+    <div id="hyVolList" class="hy-list"></div>
   </div>
 
   <div class="metric-card" data-msec="cuerpo">
@@ -366,7 +372,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite">Guardado ✓</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
-<script>window.IRONLOG_BUILD = 'f945e889'; // lo escribe tools/stamp.js</script>
+<script>window.IRONLOG_BUILD = 'b228c9f3'; // lo escribe tools/stamp.js</script>
 <script src="js/motion.js?v=7298014a"></script>
 <script src="js/config.js?v=4d929179"></script>
 <script src="js/ui-icons.js?v=bcc3f18b"></script>
@@ -379,25 +385,26 @@
 <script src="js/routine.js?v=f17fbe87"></script>
 <script src="js/outbox.js?v=dc6cb8f3"></script>
 <script src="js/body-svg.js?v=3fc81c63"></script>
-<script src="js/muscles.js?v=6f3b7688"></script>
+<script src="js/muscles.js?v=e39a621c"></script>
 <script src="js/planning.js?v=5e449824"></script>
 <script src="js/body.js?v=a784bc90"></script>
 <script src="js/history.js?v=4c11d7b3"></script>
 <script src="js/metrics.js?v=4a017133"></script>
 <script src="js/summary.js?v=1f827f4d"></script>
-<script src="js/prescription.js?v=f30ad127"></script>
+<script src="js/prescription.js?v=33ede7f4"></script>
 <script src="js/deload.js?v=9c28db67"></script>
+<script src="js/hypertrophy.js?v=17072752"></script>
 <script src="js/checkin.js?v=4398e89b"></script>
-<script src="js/state-sync.js?v=7d7ab950"></script>
-<script src="js/training.js?v=1556e83a"></script>
-<script src="js/rir.js?v=aa0153d6"></script>
+<script src="js/state-sync.js?v=340bc686"></script>
+<script src="js/training.js?v=4464dfc7"></script>
+<script src="js/rir.js?v=c5f677b1"></script>
 <script src="js/plan-panel.js?v=2b3ec21d"></script>
 <script src="js/export.js?v=44e3eea4"></script>
 <script src="js/feel-data.js?v=72b2bdef"></script>
 <script src="js/feel-anim.js?v=254a5b63"></script>
 <script src="js/feel.js?v=e98b2186"></script>
 <script src="js/progress-chart.js?v=a38785d4"></script>
-<script src="js/day-view.js?v=119775f3"></script>
+<script src="js/day-view.js?v=c49860a1"></script>
 <script src="js/day-picker.js?v=0a9a67cb"></script>
 <script src="js/coach-tools.js?v=907afa22"></script>
 <script src="js/coach.js?v=79e01680"></script>

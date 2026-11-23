@@ -50,6 +50,7 @@ function rirPick(n){
   const rb = document.getElementById('rcRir'); if (rb) rb.classList.add('picked');   // una vez anotado, el recordatorio sobra y la tarjeta se encoge
   document.querySelectorAll('#rcRir .rir-pick').forEach(b => b.setAttribute('aria-pressed', String(Number(b.getAttribute('data-r')) === n)));
   if (typeof updateCardHighlights === 'function') updateCardHighlights();   // repinta los planes: la serie hecha enseña su RIR
+  if (typeof restRirPicked === 'function') restRirPicked();
 }
 
 // ---------- El texto que lo explica ----------

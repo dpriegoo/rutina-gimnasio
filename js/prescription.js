@@ -53,6 +53,28 @@ const RX_TABLE = {
   'planchas abdominales':            { cat: 'core',      descanso: [60, 60],   rango: [45, 75], rangoAntes: [30, 30], rir: [1, 1, 0] },
 };
 
+// Recorrido: la parte en la que el músculo está estirado es la que más parece estimular, y recortarla es lo que más quita.
+// Hay pocos estudios por ejercicio; se citan solo los que lo comparan directamente. El resto es criterio práctico.
+const RX_ROM = {
+  'sentadillas':                     'Baja todo lo que tu técnica permita: la sentadilla profunda hizo crecer más glúteo y aductores que la media sentadilla (Kubo y cols., 2019).',
+  'prensa':                          'Baja hasta donde la zona lumbar siga pegada al respaldo: más recorrido, más estímulo para el cuádriceps.',
+  'ext. de cuadriceps':              'No recortes la parte de abajo (rodilla bien flexionada): entrenar esa mitad del recorrido hizo crecer más el cuádriceps que la de arriba (Pedrosa y cols., 2022).',
+  'femoral sentado o tumbado':       'Si puedes elegir, sentado: con la cadera flexionada el femoral trabaja más estirado y creció más que tumbado (Maeo y cols., 2021).',
+  'peso muerto rumano':              'Baja hasta notar el femoral bien estirado con la espalda neutra: ese tramo es el que cuenta.',
+  'zancadas con mancuernas':         'Paso largo y rodilla trasera cerca del suelo: el glúteo trabaja más estirado.',
+  'ext. triceps con cuerda overhead':'Baja del todo, con los codos altos: con los brazos por encima de la cabeza el tríceps creció más que con la extensión en polea normal (Maeo y cols., 2023).',
+  'extension de triceps en polea':   'Sube hasta que el codo quede bien flexionado: no recortes la parte de arriba, que es donde el tríceps se estira.',
+  'curl predicador biceps':          'La parte de abajo, con el codo casi estirado, es la que más cuenta: no la recortes.',
+  'curl de biceps con barra':        'Estira el codo del todo abajo, sin soltar la tensión, antes de volver a subir.',
+  'aperturas en maquina':            'Abre hasta notar el pecho estirado, sin molestia en el hombro: es la parte que más estimula.',
+  'press banca plano':               'Baja hasta rozar el pecho: el recorrido completo estimula más que las repeticiones cortas.',
+  'jalon al pecho agarre neutro':    'Arriba del todo, deja que el dorsal se estire antes de volver a tirar.',
+  'jalon al pecho agarre supino':    'Arriba del todo, deja que el dorsal se estire antes de volver a tirar.',
+  'pullover serrato polea alta':     'Empieza con los brazos bien arriba, notando el dorsal estirado.',
+  'remo en maquina':                 'Al volver, deja que los hombros vayan hacia delante y la espalda se estire.',
+  'remo en polea baja agarre v':     'Al volver, deja que los hombros vayan hacia delante y la espalda se estire.',
+};
+
 function rxKey(name){ return String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
 
 // "3 · 6-8" -> [6, 8];  "3 · 30 seg" -> [30, 30]
@@ -97,7 +119,8 @@ function prescriptionSpec(ex, variante){
   // Aviso de seguridad: solo en ejercicios de barra libre cuando la variante no es una máquina, y si no lo has personalizado
   const nota = custom ? '' : (t.libre && !rxIsMachineVariant(variante) ? RX_LIBRE_NOTE : (t.nota || ''));
   const notaReps = !timed && rango[1] > 12 ? RX_REPS_NOTE : '';
-  return { cat: cat, catLabel: base.label, rango: rango, rir: rir, descanso: descanso, timed: timed, series: 3, nota: nota, notaReps: notaReps, paso: Number(ex.paso_kg) > 0 ? Number(ex.paso_kg) : null };
+  const notaRom = timed ? '' : (RX_ROM[rxKey(ex.name)] || '');
+  return { cat: cat, catLabel: base.label, rango: rango, rir: rir, descanso: descanso, timed: timed, series: 3, nota: nota, notaReps: notaReps, notaRom: notaRom, paso: Number(ex.paso_kg) > 0 ? Number(ex.paso_kg) : null };
 }
 
 // Salto de carga: el que pongas a mano en la rutina (paso_kg) > el que se deduce de tus cargas anteriores en ese ejercicio y esa máquina
@@ -207,8 +230,9 @@ function rxLoadFor(L, capNow, capWanted, step){
 // Devuelve { peso, sets: [{ n, reps, rir }], motivo, descanso, spec, primera, cambioCarga }
 function rxPlanNormal(ex, variante){
   const spec = prescriptionSpec(ex, variante), step = rxStep(ex, spec, variante), lo = spec.rango[0], hi = spec.rango[1];
+  let microAsk = false;   // se cumple la condición del salto pequeño pero aún no has dicho si lo tienes
   const mk = (peso, reps, motivo, extra) => Object.assign({
-    peso: peso, sets: reps.map((r, i) => ({ n: i + 1, reps: r, rir: spec.rir[i] })), motivo: motivo, descanso: rxRestSeconds(spec), spec: spec, primera: false, cambioCarga: 0,
+    peso: peso, sets: reps.map((r, i) => ({ n: i + 1, reps: r, rir: spec.rir[i] })), motivo: motivo, descanso: rxRestSeconds(spec), spec: spec, primera: false, cambioCarga: 0, microAsk: microAsk,
   }, extra || {});
   const sessions = rxSessions(ex.name, variante || '');
   if (!sessions.length) {
@@ -230,6 +254,20 @@ function rxPlanNormal(ex, variante){
   if (R.every(r => r >= hi) && atL.length >= 3) {
     if (spec.timed) return mk(0, [hi, hi, hi], 'Superaste ' + hi + ' s en las 3 series: añade dificultad (lastre o una variante más exigente).');
     return mk(L + step, [lo, lo, lo], 'Completaste ' + hi + ' repeticiones en las 3 series: sube ' + fmtNum(step, 2) + ' kg y vuelve a ' + lo + '.', { cambioCarga: step });
+  }
+  // 1b) Tope del rango en la serie 1 dos sesiones seguidas con esta carga (pero no en las 3): si tienes un salto más pequeño
+  //     que el habitual, se sube solo eso y las repeticiones se recalculan con tu capacidad (si no anotaste el RIR, el del plan)
+  if (!spec.timed && R[0] >= hi && sessions.length >= 2) {
+    const prevS = sessions[sessions.length - 2], prevAt = prevS.sets.filter(s => s.peso === L);
+    if (rxModalLoad(prevS.sets) === L && prevAt.length && prevAt[0].reps >= hi) {
+      const micro = typeof hyMicro === 'function' ? hyMicro(ex.name, variante) : 0;
+      if (micro > 0 && micro < step) {
+        const P = Math.round((L + micro) * 100) / 100;
+        const reps = [0, 1, 2].map(i => { const c = R[i] + (Rir[i] === null ? spec.rir[i] : Rir[i]); return Math.max(lo, Math.min(hi, Math.round(30 * (L * (1 + c / 30) / P - 1)) - spec.rir[i])); });
+        return mk(P, reps, 'Llegaste a ' + hi + ' en la serie 1 dos sesiones seguidas: sube solo ' + fmtNum(micro, 2) + ' kg (tu salto pequeño) y sigue sumando repeticiones.', { cambioCarga: micro, micro: micro });
+      }
+      if (micro === null) microAsk = true;
+    }
   }
   // 2) Había un plan para esta carga: se mide lo conseguido contra lo previsto
   if (havePrev) {
@@ -265,6 +303,46 @@ function rxDeloadize(plan){
   const sets = reps.map((r, i) => ({ n: i + 1, reps: r, rir: Math.min(5, plan.sets[i].rir + DELOAD_RIR_PLUS) }));
   return Object.assign({}, plan, { peso: peso, sets: sets, cambioCarga: plan.cambioCarga > 0 ? 0 : plan.cambioCarga, descarga: true,
     motivo: 'Semana de descarga: ' + DELOAD_SERIES + ' series con la carga de siempre y un RIR más.' + extra + ' ' + plan.motivo });
+}
+
+// ---------- Ajuste en vivo ----------
+// El plan de hoy sale de sesiones anteriores; si HOY una serie no sale como estaba previsto (otro peso, otras repeticiones u
+// otro RIR), las series que faltan se recalculan con lo que acabas de hacer:
+//   capacidad de hoy = repeticiones + RIR anotado (si no lo anotaste, el que pedía el plan) -> 1RM estimado (Epley)
+//   -> repeticiones posibles con el peso que tengas puesto - cansancio acumulado - RIR de esa serie.
+// El cansancio entre series (≈1 repetición por serie con estos descansos, cerca del fallo) es criterio práctico, no un dato exacto.
+const RX_FATIGUE_REPS = 1;
+
+// sets: series de trabajo de HOY de este ejercicio (en orden); plan: rxPlan; idx: serie que toca; pesoNow: el peso del selector.
+// Devuelve null si no hay nada que ajustar; si no, { reps: [objetivo por serie desde idx], sugPeso, motivo, ref }.
+function rxLive(plan, todaySets, idx, pesoNow, step){
+  const spec = plan.spec, n = plan.sets.length;
+  if (spec.timed || !todaySets.length || idx >= n || !(pesoNow > 0)) return null;
+  const j = todaySets.length - 1, ref = todaySets[j];
+  if (!(ref.peso > 0) || !(ref.reps > 0)) return null;
+  const tj = plan.sets[Math.min(j, n - 1)];
+  const rirRef = ref.rir === null || ref.rir === undefined ? tj.rir : ref.rir;
+  // Si la serie salió como estaba prevista y no has tocado el peso, manda el plan (no se recalcula por ruido)
+  const asPlanned = plan.peso != null && Math.abs(ref.peso - plan.peso) < 0.01 && Math.abs(ref.reps - tj.reps) <= 1 && Math.abs(rirRef - tj.rir) <= 1;
+  if (asPlanned && Math.abs(pesoNow - ref.peso) < 0.01) return null;
+  const e1 = ref.peso * (1 + (ref.reps + rirRef) / 30);
+  const capAt = p => 30 * (e1 / p - 1);
+  const lo = spec.rango[0], hi = spec.rango[1];
+  const repsAt = (p, i) => Math.max(1, Math.min(30, Math.round(capAt(p) - RX_FATIGUE_REPS * (i - j) - plan.sets[i].rir)));
+  const reps = [];
+  for (let i = idx; i < n; i++) reps.push(repsAt(pesoNow, i));
+  // Fuera del rango: peso que te devuelve a él en la serie que toca (redondeado a tu salto de carga)
+  let sugPeso = null, motivo = 'Ajustado a tu serie anterior (' + fmtNum(ref.peso, 2) + ' kg × ' + ref.reps + (ref.rir === null || ref.rir === undefined ? '' : ', RIR ' + ref.rir) + ').';
+  const need = c => e1 / (1 + c / 30), extra = RX_FATIGUE_REPS * (idx - j) + plan.sets[idx].rir;
+  if (reps[0] < lo) {
+    const p = Math.max(step, Math.floor(need(lo + extra) / step + 1e-9) * step);
+    if (p < pesoNow - 0.001) { sugPeso = Math.round(p * 100) / 100; motivo += ' Con ' + fmtNum(pesoNow, 2) + ' kg te quedarías por debajo de ' + lo + ': baja a ' + fmtNum(sugPeso, 2) + ' kg para entrar en el rango.'; }
+  } else if (reps[0] > hi && !plan.descarga) {
+    const p = Math.ceil(need(hi + extra) / step - 1e-9) * step;
+    if (p > pesoNow + 0.001 && repsAt(p, idx) >= lo) { sugPeso = Math.round(p * 100) / 100; motivo += ' Con ' + fmtNum(pesoNow, 2) + ' kg te pasarías de ' + hi + ': sube a ' + fmtNum(sugPeso, 2) + ' kg.'; }
+  }
+  if (!ref.rir && ref.rir !== 0) motivo += ' Anota el RIR de cada serie y el ajuste será más fino.';
+  return { reps: reps, sugPeso: sugPeso, motivo: motivo, ref: ref };
 }
 
 // Series de esta semana (día + ejercicio) en el orden registrado: lo ya hecho de la tanda actual

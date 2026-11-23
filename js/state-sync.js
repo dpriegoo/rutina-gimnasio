@@ -9,6 +9,8 @@
 const STATE_KEYS = {
   deload:   { storage: () => deloadListKey(), apply: () => { if (typeof renderDeloadCard === 'function') renderDeloadCard(); if (typeof renderTabs === 'function') renderTabs(); } },
   checkins: { storage: () => checkinKey(),    apply: () => { if (typeof renderCheckinCard === 'function') renderCheckinCard(); if (typeof renderDeloadCard === 'function') renderDeloadCard(); } },
+  // Saltos pequeños, bloques de variante y avisos de estancamiento pospuestos (hypertrophy.js)
+  ajustes:  { storage: () => hyKey(),         apply: () => { if (typeof dayScreenOpen !== 'undefined' && dayScreenOpen && typeof renderDay === 'function') renderDay(); } },
 };
 function stateMetaKey(){ return 'stateMeta_' + getProfile(); }
 function stateMeta(){ try { return JSON.parse(localStorage.getItem(stateMetaKey()) || '{}'); } catch (e) { return {}; } }
