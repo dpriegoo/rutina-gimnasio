@@ -199,5 +199,77 @@ assert(!sheet().textContent.includes('no coincide con el 1RM'), 'por tiempo: sin
 get('closeProgressSheet()');
 assert(!sheet().classList.contains('on'));
 
+// 10) RIR anotado: cuenta lo que podías hacer (reps + RIR, hasta 3); sin RIR, las reps tal cual
+get("var _prefs = {}; function hyPref(s){ return _prefs[s] || {}; } function hySetPref(s, k, v){ _prefs[s] = _prefs[s] || {}; if (v === undefined) delete _prefs[s][k]; else _prefs[s][k] = v; } function rowRir(r){ return (r.RIR === '' || r.RIR === undefined || r.RIR === null) ? null : Number(r.RIR); }");
+const add = list => get('window._progressCache = window._progressCache.concat(' + JSON.stringify(list.map(row)) + ')');
+add([
+  { Fecha: '2026-12-02', 'Día': 'Día 1 · Pecho', Ejercicio: 'ConRIR', 'Peso (kg)': 50, Reps: 6, RIR: 1 },
+  { Fecha: '2026-12-02', 'Día': 'Día 1 · Pecho', Ejercicio: 'ConRIR', 'Peso (kg)': 50, Reps: 6, RIR: 5 },   // «5» se queda en 3
+  { Fecha: '2026-12-02', 'Día': 'Día 1 · Pecho', Ejercicio: 'ConRIR', 'Peso (kg)': 50, Reps: 6 },          // sin RIR
+]);
+const sR = get("exerciseSessions('ConRIR')")[0];
+near(sR.value, (S(50, 7) + S(50, 9) + S(50, 6)) / 3, 'reps + RIR, con tope de 3, y sin RIR las reps');
+assert.strictEqual(sR.rirSets, 2, 'cuenta las series con RIR');
+assert.strictEqual(sR.reps, 6, 'la mejor serie que se enseña son las reps reales, no las ajustadas');
+near(get('pgStrength(35, 6, 1)'), S(35, 7)); near(get('pgStrength(35, 6, null)'), S(35, 6));
+// el caso real: 35 × 6/6/6 a RIR 1/1/0 vale lo mismo que 35 × 7/7/6 al fallo
+add([7, 7, 6].map(r => ({ Fecha: '2026-12-03', 'Día': 'Día 1 · Pecho', Ejercicio: 'Banca2', 'Peso (kg)': 35, Reps: r })).concat(
+  [1, 1, 0].map(x => ({ Fecha: '2026-12-10', 'Día': 'Día 1 · Pecho', Ejercicio: 'Banca2', 'Peso (kg)': 35, Reps: 6, RIR: x }))));
+const sb2 = get("exerciseSessions('Banca2')");
+near(sb2[0].value, sb2[1].value, 'dejarse repeticiones en reserva no parece una bajada');
+
+// 11) Primera serie mucho más ligera = calentamiento anotado como trabajo: fuera de la fuerza, dentro del volumen
+add([[40, 9], [60, 8], [60, 7]].map(p => ({ Fecha: '2026-12-03', 'Día': 'Día 3 · Pierna', Ejercicio: 'Rampa', 'Peso (kg)': p[0], Reps: p[1] })));
+const sRa = get("exerciseSessions('Rampa')")[0];
+near(sRa.value, (S(60, 8) + S(60, 7)) / 2, 'la serie de 40 kg no entra en la fuerza');
+assert.strictEqual(sRa.volume, 40 * 9 + 60 * 8 + 60 * 7, 'sí entra en el volumen');
+assert(sRa.warmupSkipped && sRa.nSets === 2);
+near(get("exerciseSessions('Remo')")[0].value, (2 * S(60, 8) + S(60, 6)) / 3, 'con dos filas de la misma carga no se quita nada');
+
+// 12) Fecha base: desde cuándo cuenta, sugerencia de reinicio y prioridad ejercicio > general
+const reinicio = [80, 80, 82.5, 80, 60, 60, 62.5, 65, 67.5];
+add(reinicio.map((w, i) => ({ Fecha: '2026-06-' + String(1 + i * 3).padStart(2, '0'), 'Día': 'Día 3 · Pierna', Ejercicio: 'Reinicio', 'Peso (kg)': w, Reps: 8, Series: 3 })));
+const sug = get("pgSuggestBase('Reinicio')");
+assert(sug && sug.fecha === '2026-06-13' && sug.from === 80 && sug.to === 60, 'sugiere la sesión en que bajó la carga y se quedó abajo: ' + JSON.stringify(sug));
+assert.strictEqual(get("pgSuggestBase('Prensa')"), null, 'progreso de verdad: sin sugerencia');
+assert.strictEqual(get("pgSuggestBase('Sentadilla')"), null, 'estable: sin sugerencia');
+assert.strictEqual(get("exerciseSeries('Reinicio').sessions.length"), 9, 'sin fecha base cuenta todo');
+get("pgSetBase('Reinicio', '2026-06-13')");
+let serR = get("exerciseSeries('Reinicio')");
+assert.strictEqual(serR.sessions.length, 5); assert.strictEqual(serR.beforeBase, 4); assert.strictEqual(serR.base, '2026-06-13');
+assert(get("pgChange(exerciseSeries('Reinicio').sessions.map(s => s.value))").pct > 0, 'desde la base, el cambio es una subida (antes parecía una bajada)');
+assert.strictEqual(get("pgSuggestBase('Reinicio')"), null, 'aplicada, deja de sugerirse');
+// general para los demás; la propia manda; '' = todo el historial aunque haya general
+get("pgSetBase('', '2026-10-10')");
+assert.strictEqual(get("exerciseSeries('Press banca').sessions.length"), 1, 'la general se aplica a los que no tienen fecha propia');
+assert.strictEqual(get("pgBaseInfo('Press banca').scope"), 'general');
+assert.strictEqual(get("exerciseSeries('Reinicio').base"), '2026-06-13', 'la fecha propia manda sobre la general');
+get("pgSetBase('Press banca', '')");
+assert.strictEqual(get("exerciseSeries('Press banca').base"), null, "'' = todo el historial solo para ese ejercicio");
+get("pgSetBase('Press banca', undefined)");
+assert.strictEqual(get("exerciseSeries('Press banca').base"), '2026-10-10', 'quitar la propia vuelve a la general');
+get("pgSetBase('', undefined)");
+// hoja: bloque «Desde cuándo cuenta», sesiones anteriores marcadas y selector
+get("openProgressSheet('Reinicio')");
+assert(/cuenta desde el 13 jun/.test(sheet().textContent) && /4 sesiones anteriores no entran/.test(sheet().textContent), 'la hoja dice desde cuándo cuenta');
+assert(sheet().querySelector('label[for="pgBaseSel"]') && sheet().querySelector('#pgBaseSel'), 'selector con etiqueta');
+assert(!/NaN|undefined|Infinity/.test(sheet().innerHTML));
+const selR = sheet().querySelector('#pgBaseSel');
+assert.strictEqual(selR.options[selR.selectedIndex].textContent, 'Desde el 13 jun 2026');
+selR.selectedIndex = 0; get("pgPickBase(document.getElementById('pgBaseSel').value, true)");
+assert.strictEqual(get("exerciseSeries('Reinicio').base"), null, 'elegir «Todo el historial» quita la fecha');
+assert(/Rehiciste la técnica/.test(sheet().textContent) && /Contar desde el 13 jun/.test(sheet().textContent), 'sin fecha, la hoja propone la sugerida');
+get("pgPickBase('2026-06-13')");
+assert.strictEqual(get("exerciseSeries('Reinicio').base"), '2026-06-13', 'el botón de la sugerencia la aplica');
+// todo el historial anterior a la base: tarjeta y hoja lo explican, sin gráficas vacías
+get("pgSetBase('Reinicio', '2027-01-01')");
+const cRe = mk('Reinicio');
+assert(/cuenta desde el 1 ene: aún no hay sesiones/.test(cRe.textContent), 'la tarjeta explica por qué no hay gráfica');
+get("openProgressSheet('Reinicio')");
+assert(/aún no hay sesiones desde entonces/.test(sheet().textContent) && !sheet().querySelector('svg.pg-chart'), 'hoja sin gráfica y con aviso');
+assert(/antes de la fecha base/.test(sheet().textContent), 'la lista marca las sesiones anteriores');
+assert(!/NaN|undefined|Infinity/.test(sheet().innerHTML));
+get('closeProgressSheet()');
+
 console.log('OK progress-chart: métrica por series, máquinas secundarias, cambio y tendencia, avisos y hoja de detalle');
 process.exit(0);

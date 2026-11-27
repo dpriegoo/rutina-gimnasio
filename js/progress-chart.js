@@ -35,38 +35,148 @@ function pgDate(fecha){
 // Exponente de las repeticiones en la fuerza estimada (0 = solo peso; Epley equivale a ~0,2-0,3)
 const PG_EXP = 0.10;
 const PG_TREND_N = 8;   // sesiones para decidir "tendencia al alza / sin tendencia"
+// RIR que se suma como máximo: en la app «3» significa «3 o más», así que sumar más sería inventar repeticiones
+const PG_RIR_CAP = 3;
 
-function pgStrength(peso, reps){ return peso * Math.pow(reps, PG_EXP); }
+// Fuerza de una serie. Con el RIR anotado se mide lo que PODÍAS hacer (reps + RIR), no solo lo que hiciste:
+// dejarte repeticiones en reserva a propósito (lo que pide el plan) no es una caída de rendimiento. Sin RIR se usan las
+// repeticiones tal cual, que es suponer que acabaste cerca del fallo (lo mismo que supone el plan, prescription.js).
+// No se corrige el sesgo al estimar (de media se subestima ~1 repetición): sería añadir repeticiones que no constan.
+function pgStrength(peso, reps, rir){
+  const extra = (rir === null || rir === undefined || !isFinite(rir)) ? 0 : Math.max(0, Math.min(PG_RIR_CAP, Number(rir)));
+  return peso * Math.pow(reps + extra, PG_EXP);
+}
+
+function pgRowRir(r){ return typeof rowRir === 'function' ? rowRir(r) : null; }
 
 // Una entrada por fecha Y MÁQUINA (variante). Sesión normal: media (ponderada por nº de series) de la
 // fuerza de todas las series de trabajo. Ejercicio por tiempo: la mejor serie en segundos. Se guarda también
 // la mejor serie (para mostrarla), el volumen total y la máquina (variante; '' = la habitual).
 // Si un mismo día se usan dos máquinas salen dos entradas: cada una con su propio peso.
+// Una primera serie mucho más ligera que las demás (≤ 85 % de la mediana, con 3 series o más) suele ser un
+// calentamiento anotado como serie de trabajo: no entra en la fuerza (sí en el volumen). Es el mismo criterio que usa
+// el plan para leer tu historial (rxCleanSets en prescription.js).
 function exerciseSessions(ejercicio, dia){
   const timed = isTimedExercise(ejercicio);
   const byKey = {};
-  myRows().forEach(r => {
+  myRows().forEach((r, i) => {
     if (r['Ejercicio'] !== ejercicio || isWarmupRow(r)) return;
     if (dia && r['Día'] !== dia) return;   // opcional: solo las filas de un día concreto
-    const fecha = String(r['Fecha']).slice(0, 10);
     const peso = Number(r['Peso (kg)']) || 0;
     const reps = Number(r['Reps']) || 0;
-    const n = Math.max(1, Number(r['Series']) || 1);
-    const val = timed ? reps : (peso > 0 && reps > 0 ? pgStrength(peso, reps) : 0);
-    if (!(val > 0)) return;
+    if (!(timed ? reps > 0 : (peso > 0 && reps > 0))) return;
+    const fecha = String(r['Fecha']).slice(0, 10);
     const variante = r['Variante'] || '';
     const key = fecha + '|' + variante;
-    const s = byKey[key] || (byKey[key] = { fecha: fecha, variante: variante, sumVal: 0, sumN: 0, best: 0, peso: 0, reps: 0, dia: '', volume: 0, timed: timed });
-    s.sumVal += val * n; s.sumN += n;
-    s.volume += timed ? reps * n : peso * reps * n;
-    if (val > s.best) { s.best = val; s.peso = peso; s.reps = reps; s.dia = r['Día'] || ''; }
+    (byKey[key] = byKey[key] || { fecha: fecha, variante: variante, rows: [] }).rows.push({ r: r, i: i, peso: peso, reps: reps, n: Math.max(1, Number(r['Series']) || 1), rir: timed ? null : pgRowRir(r) });
   });
   return Object.keys(byKey).sort().map(k => {
-    const s = byKey[k];
+    const g = byKey[k], rows = g.rows.sort((a, b) => a.i - b.i);
+    const s = { fecha: g.fecha, variante: g.variante, sumVal: 0, sumN: 0, best: 0, peso: 0, reps: 0, dia: '', volume: 0, timed: timed, rirSets: 0, weights: [] };
+    let skip = null;
+    if (!timed && rows.length >= 3) {
+      const rest = rows.slice(1).map(x => x.peso).sort((a, b) => a - b), med = rest[Math.floor(rest.length / 2)];
+      if (med > 0 && rows[0].peso <= 0.85 * med) skip = rows[0];
+    }
+    s.allWeights = [];
+    rows.forEach(x => {
+      s.volume += timed ? x.reps * x.n : x.peso * x.reps * x.n;
+      for (let j = 0; j < x.n; j++) s.allWeights.push(x.peso);
+      if (x === skip) return;
+      const val = timed ? x.reps : pgStrength(x.peso, x.reps, x.rir);
+      s.sumVal += val * x.n; s.sumN += x.n;
+      if (x.rir !== null && x.rir !== undefined) s.rirSets += x.n;
+      for (let j = 0; j < x.n; j++) s.weights.push(x.peso);
+      if (val > s.best) { s.best = val; s.peso = x.peso; s.reps = x.reps; s.dia = x.r['Día'] || ''; }
+    });
     s.value = timed ? s.best : s.sumVal / s.sumN;
     s.nSets = s.sumN;
+    s.warmupSkipped = !!skip;
     return s;
   });
+}
+
+// ---------- Desde cuándo cuenta el progreso (fecha base) ----------
+// Al empezar, la técnica cambia mucho: se suele mover más peso del que toca y luego bajarlo para hacerlo bien.
+// Esas sesiones no son comparables con las de después y hunden la gráfica (un «récord» de septiembre con mala
+// técnica hace parecer retroceso lo que es progreso). Se puede elegir desde qué fecha cuenta:
+//   - por ejercicio (hoja del ejercicio), que manda sobre la general;
+//   - general (Métricas › Ejercicios), para todos los que no tengan la suya.
+// Lo anterior no se borra: solo deja de contar en gráficas, cambio, tendencia, estancamiento, índice de fuerza,
+// propuesta de descarga y entrenador. Se guarda en las preferencias (hyPrefs, sección «base»), que se sincronizan
+// con el servidor (clave «ajustes»). Valor '' en un ejercicio = «todo el historial» aunque haya una general.
+const PG_BASE_ALL = '*';
+
+function pgBasePrefs(){ return typeof hyPref === 'function' ? hyPref('base') : {}; }
+function pgValidDate(v){ return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v); }
+
+// { fecha: 'AAAA-MM-DD' | null, scope: 'ejercicio' | 'general' | null }
+function pgBaseInfo(ejercicio){
+  const p = pgBasePrefs();
+  if (ejercicio && Object.prototype.hasOwnProperty.call(p, ejercicio)) {
+    const v = p[ejercicio];
+    return pgValidDate(v) ? { fecha: v, scope: 'ejercicio' } : { fecha: null, scope: 'ejercicio' };
+  }
+  return pgValidDate(p[PG_BASE_ALL]) ? { fecha: p[PG_BASE_ALL], scope: 'general' } : { fecha: null, scope: null };
+}
+function pgBaseDate(ejercicio){ return pgBaseInfo(ejercicio).fecha; }
+
+// v: fecha, '' (todo el historial, solo por ejercicio) o undefined (quitar la del ejercicio: vuelve a la general)
+function pgSetBase(ejercicio, v){
+  if (typeof hySetPref !== 'function') return;
+  hySetPref('base', ejercicio || PG_BASE_ALL, v);
+  pgRefreshAfterBase();
+}
+function pgRefreshAfterBase(){
+  if (typeof updateCardHighlights === 'function') { try { updateCardHighlights(); } catch (e) {} }
+  if (typeof renderProgressChart === 'function' && document.getElementById('exerciseSelect')) { try { renderProgressChart(); } catch (e) {} }
+  if (typeof renderStrengthIndexChart === 'function') { try { renderStrengthIndexChart(); } catch (e) {} }
+  if (typeof renderBaseCard === 'function') { try { renderBaseCard(); } catch (e) {} }
+  if (typeof renderPlanPanel === 'function') { try { renderPlanPanel(); } catch (e) {} }
+}
+
+// Separa las sesiones que cuentan (desde la fecha base, incluida) de las anteriores
+function pgSplitBase(sess, ejercicio){
+  const base = pgBaseDate(ejercicio);
+  if (!base) return { kept: sess, before: 0, base: null };
+  const kept = sess.filter(x => x.fecha >= base);
+  return { kept: kept, before: sess.length - kept.length, base: base };
+}
+
+// Serie de un ejercicio a partir de sus sesiones, respetando la fecha base. Añade base y beforeBase al resultado.
+function pgSeriesFrom(all, ejercicio, mode){
+  const sp = pgSplitBase(all, ejercicio);
+  const ser = pgBuildSeries(sp.kept, mode || 'auto');
+  ser.base = sp.base; ser.beforeBase = sp.before;
+  return ser;
+}
+
+// Sugerencia de fecha base: la última vez que BAJASTE la carga de golpe y te quedaste abajo (lo típico al rehacer
+// la técnica). Se mira la carga mediana de cada sesión en la máquina de referencia (con todas sus series de trabajo,
+// también una primera más ligera): una sesión ≤ 85 % de la mediana de las 3 anteriores y la siguiente también ≤ 90 %
+// (si vuelves arriba enseguida, fue un mal día, no un reinicio). Tiene que ser una bajada nueva: viniendo de una sesión
+// que no estaba abajo, o un segundo escalón (≤ 85 % de la anterior); si no, las sesiones que siguen abajo se tomarían
+// por reinicios. Es solo una propuesta: la app nunca la aplica sola.
+// Probado con un historial real: marca los reinicios de sentadilla, peso muerto rumano, extensión de cuádriceps o
+// remo, y no marca nada donde hubo progreso de verdad (press de hombros) ni en ejercicios estables (press banca).
+function pgSuggestBase(ejercicio){
+  if (isTimedExercise(ejercicio)) return null;
+  const all = exerciseSessions(ejercicio);
+  if (all.length < 4) return null;
+  const ref = pgReferenceMachine(all);
+  const sess = all.filter(x => x.variante === ref && x.allWeights.length);
+  const med = a => { const b = a.slice().sort((x, y) => x - y), h = b.length >> 1; return b.length % 2 ? b[h] : (b[h - 1] + b[h]) / 2; };
+  const L = sess.map(x => med(x.allWeights));
+  let out = null;
+  for (let i = 1; i < sess.length - 1; i++) {
+    const pm = med(L.slice(Math.max(0, i - 3), i));
+    const fresh = L[i - 1] > 0.85 * pm || L[i] <= 0.85 * L[i - 1];
+    if (L[i] <= 0.85 * pm && L[i + 1] <= 0.9 * pm && fresh) out = { fecha: sess[i].fecha, from: L[i - 1] > 0.85 * pm ? pm : L[i - 1], to: L[i], before: i };
+  }
+  if (!out) return null;
+  const cur = pgBaseDate(ejercicio);
+  if (cur && cur >= out.fecha) return null;   // ya cuentas desde esa fecha o desde una posterior
+  return out;
 }
 
 // ---------- Máquinas (variantes) ----------
@@ -136,7 +246,7 @@ function pgBuildSeries(sess, mode){
 
 // Serie estándar de un ejercicio (la que usan tarjeta, hoja, Resumen y Métricas)
 function exerciseSeries(ejercicio, dia, mode){
-  return pgBuildSeries(exerciseSessions(ejercicio, dia), mode || 'auto');
+  return pgSeriesFrom(exerciseSessions(ejercicio, dia), ejercicio, mode);
 }
 
 // Valor de un ejercicio en una semana (la que empieza en weekStart): media de sus sesiones de esa semana
@@ -234,6 +344,11 @@ function renderCardProgress(cardEl){
   const ser = exerciseSeries(name);
   const sess = ser.sessions.slice(-PG_CARD_POINTS);
   if (sess.length === 0) {
+    if (ser.beforeBase) {   // hay historial, pero todo es anterior a la fecha desde la que cuenta
+      box.disabled = false;
+      box.innerHTML = '<div class="pg-empty">Tu progreso cuenta desde el ' + pgDate(ser.base) + ': aún no hay sesiones desde entonces.</div><div class="pg-more">Toca para ver el detalle</div>';
+      return;
+    }
     box.disabled = true;
     box.innerHTML = '<div class="pg-empty">Aún sin historial: tu primera sesión aparecerá aquí como gráfica.</div>';
     return;
@@ -254,6 +369,7 @@ function renderCardProgress(cardEl){
     '<div class="pg-cap">' + cap + '</div></div>' + deltaHtml + '</div>' +
     (sess.length > 1 ? pgSparkline(values) : '') +
     pgMachineNote(ser) +
+    (ser.base ? '<div class="pg-mnote">Cuenta desde el ' + pgDate(ser.base) + '</div>' : '') +
     '<div class="pg-more">Toca para ver el detalle</div>';
   pgDrawWhenVisible(box);
 }
@@ -366,11 +482,55 @@ function pgPickMachine(i){
   if (btn) btn.focus({ preventScroll: true });
 }
 
+// Bloque «Contar desde» de la hoja: fecha base activa, sugerencia (si la hay) y selector
+let _pgBaseOpts = [];
+function pgBaseBlock(ejercicio, all, ser){
+  const info = pgBaseInfo(ejercicio), sug = pgSuggestBase(ejercicio);
+  const gen = pgBasePrefs()[PG_BASE_ALL], hasGen = pgValidDate(gen);
+  let txt;
+  if (ser.base) {
+    txt = 'Tu progreso cuenta desde el <b>' + pgDate(ser.base) + '</b>' + (info.scope === 'general' ? ' (la fecha general de Métricas)' : '') +
+      (ser.beforeBase ? ': ' + ser.beforeBase + (ser.beforeBase === 1 ? ' sesión anterior no entra' : ' sesiones anteriores no entran') + ' en la gráfica, la tendencia ni los avisos. Siguen guardadas.' : '.');
+  } else {
+    txt = 'Cuenta todo tu historial (desde el ' + pgDate(all[0].fecha) + '). Si al principio la técnica era otra, elige desde cuándo es comparable.';
+  }
+  let sugHtml = '';
+  if (sug) {
+    sugHtml = '<div class="pg-note"><b>¿Rehiciste la técnica?</b> El ' + pgDate(sug.fecha) + ' bajaste de ' + pgKg(sug.from) + ' a ' + pgKg(sug.to) + ' kg y no volviste arriba enseguida. Si fue para hacerlo mejor, lo de antes no es comparable.' +
+      '<div class="ps-btns" style="margin-top:8px"><button type="button" class="dl-btn pri" onclick="pgPickBase(\'' + sug.fecha + '\')">Contar desde el ' + pgDate(sug.fecha) + '</button></div></div>';
+  }
+  // Opciones del selector: la general (o todo, si no hay general), todo el historial y cada sesión, de la más reciente a la más antigua
+  _pgBaseOpts = [];
+  const opt = (v, label, sel) => { _pgBaseOpts.push(v); return '<option value="' + (_pgBaseOpts.length - 1) + '"' + (sel ? ' selected' : '') + '>' + escHtml(label) + '</option>'; };
+  const own = info.scope === 'ejercicio';
+  let opts = opt('__general', hasGen ? 'La general: desde el ' + pgDate(gen) : 'Todo el historial', !own);
+  if (hasGen) opts += opt('__all', 'Todo el historial (solo este ejercicio)', own && !info.fecha);
+  const dates = []; all.forEach(x => { if (dates.indexOf(x.fecha) < 0) dates.push(x.fecha); });
+  if (own && info.fecha && dates.indexOf(info.fecha) < 0) dates.push(info.fecha);
+  dates.sort().reverse().forEach(f => { opts += opt(f, 'Desde el ' + pgDate(f) + ' ' + f.slice(0, 4), own && info.fecha === f); });
+  return '<div class="pg-sec">Desde cuándo cuenta</div><p class="pg-hint">' + txt + '</p>' + sugHtml +
+    '<label class="pg-mlabel" for="pgBaseSel">Contar desde</label>' +
+    '<select class="metric-select" id="pgBaseSel" onchange="pgPickBase(this.value, true)">' + opts + '</select>';
+}
+
+// v: índice de la opción del selector (fromSelect) o una fecha directa (botón de la sugerencia)
+function pgPickBase(v, fromSelect){
+  const val = fromSelect ? _pgBaseOpts[Number(v)] : v;
+  if (val === undefined || !_pgSheetEx) return;
+  pgSetBase(_pgSheetEx, val === '__general' ? undefined : (val === '__all' ? '' : val));
+  const sheet = document.getElementById('pgSheet'); if (!sheet || !sheet.classList.contains('on')) return;
+  const top = sheet.scrollTop;
+  renderProgressSheet();
+  sheet.scrollTop = top;
+  const sel = sheet.querySelector('#pgBaseSel'); if (sel) sel.focus({ preventScroll: true });
+}
+
 function renderProgressSheet(){
   const ejercicio = _pgSheetEx, timed = isTimedExercise(ejercicio);
   const all = exerciseSessions(ejercicio);
-  let ser = pgBuildSeries(all, _pgSheetMode);
-  if (ser.sessions.length === 0) { _pgSheetMode = 'auto'; ser = pgBuildSeries(all, 'auto'); }
+  let ser = pgSeriesFrom(all, ejercicio, _pgSheetMode);
+  if (ser.sessions.length === 0 && _pgSheetMode !== 'auto') { _pgSheetMode = 'auto'; ser = pgSeriesFrom(all, ejercicio, 'auto'); }
+  if (ser.sessions.length === 0) { renderProgressSheetEmpty(ejercicio, all, ser); return; }
   const sess = ser.sessions.slice(-PG_SHEET_POINTS);
   const values = sess.map(s => s.value);
   const cur = values[values.length - 1];
@@ -417,34 +577,12 @@ function renderProgressSheet(){
     machinesHtml += '<p class="pg-hint">' + hint + '</p>';
   }
 
-  // Últimas sesiones (de todas las máquinas), diciendo cuáles entran en la gráfica
-  const included = {};
-  ser.sessions.forEach(x => { included[x.fecha + '|' + x.variante] = x; });
-  const rows = all.slice().reverse().slice(0, 6).map(x => {
-    const detail = timed ? x.reps + ' s' : pgKg(x.peso) + ' kg × ' + x.reps;
-    const inc = included[x.fecha + '|' + x.variante];
-    let tag = '';
-    if (x.variante || !inc) {
-      const bits = [];
-      if (x.variante) bits.push(escHtml(x.variante));
-      if (inc && inc.adj) bits.push('ajustada ×' + fmtNum(inc.adj, 2));
-      if (!inc) bits.push('no entra');
-      tag = ' <small>(' + bits.join(', ') + ')</small>';
-    }
-    const dayShort = String(x.dia).split('·')[0].trim();
-    return '<div class="pg-sess"><span>' + (x.fecha === localDateStr() ? 'Hoy' : pgDate(x.fecha)) + '</span>' +
-      '<span>' + (timed ? '' : 'mejor ') + detail + tag + '</span>' +
-      '<small>' + escHtml(dayShort) + (timed ? '' : ' · ' + pgNum(inc ? inc.value : x.value)) + '</small></div>';
-  }).join('');
+  const rows = pgSessionRows(all, ser, timed);
 
   const sheet = ensurePgSheet();
   sheet.style.setProperty('--c', (typeof dayColorVar === 'function' ? dayColorVar(currentDay) : 'var(--blue)'));
   sheet.setAttribute('aria-label', 'Progresión de ' + ejercicio);
-  sheet.innerHTML = '<div class="pg-grab"></div>' +
-    '<div class="pg-shead"><div><h2>' + escHtml(ejercicio) + '</h2>' +
-    (days.length ? '<div class="pg-where">' + days.map(d => '<span class="pg-chip">' + escHtml(d) + '</span>').join('') + '</div>' : '') +
-    '</div><button class="pg-close" type="button" id="pgClose" aria-label="Cerrar">' + uiIcon('x') + '</button></div>' +
-    (days.length > 1 ? '<p class="pg-hint">Este ejercicio se hace en varios días: la gráfica los junta todos.</p>' : '') +
+  sheet.innerHTML = pgSheetHead(ejercicio, days) +
     machinesHtml +
     '<div class="pg-stats"><div class="pg-stat"><b>' + pgNum(cur) + '</b><span>' + (timed ? 'Última (s)' : 'Fuerza actual (kg)') + '</span></div>' +
     '<div class="pg-stat"><b>' + pgNum(best) + '</b><span>' + (timed ? 'Mejor (s)' : 'Mejor sesión (kg)') + '</span></div>' +
@@ -452,10 +590,59 @@ function renderProgressSheet(){
     pgBigChart(sess, timed) +
     '<div class="pg-leg"><span><i></i>Sesión</span>' + (sess.length >= 3 ? '<span><i class="t"></i>Tendencia (media de 3)</span>' : '') + (sess.some(x => x.adj) ? '<span><i class="h"></i>Ajustada desde otra máquina</span>' : '') + '<span>Línea punteada: mejor marca</span></div>' +
     '<div class="pg-note">' + note + '</div>' +
+    pgBaseBlock(ejercicio, all, ser) +
     '<div class="pg-sec">Volumen por sesión</div>' + pgVolumeChart(sess) +
     '<div class="pg-hint" style="margin-top:6px">Mide cuánto trabajo acumulas, no cuánto de fuerte eres: sube si haces más series aunque no mejores' + (ser.machines.length > 1 ? ' (y no se ajusta entre máquinas)' : '') + '.</div>' +
     '<div class="pg-sec">Últimas sesiones</div>' + rows +
-    (timed ? '' : '<div class="pg-foot">Fuerza estimada = media de tus series de trabajo con la fórmula peso × (reps elevadas a 0,10). Pesa menos las repeticiones que el 1RM de Epley, por eso no coincide con el 1RM de otras pantallas, pero detecta mejor si progresas.</div>');
+    (timed ? '' : '<div class="pg-foot">' + PG_FORMULA_TEXT + '</div>');
+  sheet.querySelector('#pgClose').onclick = closeProgressSheet;
+}
+
+const PG_FORMULA_TEXT = 'Fuerza estimada = media de tus series de trabajo con la fórmula peso × (reps elevadas a 0,10). Si anotas el RIR, cuenta lo que podías hacer: reps + RIR (hasta 3), así dejarte repeticiones en reserva no parece una bajada. Una primera serie mucho más ligera que las demás se toma como calentamiento. Pesa menos las repeticiones que el 1RM de Epley, por eso no coincide con el 1RM de otras pantallas, pero detecta mejor si progresas.';
+
+function pgSheetHead(ejercicio, days){
+  return '<div class="pg-grab"></div>' +
+    '<div class="pg-shead"><div><h2>' + escHtml(ejercicio) + '</h2>' +
+    (days.length ? '<div class="pg-where">' + days.map(d => '<span class="pg-chip">' + escHtml(d) + '</span>').join('') + '</div>' : '') +
+    '</div><button class="pg-close" type="button" id="pgClose" aria-label="Cerrar">' + uiIcon('x') + '</button></div>' +
+    (days.length > 1 ? '<p class="pg-hint">Este ejercicio se hace en varios días: la gráfica los junta todos.</p>' : '');
+}
+
+// Últimas sesiones (de todas las máquinas), diciendo cuáles entran en la gráfica y por qué no las que no
+function pgSessionRows(all, ser, timed){
+  const included = {};
+  ser.sessions.forEach(x => { included[x.fecha + '|' + x.variante] = x; });
+  return all.slice().reverse().slice(0, 6).map(x => {
+    const detail = timed ? x.reps + ' s' : pgKg(x.peso) + ' kg × ' + x.reps;
+    const inc = included[x.fecha + '|' + x.variante];
+    const preBase = ser.base && x.fecha < ser.base;
+    let tag = '';
+    if (x.variante || !inc || (!timed && x.rirSets)) {
+      const bits = [];
+      if (x.variante) bits.push(escHtml(x.variante));
+      if (inc && inc.adj) bits.push('ajustada ×' + fmtNum(inc.adj, 2));
+      if (!timed && x.rirSets) bits.push('con RIR');
+      if (preBase) bits.push('antes de la fecha base');
+      else if (!inc) bits.push('no entra');
+      tag = ' <small>(' + bits.join(', ') + ')</small>';
+    }
+    const dayShort = String(x.dia).split('·')[0].trim();
+    return '<div class="pg-sess"><span>' + (x.fecha === localDateStr() ? 'Hoy' : pgDate(x.fecha)) + '</span>' +
+      '<span>' + (timed ? '' : 'mejor ') + detail + tag + '</span>' +
+      '<small>' + escHtml(dayShort) + (timed ? '' : ' · ' + pgNum(inc ? inc.value : x.value)) + '</small></div>';
+  }).join('');
+}
+
+// Hoja cuando todo el historial es anterior a la fecha base
+function renderProgressSheetEmpty(ejercicio, all, ser){
+  const timed = isTimedExercise(ejercicio);
+  const sheet = ensurePgSheet();
+  sheet.style.setProperty('--c', (typeof dayColorVar === 'function' ? dayColorVar(currentDay) : 'var(--blue)'));
+  sheet.setAttribute('aria-label', 'Progresión de ' + ejercicio);
+  sheet.innerHTML = pgSheetHead(ejercicio, exerciseDayLabels(ejercicio)) +
+    '<div class="empty-note">Tu progreso de este ejercicio cuenta desde el ' + pgDate(ser.base) + ' y aún no hay sesiones desde entonces. La gráfica empezará con la próxima.</div>' +
+    '<div class="pg-sec">Últimas sesiones</div>' + pgSessionRows(all, ser, timed) +
+    pgBaseBlock(ejercicio, all, ser);
   sheet.querySelector('#pgClose').onclick = closeProgressSheet;
 }
 

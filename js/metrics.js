@@ -24,7 +24,7 @@ function setMetricsSection(sec){
   if (MT_SECTIONS.indexOf(sec) < 0) sec = 'resumen';
   try { localStorage.setItem('mtSection', sec); } catch (e) {}
   document.querySelectorAll('#metricasView [data-msec]').forEach(el => el.classList.toggle('mt-hidden', el.getAttribute('data-msec') !== sec));
-  if (sec === 'ejercicios') { if (typeof renderCalCard === 'function') renderCalCard(); if (typeof renderPlanPanel === 'function') renderPlanPanel(); }
+  if (sec === 'ejercicios') { renderBaseCard(); if (typeof renderCalCard === 'function') renderCalCard(); if (typeof renderPlanPanel === 'function') renderPlanPanel(); }
   MT_SECTIONS.forEach(n => {
     const b = document.getElementById('mtTab' + n.charAt(0).toUpperCase() + n.slice(1)); if (!b) return;
     b.classList.toggle('on', n === sec); b.setAttribute('aria-pressed', String(n === sec));
@@ -56,6 +56,7 @@ async function loadMetrics(force){
     renderProgressChart();
     renderVolumeChart();
     renderStrengthIndexChart();
+    renderBaseCard();
     renderTabs();
     updateCardHighlights();
     loadBodyStats();
@@ -150,7 +151,7 @@ function renderProgressChart(){
   if (!exercise || labels.length === 0) {
     subEl.textContent = rows.length === 0
       ? 'Aún no hay registros para tu perfil.'
-      : 'No hay registros de "' + exercise + '" todavía.';
+      : (ser.beforeBase ? 'El progreso de "' + exercise + '" cuenta desde el ' + pgDate(ser.base) + ' y aún no hay sesiones desde entonces.' : 'No hay registros de "' + exercise + '" todavía.');
     chartShow(ctx, false);
     return;
   }
@@ -173,9 +174,10 @@ function renderProgressChart(){
   if (timed) {
     subEl.textContent = 'Ejercicio por tiempo: mejor serie de cada sesión (segundos) · línea ámbar: tendencia (media de 3 sesiones)';
   } else {
-    subEl.textContent = 'Línea azul: fuerza estimada de cada sesión (media de tus series de trabajo) · línea ámbar: tendencia (media de 3 sesiones). Toca “Peso de la mejor serie” en la leyenda para verlo también.' +
+    subEl.textContent = 'Línea azul: fuerza estimada de cada sesión (media de tus series de trabajo; con RIR anotado, cuenta reps + RIR) · línea ámbar: tendencia (media de 3 sesiones). Toca “Peso de la mejor serie” en la leyenda para verlo también.' +
       (ser.machines.length > 1 ? ' Varias máquinas: referencia ' + (ser.ref || 'habitual') + (ser.adjusted ? ', con ' + ser.adjusted + ' sesión(es) de otras máquinas ajustadas' : '') + (ser.excluded ? ', ' + ser.excluded + ' sin ajustar no entran' : '') + '.' : '');
   }
+  if (ser.base) subEl.textContent += ' Cuenta desde el ' + pgDate(ser.base) + (ser.beforeBase ? ' (' + ser.beforeBase + ' sesiones anteriores no entran)' : '') + '.';
   const datasets = [
     { label: timed ? 'Mejor serie (s)' : 'Fuerza estimada (kg)', data: values, borderColor: timed ? T.green : T.blue,
       backgroundColor: timed ? T.greenFill : T.blueFill, tension: 0.3, fill: true, pointRadius: 3 },
@@ -252,7 +254,7 @@ function renderVolumeChart(){
 
 // ---- Índice de fuerza (tendencia de fondo, no solo esta semana vs. la pasada) ----
 // Para cada ejercicio, su fuerza estimada (media de series de cada sesión) relativa a su primera sesión
-// registrada; cada semana es la media de esos porcentajes entre todos los ejercicios.
+// desde su fecha base (si no hay, la primera registrada); cada semana es la media de esos porcentajes entre todos los ejercicios.
 function computeStrengthIndexByWeek(profile){
   const names = [];
   myRows().forEach(r => { const ex = r['Ejercicio']; if (ex && !isWarmupRow(r) && !isTimedExercise(ex) && names.indexOf(ex) < 0) names.push(ex); });
@@ -299,7 +301,8 @@ function renderStrengthIndexChart(){
     return;
   }
   chartShow(ctx, true);
-  subEl.textContent = '100% = tu primera sesión registrada de cada ejercicio (fuerza estimada: media de tus series de trabajo, sin calentamientos). Por encima de 100%, vas a más de media.';
+  const anyBase = typeof pgBasePrefs === 'function' && Object.keys(pgBasePrefs()).some(k => pgValidDate(pgBasePrefs()[k]));
+  subEl.textContent = '100% = tu primera sesión ' + (anyBase ? 'desde la fecha en que cuenta cada ejercicio' : 'registrada de cada ejercicio') + ' (fuerza estimada: media de tus series de trabajo, sin calentamientos). Por encima de 100%, vas a más de media.';
 
   strengthIndexChartInstance = new Chart(ctx, {
     type: 'line',
@@ -326,3 +329,51 @@ function renderStrengthIndexChart(){
     }
   });
 }
+
+// ---- Desde cuándo cuenta tu progreso (fecha base; la lógica está en progress-chart.js) ----
+// Tarjeta de Métricas > Ejercicios: fecha general, ejercicios con fecha propia y reinicios de carga detectados
+// (sugerencias que solo se aplican si las aceptas).
+function baseExerciseNames(){
+  const names = [];
+  myRows().forEach(r => { const ex = r['Ejercicio']; if (ex && !isWarmupRow(r) && !isTimedExercise(ex) && names.indexOf(ex) < 0) names.push(ex); });
+  return names.sort((a, b) => a.localeCompare(b, 'es'));
+}
+function baseSuggestions(){
+  const out = [];
+  baseExerciseNames().forEach(ex => {
+    if (pgBaseInfo(ex).scope === 'ejercicio') return;   // ya elegiste a mano
+    const s = pgSuggestBase(ex); if (s) out.push(Object.assign({ ej: ex }, s));
+  });
+  return out;
+}
+let _baseSug = [], _baseOwn = [];
+function renderBaseCard(){
+  const el = document.getElementById('baseCardBody'); if (!el || typeof pgBasePrefs !== 'function') return;
+  const p = pgBasePrefs(), gen = pgValidDate(p[PG_BASE_ALL]) ? p[PG_BASE_ALL] : '';
+  _baseSug = baseSuggestions();
+  _baseOwn = Object.keys(p).filter(k => k !== PG_BASE_ALL).sort((a, b) => a.localeCompare(b, 'es'));
+  const dm = f => pgDate(f) + ' ' + f.slice(0, 4);
+  let h = '<div class="metric-sub" style="margin:0 0 10px;">Si al empezar la técnica era otra (más peso del que tocaba, que luego bajaste para hacerlo bien), esas sesiones no son comparables y hunden las gráficas. Elige desde cuándo cuentan: lo anterior se queda guardado, pero no entra en la gráfica, la tendencia, los avisos de estancamiento ni el índice de fuerza.</div>' +
+    '<div class="metric-sub" style="margin:0 0 10px;">No hace falta empezar en el plan guiado: si anotas el RIR, la fuerza estimada cuenta reps + RIR, así que dejarte repeticiones en reserva no se ve como una bajada.</div>';
+  h += '<label class="exp-field" for="baseGenDate">Fecha general (para todos los ejercicios sin fecha propia)<input type="date" id="baseGenDate" class="exp-date" value="' + gen + '" max="' + localDateStr() + '" onchange="baseSetGeneral(this.value)"></label>' +
+    '<div class="metric-sub" style="margin:6px 0 0;">' + (gen ? 'Ahora cuenta desde el ' + dm(gen) + '. <button type="button" class="link-btn" onclick="baseSetGeneral(\'\')">Contar todo el historial</button>' : 'Ahora cuenta todo el historial.') + '</div>';
+  if (_baseSug.length) {
+    h += '<div class="metric-title" style="margin-top:14px;">Reinicios detectados</div>' +
+      '<div class="metric-sub" style="margin:0 0 6px;">Bajaste la carga de golpe y no volviste arriba enseguida: suele ser rehacer la técnica. Revisa que sea eso antes de aplicarlo.</div>' +
+      '<ul class="pp-read">' + _baseSug.map((s, i) => '<li><b>' + escHtml(s.ej) + '</b>: el ' + dm(s.fecha) + ' (de ' + fmtNum(s.from, 2) + ' a ' + fmtNum(s.to, 2) + ' kg). <button type="button" class="link-btn" onclick="baseApplySug(' + i + ')">Contar desde ahí</button></li>').join('') + '</ul>' +
+      (_baseSug.length > 1 ? '<button type="button" class="log-add" style="width:100%" onclick="baseApplySug(-1)">Aplicar las ' + _baseSug.length + '</button>' : '');
+  }
+  if (_baseOwn.length) {
+    h += '<div class="metric-title" style="margin-top:14px;">Con fecha propia</div><ul class="pp-read">' +
+      _baseOwn.map((ex, i) => '<li><b>' + escHtml(ex) + '</b>: ' + (pgValidDate(p[ex]) ? 'desde el ' + dm(p[ex]) : 'todo el historial') + '. <button type="button" class="link-btn" onclick="baseClearOwn(' + i + ')">Usar la general</button></li>').join('') + '</ul>';
+  }
+  h += '<div class="metric-sub" style="margin:10px 0 0;">También puedes elegirla en la hoja de cada ejercicio (toca su gráfica).</div>';
+  el.innerHTML = h;
+}
+function baseSetGeneral(v){ pgSetBase('', pgValidDate(v) ? v : undefined); }
+function baseApplySug(i){
+  const list = i < 0 ? _baseSug : [_baseSug[i]];
+  list.forEach(s => { if (s && typeof hySetPref === 'function') hySetPref('base', s.ej, s.fecha); });
+  pgRefreshAfterBase();
+}
+function baseClearOwn(i){ const ex = _baseOwn[i]; if (ex !== undefined) pgSetBase(ex, undefined); }

@@ -16,7 +16,7 @@
 <title>IronLog · Rutina de fuerza</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link rel="stylesheet" href="styles.css?v=4a2ebe8d">
+<link rel="stylesheet" href="styles.css?v=18ef1c7e">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
     <p><b>RIR</b> son las repeticiones que te quedan «en el depósito». <b>RIR 2</b>: terminas dejando 2. <b>Fallo técnico</b> (RIR 0): hasta la última repetición con técnica limpia, sin rebotes. Calcular el RIR es difícil: de media se subestima en cerca de 1 repetición, y el error es mucho mayor por encima de 12 repeticiones.</p>
     <p><b>Pesados</b> (básicos multiarticulares): RIR 2 / 1 / 1 y 2:30-3:30 de descanso; no llegan al fallo. <b>Accesorios</b>: RIR 1 / 1 / 0 y 1:30-2:00. <b>Core</b>: 1:00-1:30. Lo que respalda la evidencia es dejar entre 1 y 3 repeticiones en reserva (casi la misma hipertrofia que al fallo y menos fatiga). No hay estudios que respalden llevar al fallo solo la última serie, ni sobre el core.</p>
     <p><b>Doble progresión:</b> cuando llegas al tope de repeticiones en las 3 series, la app te sube la carga y vuelves al mínimo del rango. Progresar por carga o por repeticiones da resultados parecidos; los valores se pueden ajustar en Editar.</p>
-    <p><b>Progreso:</b> la app lo mide con la fuerza estimada de cada sesión (la media de tus series de trabajo, peso × repeticiones^0,10) y no con el 1RM, el peso máximo para una sola repetición, que nadie hace a diario y solo se puede estimar.</p>
+    <p><b>Progreso:</b> la app lo mide con la fuerza estimada de cada sesión (la media de tus series de trabajo, peso × repeticiones^0,10; si anotas el RIR, cuenta repeticiones + RIR) y no con el 1RM, el peso máximo para una sola repetición, que nadie hace a diario y solo se puede estimar.</p>
   </details>
 
 </div>
@@ -180,6 +180,11 @@
     <div class="metric-sub" id="progressSub">Elige un ejercicio para ver su evolución</div>
     <select class="metric-select" id="exerciseSelect" onchange="renderProgressChart()"></select>
     <div class="chart-wrap"><canvas id="progressChart" role="img" aria-label="Gráfica de progresión del ejercicio elegido"></canvas></div>
+  </div>
+
+  <div class="metric-card" id="baseCard" data-msec="ejercicios">
+    <div class="metric-title">Desde cuándo cuenta tu progreso</div>
+    <div id="baseCardBody"></div>
   </div>
 
   <div class="metric-card" data-msec="resumen">
@@ -372,47 +377,47 @@
 <div class="toast" id="toast" role="status" aria-live="polite">Guardado ✓</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
-<script>window.IRONLOG_BUILD = 'b228c9f3'; // lo escribe tools/stamp.js</script>
-<script src="js/motion.js?v=7298014a"></script>
-<script src="js/config.js?v=4d929179"></script>
-<script src="js/ui-icons.js?v=bcc3f18b"></script>
-<script src="js/utils.js?v=3734d2d1"></script>
-<script src="js/icons.js?v=91462c98"></script>
-<script src="js/routine-default.js?v=7400eda4"></script>
-<script src="js/api-supabase.js?v=c031580b"></script>
-<script src="js/api.js?v=684a8597"></script>
-<script src="js/auth.js?v=25c0501e"></script>
-<script src="js/routine.js?v=f17fbe87"></script>
-<script src="js/outbox.js?v=dc6cb8f3"></script>
-<script src="js/body-svg.js?v=3fc81c63"></script>
-<script src="js/muscles.js?v=e39a621c"></script>
-<script src="js/planning.js?v=5e449824"></script>
-<script src="js/body.js?v=a784bc90"></script>
-<script src="js/history.js?v=4c11d7b3"></script>
-<script src="js/metrics.js?v=4a017133"></script>
-<script src="js/summary.js?v=1f827f4d"></script>
-<script src="js/prescription.js?v=33ede7f4"></script>
-<script src="js/deload.js?v=9c28db67"></script>
-<script src="js/hypertrophy.js?v=17072752"></script>
-<script src="js/checkin.js?v=4398e89b"></script>
-<script src="js/state-sync.js?v=340bc686"></script>
-<script src="js/training.js?v=4464dfc7"></script>
-<script src="js/rir.js?v=c5f677b1"></script>
-<script src="js/plan-panel.js?v=2b3ec21d"></script>
-<script src="js/export.js?v=44e3eea4"></script>
-<script src="js/feel-data.js?v=72b2bdef"></script>
-<script src="js/feel-anim.js?v=254a5b63"></script>
-<script src="js/feel.js?v=e98b2186"></script>
-<script src="js/progress-chart.js?v=a38785d4"></script>
-<script src="js/day-view.js?v=c49860a1"></script>
-<script src="js/day-picker.js?v=0a9a67cb"></script>
-<script src="js/coach-tools.js?v=907afa22"></script>
-<script src="js/coach.js?v=79e01680"></script>
-<script src="js/coach-ui.js?v=6eaadc4a"></script>
-<script src="js/editor.js?v=8950581e"></script>
-<script src="js/progress.js?v=e0415c15"></script>
-<script src="js/navigation.js?v=e3b94915"></script>
-<script src="js/main.js?v=c038782c"></script>
+<script>window.IRONLOG_BUILD = '33cb50a5'; // lo escribe tools/stamp.js</script>
+<script src="js/motion.js?v=46f94aff"></script>
+<script src="js/config.js?v=66b3bd45"></script>
+<script src="js/ui-icons.js?v=9068a33e"></script>
+<script src="js/utils.js?v=71976e8d"></script>
+<script src="js/icons.js?v=e35238c5"></script>
+<script src="js/routine-default.js?v=2bc2a71e"></script>
+<script src="js/api-supabase.js?v=828f7555"></script>
+<script src="js/api.js?v=c29f7b81"></script>
+<script src="js/auth.js?v=851a5570"></script>
+<script src="js/routine.js?v=fbc1f9a0"></script>
+<script src="js/outbox.js?v=05b46712"></script>
+<script src="js/body-svg.js?v=3aaf5122"></script>
+<script src="js/muscles.js?v=c3287e19"></script>
+<script src="js/planning.js?v=bae2a67b"></script>
+<script src="js/body.js?v=8fccb249"></script>
+<script src="js/history.js?v=5717e004"></script>
+<script src="js/metrics.js?v=ceef0edf"></script>
+<script src="js/summary.js?v=51cc7c3d"></script>
+<script src="js/prescription.js?v=1eaf6ff5"></script>
+<script src="js/deload.js?v=7ee34688"></script>
+<script src="js/hypertrophy.js?v=0dd28f91"></script>
+<script src="js/checkin.js?v=98b7b125"></script>
+<script src="js/state-sync.js?v=fe51b581"></script>
+<script src="js/training.js?v=47aaf0ab"></script>
+<script src="js/rir.js?v=63a434ee"></script>
+<script src="js/plan-panel.js?v=78718578"></script>
+<script src="js/export.js?v=cf40ba1e"></script>
+<script src="js/feel-data.js?v=ce22639e"></script>
+<script src="js/feel-anim.js?v=2f52fd0d"></script>
+<script src="js/feel.js?v=0ed0b044"></script>
+<script src="js/progress-chart.js?v=fbaeb34f"></script>
+<script src="js/day-view.js?v=5a727f38"></script>
+<script src="js/day-picker.js?v=4db4158c"></script>
+<script src="js/coach-tools.js?v=680ab914"></script>
+<script src="js/coach.js?v=9967acdd"></script>
+<script src="js/coach-ui.js?v=99a807b5"></script>
+<script src="js/editor.js?v=ad5a3c4b"></script>
+<script src="js/progress.js?v=d9594ef6"></script>
+<script src="js/navigation.js?v=9831b087"></script>
+<script src="js/main.js?v=063711a7"></script>
 
 </body>
 </html>

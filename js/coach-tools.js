@@ -150,7 +150,7 @@ const COACH_TOOLS = [
     } },
 
   { name: 'get_exercise_progress',
-    description: 'Progresión de UN ejercicio con la misma métrica que la app: "fuerza estimada" por sesión (media de las series de trabajo, peso × reps^0,10), ajustada entre máquinas, con cambio reciente, tendencia (solo con 8+ sesiones), mejor sesión y últimas sesiones. Úsala para "¿voy bien en X?", "¿estoy estancado?" o decidir carga.',
+    description: 'Progresión de UN ejercicio con la misma métrica que la app: "fuerza estimada" por sesión (media de las series de trabajo, peso × (reps + RIR anotado)^0,10), desde la fecha en que el usuario dice que cuenta, ajustada entre máquinas, con cambio reciente, tendencia (solo con 8+ sesiones), mejor sesión y últimas sesiones. Úsala para "¿voy bien en X?", "¿estoy estancado?" o decidir carga.',
     parameters: { type: 'OBJECT', properties: {
       ejercicio: { type: 'STRING', description: 'Nombre del ejercicio (o parte). Si es ambiguo se devuelven candidatos.' },
       ultimas_sesiones: { type: 'INTEGER', description: 'Cuántas sesiones devolver (por defecto 12, máximo 30).' },
@@ -167,10 +167,14 @@ const COACH_TOOLS = [
         const q = coachNorm(a.maquina), m = pgBuildSeries(all, 'auto').machines.find(x => coachNorm(x.name) === q || (!x.name && /habitual/.test(q)));
         if (m) mode = 'm:' + m.name; else return { error: 'Esa máquina no aparece en el historial. Máquinas: ' + pgBuildSeries(all, 'auto').machines.map(x => x.name || 'habitual').join(' | ') };
       }
-      const ser = pgBuildSeries(all, mode), values = ser.sessions.map(s => s.value);
+      const ser = pgSeriesFrom(all, name, mode), values = ser.sessions.map(s => s.value);
+      if (!values.length) return Object.assign(base, { sesiones_totales: all.length, cuenta_desde: ser.base, sesiones_antes_de_la_fecha_base: ser.beforeBase,
+        aviso: 'El usuario eligió contar el progreso de este ejercicio desde ' + ser.base + ' (lo anterior era con otra técnica y no es comparable) y aún no hay sesiones desde entonces.' });
       const n = coachInt(a.ultimas_sesiones, 12, 1, 30), ch = pgChange(values), tr = pgTrendInfo(values);
       return Object.assign(base, {
-        metrica: timed ? 'mejor serie en segundos' : 'fuerza_estimada (kg) = media de las series de trabajo de la sesión con peso × reps^0,10; no es el 1RM',
+        metrica: timed ? 'mejor serie en segundos' : 'fuerza_estimada (kg) = media de las series de trabajo de la sesión con peso × (reps + RIR anotado, máx. 3)^0,10; sin RIR anotado, solo las reps. No es el 1RM',
+        cuenta_desde: ser.base || 'todo el historial',
+        sesiones_antes_de_la_fecha_base: ser.base ? ser.beforeBase : undefined,
         sesiones_totales: all.length, sesiones_en_la_serie: ser.sessions.length,
         maquinas: ser.machines.map(m => ({ nombre: m.name || 'habitual', sesiones: m.n })),
         maquina_de_referencia: ser.ref || 'habitual',
@@ -181,6 +185,7 @@ const COACH_TOOLS = [
         serie: ser.sessions.slice(-n).map(s => ({
           fecha: s.fecha, maquina: s.variante || 'habitual', fuerza: coachR(s.value),
           mejor_serie: timed ? (s.reps + ' s') : (fmtNum(s.peso, 2) + ' kg × ' + s.reps), series: s.nSets, dia: coachShortDay(s.dia),
+          series_con_rir: (!timed && s.rirSets) ? s.rirSets : undefined,
           ajustada_x: s.adj ? coachR(s.adj, 2) : undefined })),
       });
     } },

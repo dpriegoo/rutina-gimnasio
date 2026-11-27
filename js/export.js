@@ -43,7 +43,7 @@ const EXPORT_LEYENDA = {
     'Un mismo ejercicio y fecha suelen tener varias filas (una por serie o grupo de series).',
     'La semana va de lunes a domingo.',
     'Una variante/máquina distinta puede mover más o menos peso que la habitual: sus cargas no son comparables directamente con las de la habitual.',
-    'La app mide la progresión con la «fuerza estimada» de cada sesión = media de las series de trabajo con peso × reps^0,10 (no es el 1RM).',
+    'La app mide la progresión con la «fuerza estimada» de cada sesión = media de las series de trabajo con peso × reps^0,10 (no es el 1RM); si la serie tiene RIR anotado, usa reps + RIR (hasta 3), porque dejarse repeticiones en reserva a propósito no es rendir menos.',
     'La «rutina» es la actual: si cambió durante el rango, los registros antiguos conservan el día y el grupo con los que se guardaron.',
     'En las semanas con «descarga» = true se entrenó menos a propósito (2 series por ejercicio con la carga de siempre y un RIR más): un volumen más bajo ahí no es una caída de rendimiento.',
     'Los datos son solo del perfil indicado en «meta».',
@@ -101,6 +101,12 @@ function exportCollect(o){
   };
   if (pend) meta.pendientes_de_sincronizar_incluidos = pend;
   if (o.body && window._height) meta.altura_cm = window._height;
+  // Desde cuándo cuenta el progreso (fecha base): lo anterior lo marcó el usuario como no comparable (otra técnica)
+  if (typeof pgBasePrefs === 'function') {
+    const bp = pgBasePrefs(), fb = {};
+    Object.keys(bp).forEach(k => { fb[k === PG_BASE_ALL ? 'general' : k] = pgValidDate(bp[k]) ? bp[k] : 'todo el historial'; });
+    if (Object.keys(fb).length) meta.fechas_base = fb;
+  }
   return { meta: meta, leyenda: EXPORT_LEYENDA, rutina: rutina, semanal: semanal, series: series, peso_corporal: peso };
 }
 
@@ -133,6 +139,7 @@ function exportMarkdown(d){
   if (m.altura_cm) L.push('- **Altura:** ' + m.altura_cm + ' cm');
   L.push('', '## Cómo leer estos datos', '');
   d.leyenda.notas.forEach(n => L.push('- ' + n));
+  if (m.fechas_base) L.push('- **Desde cuándo cuenta el progreso** (el usuario indicó que lo anterior se hizo con otra técnica y no es comparable; «general» vale para los ejercicios sin fecha propia): ' + Object.keys(m.fechas_base).map(k => k + ' → ' + m.fechas_base[k]).join(' · ') + '.');
   L.push('', 'Columnas de «Series»:', '');
   Object.keys(d.leyenda.columnas).forEach(c => L.push('- `' + c + '`: ' + d.leyenda.columnas[c]));
   L.push('', '## Rutina actual', '',

@@ -108,7 +108,7 @@ function ppReadings(d){
 function renderPlanPanel(){
   const el = document.getElementById('planPanelBody'); if (!el) return;
   const d = ppData();
-  const note = '<div class="metric-sub" style="margin:10px 0 0;">Es una observación, no una prueba: no hay grupo de control, y también influyen el sueño, la comida y el estrés (y que antes entrenabas más cerca del fallo).</div>';
+  const note = '<div class="metric-sub" style="margin:10px 0 0;">Es una observación, no una prueba: no hay grupo de control, y también influyen el sueño, la comida y el estrés (y que antes entrenabas más cerca del fallo: la fuerza estimada suma el RIR que anotas, pero antes no lo anotabas).</div>';
   if (d.state === 'none') { el.innerHTML = '<div class="metric-sub" style="margin:0;">Todavía no has usado el plan serie a serie. Cuando registres series con «Hecha», aquí verás en unas semanas si te funciona: cuánto caen las repeticiones entre series, cuántas sesiones llegan al rango y cómo evoluciona tu fuerza.</div>'; return; }
   const row = (l, a, b) => '<tr><th scope="row">' + l + '</th><td>' + a + '</td><td>' + b + '</td></tr>';
   const b = d.before, a = d.after, s = d.stats, bias = rirBias();
