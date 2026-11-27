@@ -78,6 +78,20 @@ assert.strictEqual(idx.values.length, 4);
 assert(Math.abs(idx.values[0] - 100) < 0.11, 'la primera semana es el 100 %');
 assert(Math.abs(idx.values[3] - 107.5) < 0.2, 'subir 2,5 % de peso cada semana = ~107,5 % a la 4ª semana: ' + idx.values[3]);
 for (let i = 1; i < 4; i++) assert(idx.values[i] > idx.values[i - 1], 'el índice sube cada semana');
+assert.strictEqual(idx.trend.length, 4); assert(Math.abs(idx.trend[3] - (idx.values[0] + idx.values[1] + idx.values[2] + idx.values[3]) / 4) < 0.11, 'tendencia = media de 4 semanas');
+
+// El índice no salta según qué ejercicios tocaron esa semana: el que no se hizo entra con su último valor
+const wkAgo = n => { const d = new Date(wk); d.setDate(d.getDate() - 7 * n); return d; };
+get('window._progressCache = ' + JSON.stringify([
+  mk('Sube', wkAgo(3), 50, 8), mk('Sube', wkAgo(2), 65, 8),           // +30 %, y luego no se hace
+  mk('Plano', wkAgo(3), 60, 8), mk('Plano', wkAgo(2), 60, 8), mk('Plano', wkAgo(1), 60, 8), mk('Plano', wkAgo(0), 60, 8),
+  mk('Otro', wkAgo(3), 40, 8), mk('Otro', wkAgo(2), 40, 8), mk('Otro', wkAgo(1), 40, 8), mk('Otro', wkAgo(0), 40, 8),
+  mk('Crunch abdominal', wkAgo(3), 1, 12), mk('Crunch abdominal', wkAgo(0), 5, 12),   // core: de 1 a 5 kg no cuenta
+  mk('Suelto', wkAgo(0), 30, 8),                                                       // una sola sesión: no cuenta
+]));
+const idx2 = get("computeStrengthIndexByWeek('David')");
+assert.deepStrictEqual(Array.from(idx2.values), [100, 100, 100, 100], 'mediana de los mismos 3 ejercicios cada semana: ni el +30 % de uno, ni el core, ni dejar de hacer uno lo mueven: ' + idx2.values);
+assert.deepStrictEqual(Array.from(idx2.counts), [3, 3, 3, 3], 'el que no se hizo sigue contando con su último valor');
 
 // ---------- 4) Textos: la gráfica de Métricas ya no se llama "de peso" ----------
 const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');

@@ -253,34 +253,65 @@ function renderVolumeChart(){
 }
 
 // ---- Índice de fuerza (tendencia de fondo, no solo esta semana vs. la pasada) ----
-// Para cada ejercicio, su fuerza estimada (media de series de cada sesión) relativa a su primera sesión
-// desde su fecha base (si no hay, la primera registrada); cada semana es la media de esos porcentajes entre todos los ejercicios.
+// Para cada ejercicio, su fuerza estimada (media de las sesiones de la semana) relativa a su primera sesión desde su
+// fecha base (si no hay, la primera registrada). Antes cada semana promediaba SOLO los ejercicios hechos esa semana, y
+// el índice subía o bajaba según qué días tocaron, no según la fuerza (con un historial real: 131 % una semana de 3 días
+// con los ejercicios que más habían subido, 109 % la siguiente). Ahora:
+//   - mismos ejercicios cada semana: el que no hiciste esa semana entra con su último valor (hasta SI_CARRY_WEEKS);
+//   - mediana entre ejercicios, no media: un ejercicio que empezó casi sin carga (crunch de 1 kg → 245 %) no lo arrastra;
+//   - sin core (cargas mínimas y otra lógica) ni ejercicios con una sola sesión (siempre darían 100 %);
+//   - las semanas en que no entrenaste nada no salen.
+const SI_CARRY_WEEKS = 6;    // un ejercicio que dejaste hace más no sigue contando con su último valor
+const SI_TREND_WEEKS = 4;    // línea de tendencia: media de 4 semanas
+const SI_WEEKS = 12;
+
+function siIsCore(name){
+  if (typeof prescriptionSpec === 'function') {
+    let ex = null;
+    (typeof DAYS !== 'undefined' ? DAYS : []).forEach(d => d.groups.forEach(g => g.exercises.forEach(e => { if (!ex && e.name === name) ex = e; })));
+    try { return prescriptionSpec(ex || { name: name }, '').cat === 'core'; } catch (e) {}
+  }
+  return /plancha|crunch|abdominal|elevaci[oó]n de piernas/i.test(name);
+}
+function siMedian(a){ const b = a.slice().sort((x, y) => x - y), h = b.length >> 1; return b.length % 2 ? b[h] : (b[h - 1] + b[h]) / 2; }
+
 function computeStrengthIndexByWeek(profile){
   const names = [];
   myRows().forEach(r => { const ex = r['Ejercicio']; if (ex && !isWarmupRow(r) && !isTimedExercise(ex) && names.indexOf(ex) < 0) names.push(ex); });
-  if (names.length === 0) return { labels: [], values: [] };
+  const empty = { labels: [], values: [], trend: [], counts: [], weeks: [] };
+  if (names.length === 0) return empty;
 
-  const baseline = {}, byWeekEx = {};
+  const baseline = {}, byEx = {}, trained = {};
   names.forEach(ex => {
+    if (siIsCore(ex)) return;
     const sess = exerciseSeries(ex).sessions;
-    if (!sess.length || !(sess[0].value > 0)) return;
+    if (sess.length < 2 || !(sess[0].value > 0)) return;
     baseline[ex] = sess[0].value;
-    sess.forEach(x => {
-      const wk = isoWeekLabel(x.fecha);
-      if (!byWeekEx[wk]) byWeekEx[wk] = {};
-      if (!byWeekEx[wk][ex]) byWeekEx[wk][ex] = [];
-      byWeekEx[wk][ex].push(x.value);
+    const w = byEx[ex] = {};
+    sess.forEach(x => { const k = localDateStr(mondayOf(parseLocalDate(x.fecha))); (w[k] = w[k] || []).push(x.value); trained[k] = true; });
+  });
+  const weeks = Object.keys(trained).sort();
+  if (!weeks.length) return empty;
+
+  // Recorre todas las semanas desde la primera para arrastrar el último valor de cada ejercicio
+  const last = {};   // ejercicio -> { v, k }
+  const out = [];
+  weeks.forEach(k => {
+    Object.keys(byEx).forEach(ex => { if (byEx[ex][k]) last[ex] = { v: pgMean(byEx[ex][k]), k: k }; });
+    const ratios = [];
+    Object.keys(last).forEach(ex => {
+      const age = Math.round((parseLocalDate(k) - parseLocalDate(last[ex].k)) / (7 * 864e5));
+      if (age <= SI_CARRY_WEEKS) ratios.push(last[ex].v / baseline[ex] * 100);
     });
+    if (ratios.length) out.push({ k: k, v: Math.round(siMedian(ratios) * 10) / 10, n: ratios.length });
   });
-
-  const weekKeys = Object.keys(byWeekEx).sort().slice(-12);
-  const values = weekKeys.map(wk => {
-    const exMap = byWeekEx[wk];
-    const ratios = Object.keys(exMap).map(ex => (pgMean(exMap[ex]) / baseline[ex]) * 100);
-    return Math.round(pgMean(ratios) * 10) / 10;
-  });
-
-  return { labels: weekKeys, values };
+  const values = out.map(x => x.v);
+  const trend = values.map((_, i) => Math.round(pgMean(values.slice(Math.max(0, i - SI_TREND_WEEKS + 1), i + 1)) * 10) / 10);
+  const from = Math.max(0, out.length - SI_WEEKS);
+  return {
+    labels: out.slice(from).map(x => x.k.slice(5)), weeks: out.slice(from).map(x => x.k),
+    values: values.slice(from), trend: trend.slice(from), counts: out.slice(from).map(x => x.n),
+  };
 }
 
 let strengthIndexChartInstance = null;
@@ -294,7 +325,7 @@ function renderStrengthIndexChart(){
   if (!window.Chart) { subEl.textContent = 'No se pudo cargar la librería de gráficos.'; return; }
   if (!profile) return;
 
-  const { labels, values } = computeStrengthIndexByWeek(profile);
+  const { labels, values, trend, counts } = computeStrengthIndexByWeek(profile);
   if (labels.length < 3) {
     subEl.textContent = 'Aún pocos datos: necesitas al menos 3 semanas con registros para ver la tendencia de fondo (llevas ' + labels.length + ').';
     chartShow(ctx, false);
@@ -302,7 +333,8 @@ function renderStrengthIndexChart(){
   }
   chartShow(ctx, true);
   const anyBase = typeof pgBasePrefs === 'function' && Object.keys(pgBasePrefs()).some(k => pgValidDate(pgBasePrefs()[k]));
-  subEl.textContent = '100% = tu primera sesión ' + (anyBase ? 'desde la fecha en que cuenta cada ejercicio' : 'registrada de cada ejercicio') + ' (fuerza estimada: media de tus series de trabajo, sin calentamientos). Por encima de 100%, vas a más de media.';
+  subEl.textContent = '100 % = tu primera sesión ' + (anyBase ? 'desde la fecha en que cuenta cada ejercicio' : 'registrada de cada ejercicio') + '. Cada semana es la mediana de todos tus ejercicios (sin core): el que no hiciste esa semana entra con su último valor, así el índice no sube o baja por qué días tocaron. 110 % = en general, un 10 % más fuerte. Fíjate en la línea ámbar (media de ' + SI_TREND_WEEKS + ' semanas), no en una semana suelta.';
+  const T = chartTheme();
 
   strengthIndexChartInstance = new Chart(ctx, {
     type: 'line',
@@ -311,17 +343,30 @@ function renderStrengthIndexChart(){
       datasets: [{
         label: 'Índice de fuerza',
         data: values,
-        borderColor: chartTheme().blue,
-        backgroundColor: chartTheme().blueFill,
+        borderColor: T.blue,
+        backgroundColor: T.blueFill,
         tension: 0.3,
         fill: true,
         pointRadius: 3,
+      }, {
+        label: 'Tendencia (' + SI_TREND_WEEKS + ' semanas)',
+        data: trend,
+        borderColor: T.amber,
+        backgroundColor: 'transparent',
+        borderDash: [5, 4],
+        tension: 0.3,
+        fill: false,
+        pointRadius: 0,
+        borderWidth: 3,
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: true, labels: { color: T.text, font: { size: 12 }, boxWidth: 12 } },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtNum(c.parsed.y, 1) + ' %' + (c.datasetIndex === 0 && counts[c.dataIndex] ? ' (' + counts[c.dataIndex] + ' ejercicios)' : '') } },
+      },
       scales: {
         x: { ticks: { color: chartTheme().text, font: { size: 11 } }, grid: { color: chartTheme().grid } },
         y: { ticks: { color: chartTheme().text, font: { size: 11 }, callback: v => v + '%' }, grid: { color: chartTheme().grid } }
